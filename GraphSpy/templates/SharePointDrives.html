@@ -1,0 +1,146 @@
+{% extends 'layout.html'%}
+
+{%block content%}
+
+<br>
+<div class="col-md-9">
+    <h1>SharePoint Drives</h1>
+    <form id="sharepoint_form" class="row g-3">
+        <div>
+            <label for="site_id" class="form-label">Site ID *</label>
+            <input type="text" id="site_id" name="site_id" class="form-control" required>
+        </div>
+        <div class="col-3">
+            <label for="access_token_id" class="form-label">Access token id *</label>
+            <input type="text" id="access_token_id" name="access_token_id" class="form-control" required>
+        </div>
+        <div>
+            <button type="Button" class="btn btn-primary" onclick="generateTable()">Browse</button>
+        </div>
+    </form>
+    <script>
+        getActiveAccessToken(document.getElementById("sharepoint_form").access_token_id)
+    </script>
+</div>
+<br>
+
+<div>
+    <h2>Drives Table</h2>
+    <table id="response_table" class="display" style="word-wrap: break-word; word-break: break-all; width:100%">
+        <thead>
+            <tr>
+                <th></th>
+                <th></th>
+                <th>Created</th>
+                <th>Last Modified</th>
+                <th>Drive Name</th>
+                <th>URL</th>
+            </tr>
+        </thead>
+    </table>
+</div>
+<script>
+    // If the URL contains a siteId parameter, it will automatically be filled in and the table will auto generate
+    function setSiteId() {
+        let params = (new URL(document.location)).searchParams;
+        if (!params.has("siteId")) { return }
+        document.getElementById("sharepoint_form").site_id.value = params.get("siteId");
+        if (getCookie("access_token_id")) {
+            generateTable()
+        }
+    };
+    setSiteId()
+    // Populate the response_table table
+    function generateTable() {
+        if ($.fn.dataTable.isDataTable("#response_table")) {
+            // If the DataTable already exists, just reload it
+            $('#response_table').DataTable().ajax.reload(null, false);
+        } else {
+            // Initialize datatable
+            let myTable = new DataTable('#response_table', {
+                ajax: {
+                    type: "POST",
+                    url: '/api/generic_graph',
+                    dataSrc: function (json) {
+                        if (json.hasOwnProperty("error")) {
+                            bootstrapAlert(`[${json.error.code}] ${json.error.message}`, "danger");
+                            return [];
+                        }
+                        return json.value
+                    },
+                    data: function (d) {
+                        d.graph_uri = "https://graph.microsoft.com/v1.0/sites/" + document.getElementById("sharepoint_form").site_id.value + "/drives",
+                            d.access_token_id = document.getElementById("sharepoint_form").access_token_id.value
+                    }
+                },
+                columns: [
+                    {
+                        className: 'dt-control',
+                        orderable: false,
+                        data: null,
+                        defaultContent: '',
+                        'width': '20px'
+                    },
+                    {
+                        className: 'action-control',
+                        orderable: false,
+                        data: null,
+                        render: function (d, t, r) {
+                            // Link icon
+                            return '<i class="fi fi-br-link-alt" style="cursor: pointer"></i>'
+                            // Question mark icon
+                            // return '<i class="fi fi-br-question" style="cursor: pointer"></i>'
+                        },
+                        'width': '20px'
+                    },
+                    {
+                        data: 'createdDateTime',
+                        width: '150px'
+                    },
+                    {
+                        data: 'lastModifiedDateTime',
+                        width: '150px'
+                    },
+                    { data: 'name' },
+                    { data: 'webUrl' }
+                ]
+            })
+
+            myTable.on('click', 'td.dt-control', function (e) {
+                let tr = e.target.closest('tr');
+                let row = myTable.row(tr);
+
+                if (row.child.isShown()) {
+                    // This row is already open - close it
+                    row.child.hide();
+                }
+                else {
+                    // Open this row
+                    row.child(format(row.data())).show();
+                }
+            });
+
+            myTable.on('click', 'td.action-control', function (e) {
+                let tr = e.target.closest('tr');
+                let row = myTable.row(tr);
+                url = "/sharepoint?driveId=" + row.data().id
+                window.open(url, '_blank');
+            });
+        }
+
+        return false;
+    }
+
+    function format(d) {
+        // `d` is the original data object for the row
+        return (
+            '<dl style = "word-wrap: break-word; word-break: break-all; width:100%">' +
+            '<dt>Raw File Info:</dt>' +
+            '<dd><pre>' +
+            JSON.stringify(d, undefined, 4) +
+            '</pre></dd>' +
+            '</dl>'
+        );
+    }
+</script>
+{%endblock content%}

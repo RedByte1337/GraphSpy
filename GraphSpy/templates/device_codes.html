@@ -1,0 +1,151 @@
+{% extends 'layout.html'%}
+
+{%block content%}
+
+<div class="col-sm-5">
+    <h1>Generate Device Code</h1>
+    <form class="row g-3">
+        <div>
+            <label for="resource" class="form-label">Resource *</label>
+            <input list="resource_list" id="resource" class="form-control" required placeholder="https://graph.microsoft.com">
+            <datalist id="resource_list">
+                <option value="https://graph.microsoft.com">MSGraph</option>
+                <option value="https://graph.windows.net/">AAD Graph</option>
+                <option value="https://outlook.office365.com">Outlook</option>
+                <option value="https://api.spaces.skype.com/">MSTeams</option>
+                <option value="https://management.core.windows.net/">AzureCoreManagement</option>
+                <option value="https://outlook.office365.com">AzureManagement</option>
+            </datalist>
+        </div>
+        <div>
+            <label for="client_id" class="form-label">Client ID *</label>
+            <input list="client_id_list" id="client_id" class="form-control" required placeholder="d3590ed6-52b3-4102-aeff-aad2292ab01c">
+            <datalist id="client_id_list">
+                <option value="d3590ed6-52b3-4102-aeff-aad2292ab01c">Microsoft Office</option>
+                <option value="1fec8e78-bce4-4aaf-ab1b-5451cc387264">Microsoft Teams</option>
+                <option value="27922004-5251-4030-b22d-91ecd9a37ea4">Outlook Mobile</option>
+                <option value="b26aadf8-566f-4478-926f-589f601d9c74">OneDrive</option>
+                <option value="d326c1ce-6cc6-4de2-bebc-4591e5e13ef0">SharePoint</option>
+                <option value="00b41c95-dab0-4487-9791-b9d2c32c80f2">Office 365 Management</option>
+                <option value="04b07795-8ddb-461a-bbee-02f9e1bf7b46">Microsoft Azure CLI</option>
+                <option value="1950a258-227b-4e31-a9cf-717495945fc2">Microsoft Azure PowerShell</option>
+            </datalist>
+        </div>
+        <div>
+            <button type="button" class="btn btn-primary" onclick="generateDeviceCode(this.closest('form').resource.value,this.closest('form').client_id.value);">Submit</button>
+        </div>
+    </form>
+</div>
+<br>
+<div>
+    <h1>Device Code List</h1>
+    <button type="button" class="btn btn-primary" onclick="restartDeviceCodePolling()">Restart Polling</button>
+    <table id="device_codes" class="display" style="table-layout:fixed; width:100%">
+        <thead>
+            <tr>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th>ID</th>
+                <th>Generated At</th>
+                <th>Expires At</th>
+                <th>Last Polled At</th>
+                <th>User Code</th>
+                <th>Client ID</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+    </table>
+</div>
+<script type="text/javascript" class="init">
+    // Populate the device_codes table
+    let myTable = new DataTable('#device_codes', {
+        ajax: {
+            url: '/api/list_device_codes', dataSrc: ""
+        },
+        columns: [
+            {
+                className: 'dt-control',
+                orderable: false,
+                data: null,
+                defaultContent: '',
+                'width': '20px'
+            },
+            {
+                className: 'copy-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-rr-copy-alt" style="cursor: pointer"></i>',
+                'width': '20px'
+            },
+            {
+                className: 'delete-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-rr-trash" style="cursor: pointer"></i>',
+                'width': '20px'
+            },
+            { data: 'id', 'width': '30px' },
+            { data: 'generated_at', 'width': '150px' },
+            { data: 'expires_at', 'width': '150px' },
+            { data: 'last_poll', 'width': '150px' },
+            { data: 'user_code', 'width': '125px' },
+            { data: 'client_id', 'width': '310px' },
+            { data: 'status' }
+        ],
+        order: [[3, 'desc']]
+    })
+
+    myTable.on('click', 'td.dt-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+
+        if (row.child.isShown()) {
+            // This row is already open - close it
+            row.child.hide();
+        }
+        else {
+            // Open this row
+            row.child(format(row.data())).show();
+        }
+    });
+
+    myTable.on('click', 'td.copy-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+        copyToClipboard(row.data().user_code);
+    });
+
+    myTable.on('click', 'td.delete-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+        if (!confirm("Are you sure you want to delete device code with ID " + row.data().id + "?")) { return }
+        deleteDeviceCode(row.data().id);
+    });
+
+    function format(d) {
+        return (
+            //'<dl style = "word-wrap: break-word; word-break: break-all; width:100%">' +
+            '<dl>' +
+            '<dt>Device Code:</dt>' +
+            '<dd><code>' +
+            d.device_code +
+            '</code></dd>' +
+            '</dl>'
+        );
+    }
+
+    function deleteDeviceCode(id) {
+        let response = $.ajax({
+            type: "GET",
+            async: false,
+            url: "/api/delete_device_code/" + id
+        });
+        $('#device_codes').DataTable().ajax.reload(null, false);
+    }
+    // Auto refresh the table every 5 seconds
+    setInterval(function () {
+        $('#device_codes').DataTable().ajax.reload(null, false)
+    }, 5000);
+</script>
+{%endblock content%}

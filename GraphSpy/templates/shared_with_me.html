@@ -1,0 +1,137 @@
+{% extends 'layout.html'%}
+
+{%block content%}
+
+<br>
+<div class="col-6">
+    <h1>Files Shared with Me</h1>
+    <form id="shared_file_form" class="row g-3">
+        <div class="col-6">
+            <label for="access_token_id" class="form-label">Access token id *</label>
+            <input type="text" id="access_token_id" name="access_token_id" class="form-control" required>
+        </div>
+        <div>
+            <button type="Button" class="btn btn-primary" onclick="generateTable()">Request</button>
+        </div>
+    </form>
+    <script>
+        getActiveAccessToken(document.getElementById("shared_file_form").access_token_id)
+    </script>
+</div>
+<br>
+<div>
+    <h2>Files</h2>
+    <table id="response_table" class="display" style="word-wrap: break-word; word-break: break-all; width:100%">
+        <thead>
+            <tr>
+                <th></th>
+                <th></th>
+                <th>Created</th>
+                <th>Last Modified</th>
+                <th>File Name</th>
+                <th>File Size</th>
+                <th>URL</th>
+            </tr>
+        </thead>
+    </table>
+</div>
+<script>
+    generateTable();
+    // Populate the response_table table
+    function generateTable() {
+        let myTable = new DataTable('#response_table', {
+            "destroy": true,
+            ajax: {
+                type: "POST",
+                url: '/api/generic_graph',
+                dataSrc: function (json) {
+                    if (json.hasOwnProperty("error")) {
+                        bootstrapAlert(`[${json.error.code}] ${json.error.message}`, "danger");
+                        return [];
+                    }
+                    return json.value
+                },
+                data: { "graph_uri": "https://graph.microsoft.com/v1.0/me/drive/sharedWithMe", "access_token_id": document.getElementById("shared_file_form").access_token_id.value }
+            },
+            columns: [
+                {
+                    className: 'dt-control',
+                    orderable: false,
+                    data: null,
+                    defaultContent: '',
+                    'width': '20px'
+                },
+                {
+                    className: 'action-control',
+                    orderable: false,
+                    data: null,
+                    render: function (d, t, r) {
+                        if (r.folder) {
+                            // Folder icon
+                            return '<i class="fi fi-sr-folder-open" style="cursor: pointer"></i>'
+                        } else if (r.file) {
+                            // Download icon
+                            return '<i class="fi fi-br-download" style="cursor: pointer"></i>'
+                        }
+                        // Question mark icon
+                        return '<i class="fi fi-br-question" style="cursor: pointer"></i>'
+                    },
+                    'width': '20px'
+                },
+                {
+                    data: 'createdDateTime',
+                    width: '150px'
+                },
+                {
+                    data: 'lastModifiedDateTime',
+                    width: '150px'
+                },
+                { data: 'name' },
+                {
+                    data: 'size',
+                    width: '100px'
+                },
+                { data: 'webUrl' }
+            ],
+            order: [[2, 'desc']]
+        })
+
+        myTable.on('click', 'td.dt-control', function (e) {
+            let tr = e.target.closest('tr');
+            let row = myTable.row(tr);
+
+            if (row.child.isShown()) {
+                // This row is already open - close it
+                row.child.hide();
+            }
+            else {
+                // Open this row
+                row.child(format(row.data())).show();
+            }
+
+        });
+
+        myTable.on('click', 'td.action-control', function (e) {
+            let tr = e.target.closest('tr');
+            let row = myTable.row(tr);
+            drive_id = row.data().remoteItem.parentReference.driveId
+            item_id = row.data().id
+            access_token_id = document.getElementById("shared_file_form").access_token_id.value
+            graphDownload(drive_id, item_id, access_token_id);
+        });
+        return false;
+    }
+
+    function format(d) {
+        // `d` is the original data object for the row
+        return (
+            '<dl style = "word-wrap: break-word; word-break: break-all; width:100%">' +
+            '<dt>Raw File Info:</dt>' +
+            '<dd><pre>' +
+            JSON.stringify(d, undefined, 4) +
+            '</pre></dd>' +
+            '</dl>'
+        );
+    }
+</script>
+{%endblock content%}

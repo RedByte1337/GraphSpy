@@ -1,0 +1,150 @@
+{% extends 'layout.html'%}
+
+{%block content%}
+
+<br>
+<div class="col-md-6">
+    <h1>SharePoint Sites</h1>
+    <form id="sharepoint_form" class="row g-3">
+        <div class="col-sm-4">
+            <label for="search_query" class="form-label">Site Filter *</label>
+            <input type="text" id="search_query" name="search_query" class="form-control" value="*" required>
+        </div>
+        <div class="col-sm-4">
+            <label for="search_limit" class="form-label">Limit *</label>
+            <input type="text" id="search_limit" name="search_limit" class="form-control" value="100" required>
+            <i class="form-text">Max 1000</i>
+        </div>
+        <div class="col-sm-4">
+            <label for="access_token_id" class="form-label">Access token id *</label>
+            <input type="text" id="access_token_id" name="access_token_id" class="form-control" required>
+        </div>
+        <div>
+            <button type="Button" class="btn btn-primary" onclick="generateTable()">Browse</button>
+        </div>
+    </form>
+    <script>
+        getActiveAccessToken(document.getElementById("sharepoint_form").access_token_id)
+    </script>
+</div>
+<br>
+
+<div>
+    <h2>Sites Table</h2>
+    <table id="response_table" class="display" style="word-wrap: break-word; word-break: break-all; width:100%">
+        <thead>
+            <tr>
+                <th></th>
+                <th></th>
+                <th>Created</th>
+                <th>Last Modified</th>
+                <th>Site Name</th>
+                <th>Display Name</th>
+                <th>URL</th>
+            </tr>
+        </thead>
+    </table>
+</div>
+<script>
+    // Populate the response_table table
+    function generateTable() {
+        if ($.fn.dataTable.isDataTable("#response_table")) {
+            // If the DataTable already exists, just reload it
+            $('#response_table').DataTable().ajax.reload(null, false);
+        } else {
+            // Initialize datatable
+            let myTable = new DataTable('#response_table', {
+                ajax: {
+                    type: "POST",
+                    url: '/api/generic_graph_post',
+                    dataSrc: function (json) {
+                        if (json.hasOwnProperty("error")) {
+                            bootstrapAlert(`[${json.error.code}] ${json.error.message}`, "danger");
+                            return [];
+                        }
+                        return json.value[0].hitsContainers[0].hits
+                    },
+                    data: function (d) {
+                        d.graph_uri = "https://graph.microsoft.com/v1.0/search/query";
+                        d.access_token_id = document.getElementById("sharepoint_form").access_token_id.value;
+                        d.body = '{"requests": [{"entityTypes": ["site"], "query": {"queryString": "' + document.getElementById("sharepoint_form").search_query.value + '"}, "from": 0, "size": ' + document.getElementById("sharepoint_form").search_limit.value + '}]}';
+                    }
+                },
+                columns: [
+                    {
+                        className: 'dt-control',
+                        orderable: false,
+                        data: null,
+                        defaultContent: '',
+                        'width': '20px'
+                    },
+                    {
+                        className: 'action-control',
+                        orderable: false,
+                        data: null,
+                        render: function (d, t, r) {
+                            if (r.resource["@odata.type"] == "#microsoft.graph.site") {
+                                // Link icon
+                                return '<i class="fi fi-br-link-alt" style="cursor: pointer"></i>'
+                            }
+                            // Question mark icon
+                            return '<i class="fi fi-br-question" style="cursor: pointer"></i>'
+                        },
+                        'width': '20px'
+                    },
+                    {
+                        data: 'resource.createdDateTime',
+                        width: '150px'
+                    },
+                    {
+                        data: 'resource.lastModifiedDateTime',
+                        width: '150px'
+                    },
+                    { data: 'resource.name' },
+                    { data: 'resource.displayName' },
+                    { data: 'resource.webUrl' }
+                ]
+            })
+
+            myTable.on('click', 'td.dt-control', function (e) {
+                let tr = e.target.closest('tr');
+                let row = myTable.row(tr);
+
+                if (row.child.isShown()) {
+                    // This row is already open - close it
+                    row.child.hide();
+                }
+                else {
+                    // Open this row
+                    row.child(format(row.data())).show();
+                }
+            });
+
+            myTable.on('click', 'td.action-control', function (e) {
+                let tr = e.target.closest('tr');
+                let row = myTable.row(tr);
+                if (row.data().resource["@odata.type"] == "#microsoft.graph.site") {
+                    // This is a site
+                    url = "/sharepoint_drives?siteId=" + row.data().resource.id
+                    window.open(url, '_blank');
+                } else {
+                    alert("No action defined for this type of entity.")
+                }
+            });
+        }
+        return false;
+    }
+
+    function format(d) {
+        // `d` is the original data object for the row
+        return (
+            '<dl style = "word-wrap: break-word; word-break: break-all; width:100%">' +
+            '<dt>Raw File Info:</dt>' +
+            '<dd><pre>' +
+            JSON.stringify(d, undefined, 4) +
+            '</pre></dd>' +
+            '</dl>'
+        );
+    }
+</script>
+{%endblock content%}

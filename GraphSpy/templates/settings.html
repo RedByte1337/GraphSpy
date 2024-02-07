@@ -1,0 +1,163 @@
+{% extends 'layout.html'%}
+
+{%block content%}
+
+<div class="row g-5">
+    <div class="col-6">
+        <h1>Settings</h1>
+        <div class="row g-4">
+            <div class="dropdown col-12">
+                <button class="btn btn-primary dropdown-toggle" id="bd-theme" type="button" aria-expanded="false" data-bs-toggle="dropdown" data-bs-display="static" aria-label="Toggle theme (dark)">
+                    Select theme
+                </button>
+                <ul class="dropdown-menu" aria-labelledby="bd-theme-text">
+                    <li>
+                        <button type="button" class="dropdown-item" data-bs-theme-value="light" aria-pressed="false">
+                            <i class="fi fi-rr-sun"></i> Light Mode
+                        </button>
+                    </li>
+                    <li>
+                        <button type="button" class="dropdown-item active" data-bs-theme-value="dark" aria-pressed="true">
+                            <i class="fi fi-rr-moon-stars"></i> Dark Mode
+                        </button>
+                    </li>
+                    <li>
+                        <button type="button" class="dropdown-item" data-bs-theme-value="auto" aria-pressed="false">
+                            <i class="fi fi-rr-magic-wand"></i> Auto
+                        </button>
+                    </li>
+                </ul>
+            </div>
+            <div class="dropdown col-12">
+                <button class="btn btn-primary dropdown-toggle" id="dt-error-message-dropdown" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    DataTable Error Messages
+                </button>
+                <ul class="dropdown-menu">
+                    <li><button class="dropdown-item" id="dt-error-message-button-enabled" type="button" onclick="setTableErorMessages('enabled')">Enabled</button></li>
+                    <li><button class="dropdown-item" id="dt-error-message-button-disabled" type="button" onclick="setTableErorMessages('disabled')">Disabled</button></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-auto ms-auto">
+        <div class="card mt-3">
+            <div class="card-header" style="text-align: center"><b>Persistent Settings</b></div>
+            <div class="card-body">
+                <pre id="settings_json" class="mb-0"></pre>
+                <script>
+                    function obtainPersistentSettings() {
+                        response = $.ajax({
+                            type: "GET",
+                            async: false,
+                            url: "/api/get_settings"
+                        });
+                        let responseJSON = JSON.parse(response.responseText);
+                        $("#settings_json").text(JSON.stringify(responseJSON, undefined, 4));
+                    }
+                    obtainPersistentSettings();
+                </script>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-9">
+        <h1>Databases</h1>
+        <div class="col-md-6">
+            <div class="input-group">
+                <span class="input-group-text">Database Folder</span>
+                <input class="form-control" id="db_folder" type="text" value="{{ config['graph_spy_db_folder'] }}" readonly>
+            </div>
+        </div>
+        <table id="databases" class="display" style="table-layout:fixed; width:100%">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th></th>
+                    <th></th>
+                    <th>Last Modified</th>
+                    <th>Size</th>
+                    <th>State</th>
+                    <th>Database</th>
+                </tr>
+            </thead>
+        </table>
+    </div>
+    <div class="col-lg-3">
+        <h1>New Database</h1>
+        <form class="row g-3">
+            <div>
+                <label for="database" class="form-label">Database Name *</label>
+                <input type="text" id="database" name="database" class="form-control" required placeholder="database.db">
+            </div>
+            <div>
+                <button type="button" class="btn btn-primary" onclick="createDatabase(this.closest('form').database.value);$('#databases').DataTable().ajax.reload(null, false);">Create Database</button>
+            </div>
+        </form>
+    </div>
+</div>
+<script type="text/javascript" class="init">
+    // Populate the databases table
+    let myTable = new DataTable('#databases', {
+        ajax: {
+            url: '/api/list_databases', dataSrc: ""
+        },
+        columns: [
+            {
+                className: 'active-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-br-check" style="cursor: pointer"></i>',
+                'width': '20px'
+            },
+            {
+                className: 'duplicate-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-rr-duplicate" style="cursor: pointer"></i>',
+                'width': '20px'
+            },
+            {
+                className: 'delete-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-rr-trash" style="cursor: pointer"></i>',
+                'width': '20px'
+            },
+            { data: 'last_modified', 'width': '150px' },
+            { data: 'size', 'width': '75px' },
+            { data: 'state', 'width': '75px' },
+            { data: 'name' }
+        ],
+        order: [[5, 'asc'], [3, 'desc']]
+    })
+
+    myTable.on('click', 'td.active-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+        activateDatabase(row.data().name);
+        $('#databases').DataTable().ajax.reload(null, false);
+    });
+
+    myTable.on('click', 'td.duplicate-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+        duplicateDatabase(row.data().name);
+        $('#databases').DataTable().ajax.reload(null, false);
+    });
+
+    myTable.on('click', 'td.delete-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+        if (!confirm("Are you sure you want to delete database '" + row.data().name + "'?")) { return }
+        deleteDatabase(row.data().name);
+        $('#databases').DataTable().ajax.reload(null, false);
+    });
+
+    // Activate the correct option in the dt-error-message-dropdown on page load
+    var table_error_messages = "{{ config['table_error_messages'] }}";
+    if (table_error_messages == "disabled") {
+        $('#dt-error-message-button-disabled').addClass("active")
+    } else {
+        $('#dt-error-message-button-enabled').addClass("active")
+    }
+</script>
+    {%endblock content%}

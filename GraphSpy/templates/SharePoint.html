@@ -1,0 +1,204 @@
+{% extends 'layout.html'%}
+
+{%block content%}
+
+<br>
+<div class="col-md-9">
+    <h1>SharePoint Files</h1>
+    <form id="sharepoint_form" class="row g-3">
+        <div class="col-md-9">
+            <label for="drive_id" class="form-label">Drive ID *</label>
+            <input type="text" id="drive_id" name="drive_id" class="form-control" required>
+        </div>
+        <div class="col-md-3">
+            <label for="access_token_id" class="form-label">Access token id *</label>
+            <input type="text" id="access_token_id" name="access_token_id" class="form-control" required>
+        </div>
+        <div>
+            <label for="path" class="form-label">Path *</label>
+            <input type="text" id="path" name="path" value="/" class="form-control" required>
+        </div>
+        <div>
+            <button type="Button" class="btn btn-primary" onclick="generateTable()">Browse</button>
+        </div>
+    </form>
+    <br>
+    <button class="btn btn-primary" onclick="openParentFolder()">Parent Folder</button>
+    <script>
+        getActiveAccessToken(document.getElementById("sharepoint_form").access_token_id)
+    </script>
+</div>
+<br>
+
+<div>
+    <h2>Files Table</h2>
+    <table id="response_table" class="display" style="word-wrap: break-word; word-break: break-all; width:100%">
+        <thead>
+            <tr>
+                <th></th>
+                <th></th>
+                <th>Created</th>
+                <th>Last Modified</th>
+                <th>File Name</th>
+                <th>File Size</th>
+                <th>URL</th>
+            </tr>
+        </thead>
+    </table>
+</div>
+<script>
+    // If the URL contains a driveId parameter, it will automatically be filled in and the table will auto generate
+    function setDriveId() {
+        let params = (new URL(document.location)).searchParams;
+        if (!params.has("driveId")) { return }
+        document.getElementById("sharepoint_form").drive_id.value = params.get("driveId");
+        if (getCookie("access_token_id")) {
+            generateTable()
+        }
+    };
+    setDriveId()
+    // Populate the response_table table
+    function generateTable() {
+        // Remove potential trailing slashes in path
+        var temp_path = document.getElementById("sharepoint_form").path.value
+        if (temp_path.slice(-1) == '/' && temp_path != "/") {
+            document.getElementById("sharepoint_form").path.value = temp_path.slice(0, -1)
+        }
+        if ($.fn.dataTable.isDataTable("#response_table")) {
+            // If the DataTable already exists, just reload it
+            $('#response_table').DataTable().ajax.reload(null, false);
+        } else {
+            // Initialize datatable
+            let myTable = new DataTable('#response_table', {
+                ajax: {
+                    type: "POST",
+                    url: '/api/generic_graph',
+                    dataSrc: function (json) {
+                        if (json.hasOwnProperty("error")) {
+                            bootstrapAlert(`[${json.error.code}] ${json.error.message}`, "danger");
+                            return [];
+                        }
+                        return json.value
+                    },
+                    data: function (d) {
+                        d.graph_uri = "https://graph.microsoft.com/v1.0/drives/" + document.getElementById("sharepoint_form").drive_id.value + "/root:/" + document.getElementById("sharepoint_form").path.value + ":/children",
+                            d.access_token_id = document.getElementById("sharepoint_form").access_token_id.value
+                    }
+                },
+                columns: [
+                    {
+                        className: 'dt-control',
+                        orderable: false,
+                        data: null,
+                        defaultContent: '',
+                        'width': '20px'
+                    },
+                    {
+                        className: 'action-control',
+                        orderable: false,
+                        data: null,
+                        render: function (d, t, r) {
+                            if (r.folder) {
+                                // Folder icon
+                                return '<i class="fi fi-sr-folder-open" style="cursor: pointer"></i>'
+                            } else if (r.file) {
+                                // Download icon
+                                return '<i class="fi fi-br-download" style="cursor: pointer"></i>'
+                            }
+                            // Question mark icon
+                            return '<i class="fi fi-br-question" style="cursor: pointer"></i>'
+                        },
+                        'width': '20px'
+                    },
+                    {
+                        data: 'createdDateTime',
+                        width: '150px'
+                    },
+                    {
+                        data: 'lastModifiedDateTime',
+                        width: '150px'
+                    },
+                    { data: 'name' },
+                    {
+                        data: 'size',
+                        width: '100px'
+                    },
+                    { data: 'webUrl' }
+                ]
+            })
+
+
+            myTable.on('click', 'td.dt-control', function (e) {
+                let tr = e.target.closest('tr');
+                let row = myTable.row(tr);
+
+                if (row.child.isShown()) {
+                    // This row is already open - close it
+                    row.child.hide();
+                }
+                else {
+                    // Open this row
+                    row.child(format(row.data())).show();
+                }
+
+            });
+
+            myTable.on('click', 'td.action-control', function (e) {
+                let tr = e.target.closest('tr');
+                let row = myTable.row(tr);
+                //debugger;
+                if (row.data().folder) {
+                    // This is a folder
+                    folder_name = row.data().name
+                    openFolder(folder_name);
+                } else if (row.data().file) {
+                    // This is a file
+                    drive_id = row.data().parentReference.driveId
+                    item_id = row.data().id
+                    access_token_id = document.getElementById("sharepoint_form").access_token_id.value
+                    graphDownload(drive_id, item_id, access_token_id);
+                } else {
+                    alert("No action defined for this type of entity.")
+                }
+            });
+        }
+
+        return false;
+    }
+
+    function format(d) {
+        // `d` is the original data object for the row
+        return (
+            '<dl style = "word-wrap: break-word; word-break: break-all; width:100%">' +
+            '<dt>Raw File Info:</dt>' +
+            '<dd><pre>' +
+            JSON.stringify(d, undefined, 4) +
+            '</pre></dd>' +
+            '</dl>'
+        );
+    }
+
+    function openFolder(folder_name) {
+        // Make sure the last character of the path is a '/' before appending the folder name
+        if (document.getElementById("sharepoint_form").path.value.slice(-1) != '/') {
+            document.getElementById("sharepoint_form").path.value += "/"
+        }
+        document.getElementById("sharepoint_form").path.value += folder_name
+        $('#response_table').DataTable().ajax.reload(null, false);
+    }
+
+    function openParentFolder() {
+        // Make sure the last character of the path is a '/' before appending the folder name
+        var temp_path = document.getElementById("sharepoint_form").path.value
+        if (temp_path.slice(-1) == '/') {
+            temp_path = temp_path.slice(0, -1)
+        }
+        temp_path = temp_path.split('/').slice(0, -1).join("/")
+        if (temp_path == '') {
+            temp_path = "/"
+        }
+        document.getElementById("sharepoint_form").path.value = temp_path
+        $('#response_table').DataTable().ajax.reload(null, false);
+    }
+</script>
+{%endblock content%}

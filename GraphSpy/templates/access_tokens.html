@@ -1,0 +1,219 @@
+{% extends 'layout.html'%}
+
+{%block content%}
+
+<br>
+<div class="row g-3">
+    <div class="col-xl-6">
+        <div>
+            <h1>Add Access Token</h1>
+            <form action="/api/add_access_token" method="post" class="row g-3">
+                <div class="col-11">
+                    <label for="accesstoken" class="form-label"><b>Access token *</b></label>
+                    <textarea type="text" id="accesstoken" name="accesstoken" class="form-control" rows=5 required placeholder="eyJ..."></textarea>
+                </div>
+                <div class="col-11">
+                    <label for="description" class="form-label">Description</label>
+                    <input type="text" id="description" name="description" class="form-control" placeholder="My First Token">
+                </div>
+                <div>
+                    <button type="submit" class="btn btn-primary">Submit</button>
+                </div>
+            </form>
+        </div>
+        <br>
+        <div>
+            <h1>Active Access Token</h1>
+            <form id="access_token_form" class="row row-cols-auto">
+                <div>
+                    <label for="access_token_id" class="col-form-label">Active Access Token</label>
+                </div>
+                <div>
+                    <input type="text" id="access_token_id" class="form-control" size="5" required>
+                </div>
+                <div>
+                    <button type="Button" class="btn btn-primary" onclick="setActiveAccessToken(access_token_id.value)">Set active token</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="col-11">
+            <h1>Refresh To Access Token</h1>
+            <form id="refresh_to_access_token_form" class="row g-3">
+                <div class="col-12">
+                    <label for="resource" class="form-label">Resource</label>
+                    <input list="resource_list" id="resource_input" class="form-control" placeholder="https://graph.microsoft.com">
+                    <datalist id="resource_list">
+                        <option value="defined_in_token">Defined in Refresh Token</option>
+                        <option value="https://graph.microsoft.com">MSGraph</option>
+                        <option value="https://graph.windows.net/">AAD Graph</option>
+                        <option value="https://outlook.office365.com">Outlook</option>
+                        <option value="https://api.spaces.skype.com/">MSTeams</option>
+                        <option value="https://management.core.windows.net/">AzureCoreManagement</option>
+                        <option value="https://management.azure.com">AzureManagement</option>
+                    </datalist>
+                </div>
+                <div class="col-12">
+                    <label for="client_id" class="form-label">Client ID</label>
+                    <input list="client_id_list" id="client_id_input" class="form-control" placeholder="d3590ed6-52b3-4102-aeff-aad2292ab01c">
+                    <datalist id="client_id_list">
+                        <option value="d3590ed6-52b3-4102-aeff-aad2292ab01c">Microsoft Office</option>
+                        <option value="1fec8e78-bce4-4aaf-ab1b-5451cc387264">Microsoft Teams</option>
+                        <option value="27922004-5251-4030-b22d-91ecd9a37ea4">Outlook Mobile</option>
+                        <option value="b26aadf8-566f-4478-926f-589f601d9c74">OneDrive</option>
+                        <option value="d326c1ce-6cc6-4de2-bebc-4591e5e13ef0">SharePoint</option>
+                        <option value="00b41c95-dab0-4487-9791-b9d2c32c80f2">Office 365 Management</option>
+                        <option value="04b07795-8ddb-461a-bbee-02f9e1bf7b46">Microsoft Azure CLI</option>
+                        <option value="1950a258-227b-4e31-a9cf-717495945fc2">Microsoft Azure PowerShell</option>
+                    </datalist>
+                </div>
+                <div class="col-6">
+                    <div class="col-12 pt-3">
+                        <input type="checkbox" id="activate_access_token" class="form-check-input" checked value="1">
+                        <label for="activate_access_token" class="form-check-label">Activate access token</label>
+                    </div>
+                    <div class="col-12">
+                        <input type="checkbox" id="store_refresh_token" class="form-check-input" value="1">
+                        <label for="store_refresh_token" class="form-check-label">Store refresh token</label>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <label for="refresh_token_id" class="form-label"><b>Refresh Token id *</b></label>
+                    <input type="text" id="refresh_token_id" name="refresh_token_id" class="form-control" required>
+                </div>
+                <div class="col-12">
+                    <button type="Button" class="btn btn-primary" onclick="refreshToAccessToken(refresh_token_id.value, resource_input.value, client_id_input.value, store_refresh_token.checked, activate_access_token.checked);reloadTables()">Submit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+    getActiveAccessToken(document.getElementById("access_token_form").access_token_id);
+    getActiveRefreshToken(document.getElementById("refresh_to_access_token_form").refresh_token_id);
+</script>
+<div>
+    <br>
+    <h1>Access Tokens</h1>
+    <table id="access_tokens" class="display" style="table-layout:fixed; width:100%">
+        <thead>
+            <tr>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th>ID</th>
+                <th>Issued</th>
+                <th>Expires</th>
+                <th>User</th>
+                <th>Resource</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+    </table>
+</div>
+<script type="text/javascript" class="init">
+    // Populate the access_tokens table
+    let myTable = new DataTable('#access_tokens', {
+        ajax: {
+            url: '/api/list_access_tokens', dataSrc: ""
+        },
+        columns: [
+            {
+                className: 'dt-control',
+                orderable: false,
+                data: null,
+                defaultContent: '',
+                'width': '20px'
+            },
+            {
+                className: 'active-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-br-check" style="cursor: pointer"></i>',
+                'width': '20px'
+            },
+            {
+                className: 'copy-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-rr-copy-alt" style="cursor: pointer"></i>',
+                'width': '20px'
+            },
+            {
+                className: 'delete-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-rr-trash" style="cursor: pointer"></i>',
+                'width': '20px'
+            },
+            { data: 'id', 'width': '30px' },
+            { data: 'issued_at', 'width': '150px' },
+            { data: 'expires_at', 'width': '150px' },
+            { data: 'user', 'width': '350px' },
+            { data: 'resource', 'width': '350px' },
+            { data: 'description' }
+        ],
+        order: [[4, 'desc']]
+    })
+
+    myTable.on('click', 'td.dt-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+
+        if (row.child.isShown()) {
+            // This row is already open - close it
+            row.child.hide();
+        }
+        else {
+            // Open this row
+            row.child(format(row.data())).show();
+        }
+    });
+
+    myTable.on('click', 'td.active-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+        setActiveAccessToken(row.data().id);
+    });
+
+    myTable.on('click', 'td.copy-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+        copyToClipboard(row.data().accesstoken);
+    });
+
+
+    myTable.on('click', 'td.delete-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+        if (!confirm("Are you sure you want to delete access token with ID " + row.data().id + "?")) { return }
+        deleteAccessToken(row.data().id);
+        $('#access_tokens').DataTable().ajax.reload(null, false);
+    });
+
+    function format(d) {
+        // `d` is the original data object for the row
+        let response = $.ajax({
+            type: "GET",
+            async: false,
+            url: "/api/decode_token/" + d.id
+        });
+        return (
+            //'<dl style = "word-wrap: break-word; word-break: break-all; width:100%">' +
+            '<dl>' +
+            '<dt>Raw Token:</dt>' +
+            '<dd><code>' +
+            d.accesstoken +
+            '</code></dd>' +
+            '<dt>Decoded Token:</dt>' +
+            '<dd><pre>' +
+            JSON.stringify(JSON.parse(response.responseText), undefined, 4) +
+            '</pre></dd>' +
+            '</dl>'
+        );
+    }
+</script>
+
+{%endblock content%}

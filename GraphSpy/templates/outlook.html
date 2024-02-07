@@ -1,0 +1,40 @@
+{% extends 'layout.html'%}
+
+{%block content%}
+
+<br>
+<div class="col-md-6">
+    <h1>Outlook</h1>
+    <form id="access_token_form" class="row g-3">
+        <div class="col-md-6">
+            <div class="input-group">
+                <input type="text" id="access_token_id" name="access_token_id" class="form-control" required>
+                <button type="Button" class="btn btn-outline-primary" onclick="fillAccessToken(this.closest('form'))">Set access token</button>
+            </div>
+        </div>
+    </form>
+    <br>
+    <form id="outlook_form" action="https://outlook.office365.com/owa/" method="POST" target="_blank" class="row g-3">
+        <div>
+            <label for="id_token" class="form-label">Access Token *</label>
+            <textarea type="text" id="id_token" name="id_token" class="form-control" rows=5 required placeholder="eyJ..."></textarea>
+        </div>
+        <div>
+            <input type="hidden" id="code" name="code" value="anything">
+            <button type="submit" class="btn btn-primary" id="submit">Open outlook</button>
+        </div>
+    </form>
+    <script>
+        function fillAccessToken(form) {
+            let response = $.ajax({
+                type: "GET",
+                async: false,
+                url: "/api/get_access_token/" + form.access_token_id.value
+            });
+            document.getElementById("outlook_form").id_token.value = JSON.parse(response.responseText).accesstoken
+        };
+        getActiveAccessToken(document.getElementById("access_token_form").access_token_id)
+        fillAccessToken(document.getElementById("access_token_form"))
+    </script>
+</div>
+{%endblock content%}

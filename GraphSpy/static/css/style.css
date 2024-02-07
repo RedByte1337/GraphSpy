@@ -1,0 +1,8 @@
+/* Change color of every other table row to the secondary background color */
+table.dataTable.display tbody tr.odd {
+    background-color: var(--bs-secondary-bg);
+}
+/* Required to overwrite the background color of select drop downs in datatables for visibility*/
+.form-select {
+    background-color: var(--bs-body-bg) !important;
+}

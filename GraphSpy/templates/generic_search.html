@@ -1,0 +1,171 @@
+{% extends 'layout.html'%}
+
+{%block content%}
+
+<br>
+<div class="col-sm-9">
+    <h1>Generic MSGraph Search</h1>
+    <form id="search_form" class="row g-3">
+        <div class="col-sm-4">
+            <label for="search_type" class="form-label">Search type *</label>
+            <input list="search_type" name="search_type" class="form-control" placeholder="driveItem" required>
+            <datalist name="search_type" id="search_type">
+                <option value="drive">Document libraries</option>
+                <option value="driveItem">Files, folders, pages, and news</option>
+                <option value="message">Email message</option>
+                <option value="chatMessage">Teams messages</option>
+                <option value="event">Calendar events</option>
+                <option value="site">Sharepoint Sites</option>
+                <option value="list">Lists</option>
+                <option value="listItem">List Items</option>
+            </datalist>
+        </div>
+        <div class="col-sm-4">
+            <label for="search_limit" class="form-label">Limit *</label>
+            <input type="text" id="search_limit" name="search_limit" class="form-control" value="25" required>
+            <i class="form-text">Max 1000</i>
+        </div>
+        <div class="col-sm-4">
+            <label for="access_token_id" class="form-label">Access token id *</label>
+            <input type="text" id="access_token_id" name="access_token_id" class="form-control" required>
+        </div>
+        <div>
+            <label for="search_query" class="form-label">Search Query *</label>
+            <input type="text" id="search_query" name="search_query" class="form-control" value="*" required>
+        </div>
+        <div>
+            <button type="Button" class="btn btn-primary" onclick="generateTable()">Request</button>
+        </div>
+    </form>
+    <script>
+        getActiveAccessToken(document.getElementById("search_form").access_token_id)
+    </script>
+</div>
+<br>
+
+<div>
+    <h2>Response</h2>
+    <table id="response_table" class="display" style="word-wrap: break-word; word-break: break-all; width:100%">
+        <thead>
+            <tr>
+                <th></th>
+                <th></th>
+                <th>Created User</th>
+                <th>Name</th>
+                <th>Summary</th>
+                <th>URL</th>
+            </tr>
+        </thead>
+    </table>
+</div>
+<script>
+    //generateTable();
+    // Populate the response_table table
+    function generateTable() {
+        if ($.fn.dataTable.isDataTable("#response_table")) {
+            // If the DataTable already exists, just reload it
+            $('#response_table').DataTable().ajax.reload(null, false);
+        } else {
+            let myTable = new DataTable('#response_table', {
+                ajax: {
+                    type: "POST",
+                    url: '/api/generic_graph_post',
+                    dataSrc: function (json) {
+                        if (json.hasOwnProperty("error")){
+                            bootstrapAlert(`[${json.error.code}] ${json.error.message}`, "danger");
+                            return [];
+                        }
+                        return json.value[0].hitsContainers[0].hits
+                    },
+                    data: function (d) {
+                        d.graph_uri = "https://graph.microsoft.com/v1.0/search/query",
+                            d.access_token_id = document.getElementById("search_form").access_token_id.value,
+                            d.body = '{"requests": [{"entityTypes": ["' + document.getElementById("search_form").search_type.value + '"], "query": {"queryString": "' + document.getElementById("search_form").search_query.value + '"}, "from": 0, "size": ' + document.getElementById("search_form").search_limit.value + '}]}'
+                    }
+                },
+                colReorder: true,
+                columns: [
+                    {
+                        className: 'dt-control',
+                        orderable: false,
+                        data: null,
+                        defaultContent: '',
+                        'width': '20px'
+                    },
+                    {
+                        className: 'action-control',
+                        orderable: false,
+                        data: null,
+                        render: function (d, t, r) {
+                            if (r.resource.hasOwnProperty("parentReference") && r.resource.parentReference.driveId) {
+                                // Download icon
+                                return '<i class="fi fi-br-download" style="cursor: pointer"></i>'
+                            } else if (r.resource["@odata.type"] == "#microsoft.graph.drive") {
+                                // Link icon
+                                return '<i class="fi fi-br-link-alt" style="cursor: pointer"></i>'
+                            }
+                            // Question mark icon
+                            return '<i class="fi fi-br-question" style="cursor: pointer"></i>'
+                        },
+                        'width': '20px'
+                    },
+                    { data: 'resource.createdBy.user.displayName' },
+                    { data: 'resource.name' },
+                    {
+                        data: 'summary',
+                        render: function (d, t, r) {
+                            return d.replaceAll("<c0>", "<b>").replaceAll("</c0>", "</b>")
+                        }
+                    },
+                    { data: 'resource.webUrl' }
+                ]
+            })
+
+            myTable.on('click', 'td.dt-control', function (e) {
+                let tr = e.target.closest('tr');
+                let row = myTable.row(tr);
+
+                if (row.child.isShown()) {
+                    // This row is already open - close it
+                    row.child.hide();
+                }
+                else {
+                    // Open this row
+                    row.child(format(row.data())).show();
+                }
+            });
+
+            myTable.on('click', 'td.action-control', function (e) {
+                let tr = e.target.closest('tr');
+                let row = myTable.row(tr);
+                if (row.data().resource["@odata.type"] == "#microsoft.graph.driveItem") {
+                    // This is a file
+                    drive_id = row.data().resource.parentReference.driveId
+                    item_id = row.data().resource.id
+                    access_token_id = document.getElementById("search_form").access_token_id.value
+                    graphDownload(drive_id, item_id, access_token_id);
+                } else if (row.data().resource["@odata.type"] == "#microsoft.graph.drive") {
+                    // This is a drive
+                    url = "/sharepoint?driveId=" + row.data().resource.id
+                    window.open(url, '_blank');
+                } else {
+                    alert("No action defined for this type of entity.")
+                }
+            });
+        }
+        return false;
+    }
+
+    function format(d) {
+        // `d` is the original data object for the row
+        return (
+            '<dl style = "word-wrap: break-word; word-break: break-all; width:100%">' +
+            '<dt>Raw File Info:</dt>' +
+            '<dd><pre>' +
+            JSON.stringify(d, undefined, 4) +
+            '</pre></dd>' +
+            '</dl>'
+        );
+    }
+</script>
+{%endblock content%}

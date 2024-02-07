@@ -1,0 +1,177 @@
+{% extends 'layout.html'%}
+
+{%block content%}
+
+<br>
+<div class="col-md-6">
+    <h1>Add Refresh Token</h1>
+    <form action="/api/add_refresh_token" method="post" class="row g-3">
+        <div>
+            <label for="refreshtoken" class="form-label"><b>Refresh token *</b></label><br>
+            <textarea type="text" id="refreshtoken" name="refreshtoken" class="form-control" rows=5 required placeholder="0..."></textarea>
+        </div>
+        <div class="col-md-6">
+            <label for="user" class="form-label">User</label>
+            <input type="text" id="user" name="user" class="form-control" placeholder="john.doe@example.com">
+        </div>
+        <div class="col-md-6">
+            <label for="tenant_domain" class="form-label"><b>Tenant Domain/ID *</b></label>
+            <input type="text" id="tenant_domain" name="tenant_domain" class="form-control" required placeholder="example.com">
+        </div>
+        <div class="col-md-6">
+            <label for="resource" class="form-label"><b>Resource *</b></label>
+            <input list="resource" name="resource" class="form-control" required placeholder="https://graph.microsoft.com">
+            <datalist name="resource" id="resource">
+                <option value="https://graph.microsoft.com">MSGraph</option>
+                <option value="https://graph.windows.net/">AAD Graph</option>
+                <option value="https://outlook.office365.com">Outlook</option>
+                <option value="https://api.spaces.skype.com/">MSTeams</option>
+                <option value="https://management.core.windows.net/">AzureCoreManagement</option>
+                <option value="https://management.azure.com">AzureManagement</option>
+            </datalist>
+        </div>
+        <div class="col-md-6">
+            <label for="description" class="form-label">Description</label>
+            <input type="text" id="description" name="description" class="form-control" placeholder="My First Token">
+        </div>
+        <div class="col-12">
+            <input type="checkbox" id="foci" name="foci" value="1" class="form-check-input">
+            <label for="foci" class="form-check-label">Family of Client ID (FOCI)?</label>
+        </div>
+        <div class="col-12">
+            <button type="submit" class="btn btn-primary">Submit</button>
+        </div>
+    </form>
+</div>
+<br>
+<div class="col-md-6">
+    <h1>Active Refresh Token</h1>
+    <form id="refresh_token_form" class="row row-cols-auto">
+        <div>
+            <label for="refresh_token_id" class="col-form-label">Active Refresh Token</label>
+        </div>
+        <div>
+            <input type="text" id="refresh_token_id" size="5" name="refresh_token_id" class="form-control">
+        </div>
+        <div>
+            <button type="Button" class="btn btn-primary" onclick="setActiveRefreshToken(refresh_token_id.value)">Set active token</button>
+        </div>
+    </form>
+</div>
+<script>
+    getActiveRefreshToken(document.getElementById("refresh_token_form").refresh_token_id);
+</script>
+<br>
+<div>
+    <h1>Refresh Tokens</h1>
+    <table id="refresh_tokens" class="display" style="table-layout:fixed; width:100%">
+        <thead>
+            <tr>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th>ID</th>
+                <th>Stored At</th>
+                <th>User</th>
+                <th>Tenant ID</th>
+                <th>Resource</th>
+                <th>Foci</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+    </table>
+</div>
+<script type="text/javascript" class="init">
+    // Populate the refresh_tokens table
+    let myTable = new DataTable('#refresh_tokens', {
+        ajax: {
+            url: '/api/list_refresh_tokens', dataSrc: ""
+        },
+        columns: [
+            {
+                className: 'dt-control',
+                orderable: false,
+                data: null,
+                defaultContent: '',
+                'width': '20px'
+            },
+            {
+                className: 'active-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-br-check" style="cursor: pointer"></i>',
+                'width': '20px'
+            },
+            {
+                className: 'copy-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-rr-copy-alt" style="cursor: pointer"></i>',
+                'width': '20px'
+            },
+            {
+                className: 'delete-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-rr-trash" style="cursor: pointer"></i>',
+                'width': '20px'
+            },
+            { data: 'id', 'width': '30px' },
+            { data: 'stored_at', 'width': '150px' },
+            { data: 'user', 'width': '300px' },
+            { data: 'tenant_id', 'width': '300px' },
+            { data: 'resource', 'width': '300px' },
+            { data: 'foci', 'width': '30px' },
+            { data: 'description' }
+        ],
+        order: [[4, 'desc']]
+    })
+
+    myTable.on('click', 'td.dt-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+
+        if (row.child.isShown()) {
+            // This row is already open - close it
+            row.child.hide();
+        }
+        else {
+            // Open this row
+            row.child(format(row.data())).show();
+        }
+    });
+
+    myTable.on('click', 'td.active-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+        setActiveRefreshToken(row.data().id);
+    });
+
+    myTable.on('click', 'td.copy-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+        copyToClipboard(row.data().refreshtoken);
+    });
+
+    myTable.on('click', 'td.delete-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+        if (!confirm("Are you sure you want to delete refresh token with ID " + row.data().id + "?")) { return }
+        deleteRefreshToken(row.data().id);
+        $('#refresh_tokens').DataTable().ajax.reload(null, false);
+    });
+
+    function format(d) {
+        return (
+            //'<dl style = "word-wrap: break-word; word-break: break-all; width:100%">' +
+            '<dl>' +
+            '<dt>Raw Token:</dt>' +
+            '<dd><code>' +
+            d.refreshtoken +
+            '</code></dd>' +
+            '</dl>'
+        );
+    }
+</script>
+{%endblock content%}

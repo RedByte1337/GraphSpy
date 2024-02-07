@@ -1,0 +1,83 @@
+{% extends 'layout.html'%}
+
+{%block content%}
+
+<br>
+<div class="col-md-11">
+    <h1>Generic Graph Request</h1>
+    <form id="graph_generic_form" class="row g-3">
+        <div class="col-3">
+            <label for="method" class="form-label">Method *</label>
+            <input list="method" name="method" value="GET" class="form-control" required>
+            <datalist name="method" id="method">
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+            </datalist>
+        </div>
+        <div class="col-3">
+            <label for="access_token_id" class="form-label">Access token id *</label>
+            <input type="text" id="access_token_id" name="access_token_id" class="form-control" required>
+        </div>
+        <div>
+            <label for="graph_uri" class="form-label">Graph Uri *</label>
+            <input type="text" id="graph_uri" name="graph_uri" value="https://graph.microsoft.com/v1.0/" class="form-control" required>
+        </div>
+        <div>
+            <label for="body" class="form-label">Body</label>
+            <textarea type="text" id="body" name="body" value="" rows=5 class="form-control">{"requests": [{"entityTypes": ["drive"], "query": {"queryString": "*"}, "from": 0, "size": 10}]}</textarea>
+        </div>
+        <div>
+            <button type="Button" class="btn btn-primary" onclick="generateRequest()">Request</button>
+        </div>
+    </form>
+    <script>
+        getActiveAccessToken(document.getElementById("graph_generic_form").access_token_id)
+    </script>
+</div>
+<br>
+<div class="row" id="response-card" style="display: none">
+    <div class="col-auto">
+        <div class="card mt-3">
+            <div class="card-header" style="text-align: center">
+                <b>Response</b>
+                <i class="fi fi-rr-copy-alt" id="copy-icon" style="cursor: pointer; float: right"></i>
+            </div>
+            <div class="card-body">
+                <pre id="response_json" class="mb-0"></pre>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    function generateRequest() {
+        let graph_form = document.getElementById("graph_generic_form");
+        let response;
+        if (graph_form.method.value == "GET") {
+            response = $.ajax({
+                type: "POST",
+                async: false,
+                url: "/api/generic_graph",
+                dataSrc: "",
+                data: { "graph_uri": graph_form.graph_uri.value, "access_token_id": graph_form.access_token_id.value },
+            });
+        } else if (graph_form.method.value == "POST") {
+            response = $.ajax({
+                type: "POST",
+                async: false,
+                url: "/api/generic_graph_post",
+                dataSrc: "",
+                data: { "graph_uri": graph_form.graph_uri.value, "access_token_id": graph_form.access_token_id.value, "body": graph_form.body.value },
+            });
+        } else {
+            alert("Invalid method.");
+            return false;
+        }
+        let responseJSON = JSON.parse(response.responseText);
+        $("#response_json").text(JSON.stringify(responseJSON, undefined, 4))
+        $("#response-card").show()
+    }
+    $("#response-card").on('click', 'i#copy-icon', function (e) {
+        copyToClipboard($("#response_json").text())
+    })
+</script>
+    {%endblock content%}
