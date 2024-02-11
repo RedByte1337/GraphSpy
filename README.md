@@ -13,25 +13,54 @@
 
 # Table of Contents
 
-- [GraphSpy](#certipy)
+- [GraphSpy](#graphspy)
 - [Table of Contents](#table-of-contents)
 - [Quick Start](#quick-start)
+	- [Installation](#installation)
+	- [Execution](#execution)
 - [Features](#features)
 - [Upcoming Features](#upcoming-features)
 - [Credits](#credits)
 
 # Quick Start
 
-Simply running GraphSpy without any command line arguments will launch GraphSpy and make it available at `http://127.0.0.1:5000` by default.
+## Installation
+
+The following goes over the recommended installation process using pipx to avoid any dependency conflicts.
+
+For other installation options and detailed instructions, check the [Installation page](https://github.com/RedByte1337/GraphSpy/wiki/Installation) on the wiki.
+
+```bash
+# Install pipx (skip this if you already have it)
+python3 -m pip install pipx
+python3 -m pipx ensurepath
+
+# Install the latest version of GraphSpy from pypi
+python3 -m pipx install graphspy
+```
+
+## Execution
+
+After installation, the application can be launched using the `graphspy` command from any location on the system.
+
+Running GraphSpy without any command line arguments will launch GraphSpy and make it available at `http://127.0.0.1:5000` by default.
+
+```bash
+graphspy
+```
+
+Now simply open `http://127.0.0.1:5000` in your favorate browser to get started!
 
 Use the `-i` and `-p` arguments to modify the interface and port to listen on.
 
 ```bash
 # Run GraphSpy on http://192.168.0.10
-python .\GraphSpy.py -i 192.168.0.10 -p 80
+graphspy -i 192.168.0.10 -p 80
 # Run GraphSpy on port 8080 on all interfaces
-python .\GraphSpy.py -i 0.0.0.0 -p 8080
+graphspy -i 0.0.0.0 -p 8080
 ```
+
+For detailed instructions and other command line arguments, please refer to the [Execution page](https://github.com/RedByte1337/GraphSpy/wiki/Execution) on the wiki.
 
 # Features
 
