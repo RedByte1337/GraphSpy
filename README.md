@@ -49,7 +49,7 @@ Running GraphSpy without any command line arguments will launch GraphSpy and mak
 graphspy
 ```
 
-Now simply open `http://127.0.0.1:5000` in your favorate browser to get started!
+Now simply open `http://127.0.0.1:5000` in your favorite browser to get started!
 
 Use the `-i` and `-p` arguments to modify the interface and port to listen on.
 
