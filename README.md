@@ -28,15 +28,17 @@
 
 The following goes over the recommended installation process using pipx to avoid any dependency conflicts.
 
+GraphSpy is built to work on every operating system, although it was mainly tested on Linux and Windows. 
+
 For other installation options and detailed instructions, check the [Installation page](https://github.com/RedByte1337/GraphSpy/wiki/Installation) on the wiki.
 
 ```bash
 # Install pipx (skip this if you already have it)
-python3 -m pip install pipx
-python3 -m pipx ensurepath
+apt install pipx
+pipx ensurepath
 
 # Install the latest version of GraphSpy from pypi
-python3 -m pipx install graphspy
+pipx install graphspy
 ```
 
 ## Execution
