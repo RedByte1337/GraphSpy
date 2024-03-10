@@ -420,9 +420,10 @@ def init_routes():
     
     @app.post('/api/add_access_token')
     def api_add_access_token():
-        accesstoken = request.form['accesstoken']
-        description = request.form['description']
-        save_access_token(accesstoken, description)
+        accesstoken = request.form['accesstoken'] if "accesstoken" in request.form and request.form['accesstoken'] else ""
+        description = request.form['description'] if "description" in request.form else ""
+        if accesstoken:
+            save_access_token(accesstoken, description)
         return redirect('/access_tokens')
 
     @app.route("/api/get_access_token/<id>")
