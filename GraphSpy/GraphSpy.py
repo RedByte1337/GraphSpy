@@ -342,8 +342,8 @@ def init_routes():
 
     @app.post('/api/generate_device_code')
     def api_generate_device_code():
-        resource = request.form['resource'] if "resource" in request.form else "https://graph.microsoft.com"
-        client_id = request.form['client_id'] if "client_id" in request.form else "d3590ed6-52b3-4102-aeff-aad2292ab01c"
+        resource = request.form['resource'] if "resource" in request.form and request.form['resource'] else "https://graph.microsoft.com"
+        client_id = request.form['client_id'] if "client_id" in request.form and request.form['client_id'] else "d3590ed6-52b3-4102-aeff-aad2292ab01c"
         if resource and client_id:
             user_code = device_code_flow(resource, client_id)
         else:
