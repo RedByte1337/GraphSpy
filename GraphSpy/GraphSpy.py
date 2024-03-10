@@ -92,10 +92,17 @@ def save_access_token(accesstoken, description):
     user = "unknown"
     # If the idtype is user, use the unique_name or upn
     # If the idtype is app, use the app_displayname or appid
+    # Otherwise, use whatever we can get
     if "idtyp" in decoded_accesstoken and decoded_accesstoken["idtyp"] == "user":
         user = decoded_accesstoken["unique_name"] if "unique_name" in decoded_accesstoken else decoded_accesstoken["upn"] if "upn" in decoded_accesstoken else "unknown"
     elif "idtyp" in decoded_accesstoken and decoded_accesstoken["idtyp"] == "app":
         user = decoded_accesstoken["app_displayname"] if "app_displayname" in decoded_accesstoken else decoded_accesstoken["appid"] if "appid" in decoded_accesstoken else "unknown"
+    else:
+        user = decoded_accesstoken["unique_name"] if "unique_name" in decoded_accesstoken \
+            else decoded_accesstoken["upn"] if "upn" in decoded_accesstoken \
+            else decoded_accesstoken["app_displayname"] if "app_displayname" in decoded_accesstoken \
+            else decoded_accesstoken["oid"] if "oid" in decoded_accesstoken \
+            else "unknown"
     
     execute_db("INSERT INTO accesstokens (stored_at, issued_at, expires_at, description, user, resource, accesstoken) VALUES (?,?,?,?,?,?,?)",(
             f"{datetime.now()}".split(".")[0],
