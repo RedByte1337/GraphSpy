@@ -89,14 +89,21 @@ def graph_request_post(graph_uri, access_token_id, body):
     
 def save_access_token(accesstoken, description):
     decoded_accesstoken = jwt.decode(accesstoken, options={"verify_signature": False})
+    user = "unknown"
+    # If the idtype is user, use the unique_name or upn
+    # If the idtype is app, use the app_displayname or appid
+    if "idtyp" in decoded_accesstoken and decoded_accesstoken["idtyp"] == "user":
+        user = decoded_accesstoken["unique_name"] if "unique_name" in decoded_accesstoken else decoded_accesstoken["upn"] if "upn" in decoded_accesstoken else "unknown"
+    elif "idtyp" in decoded_accesstoken and decoded_accesstoken["idtyp"] == "app":
+        user = decoded_accesstoken["app_displayname"] if "app_displayname" in decoded_accesstoken else decoded_accesstoken["appid"] if "appid" in decoded_accesstoken else "unknown"
     
     execute_db("INSERT INTO accesstokens (stored_at, issued_at, expires_at, description, user, resource, accesstoken) VALUES (?,?,?,?,?,?,?)",(
             f"{datetime.now()}".split(".")[0],
-            datetime.fromtimestamp(decoded_accesstoken["iat"]),
-            datetime.fromtimestamp(decoded_accesstoken["exp"]),
+            datetime.fromtimestamp(decoded_accesstoken["iat"]) if "iat" in decoded_accesstoken else "unknown",
+            datetime.fromtimestamp(decoded_accesstoken["exp"]) if "exp" in decoded_accesstoken else "unknown",
             description,
-            decoded_accesstoken["unique_name"],
-            decoded_accesstoken["aud"],
+            user,
+            decoded_accesstoken["aud"] if "aud" in decoded_accesstoken else "unknown",
             accesstoken
             )
     )
@@ -147,13 +154,20 @@ def refresh_to_access_token(refresh_token_id, resource = "defined_in_token", cli
     access_token_id = query_db("SELECT id FROM accesstokens where accesstoken = ?",[access_token],one=True)[0]
     if store_refresh_token:
         decoded_accesstoken = jwt.decode(access_token, options={"verify_signature": False})
+        user = "unknown"
+        # If the idtype is user, use the unique_name or upn
+        # If the idtype is app, use the app_displayname or appid
+        if "idtyp" in decoded_accesstoken and decoded_accesstoken["idtyp"] == "user":
+            user = decoded_accesstoken["unique_name"] if "unique_name" in decoded_accesstoken else decoded_accesstoken["upn"] if "upn" in decoded_accesstoken else "unknown"
+        elif "idtyp" in decoded_accesstoken and decoded_accesstoken["idtyp"] == "app":
+            user = decoded_accesstoken["app_displayname"] if "app_displayname" in decoded_accesstoken else decoded_accesstoken["appid"] if "appid" in decoded_accesstoken else "unknown"
         save_refresh_token(
             response.json()["refresh_token"],
             f"Created using refresh token {refresh_token_id}",
-            decoded_accesstoken["unique_name"],
+            user,
             tenant_id,
-            response.json()["resource"],
-            response.json()["foci"]
+            response.json()["resource"]  if "resource" in response.json() else "unknown",
+            response.json()["foci"] if "foci" in response.json() else 0
         )
     return access_token_id
 
@@ -209,11 +223,18 @@ def poll_device_codes():
                     user_code = row["user_code"]
                     save_access_token(access_token, f"Created using device code auth ({user_code})")
                     decoded_accesstoken = jwt.decode(access_token, options={"verify_signature": False})
+                    user = "unknown"
+                    # If the idtype is user, use the unique_name or upn
+                    # If the idtype is app, use the app_displayname or appid
+                    if "idtyp" in decoded_accesstoken and decoded_accesstoken["idtyp"] == "user":
+                        user = decoded_accesstoken["unique_name"] if "unique_name" in decoded_accesstoken else decoded_accesstoken["upn"] if "upn" in decoded_accesstoken else "unknown"
+                    elif "idtyp" in decoded_accesstoken and decoded_accesstoken["idtyp"] == "app":
+                        user = decoded_accesstoken["app_displayname"] if "app_displayname" in decoded_accesstoken else decoded_accesstoken["appid"] if "appid" in decoded_accesstoken else "unknown"
                     save_refresh_token(
                         response.json()["refresh_token"], 
                         f"Created using device code auth ({user_code})", 
-                        decoded_accesstoken["unique_name"], 
-                        decoded_accesstoken["tid"], 
+                        user, 
+                        decoded_accesstoken["tid"] if "tid" in decoded_accesstoken else "unknown", 
                         response.json()["resource"], 
                         int(response.json()["foci"]))
                     execute_db("UPDATE devicecodes SET status = ? WHERE device_code = ?",("SUCCESS",row["device_code"]))
