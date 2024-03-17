@@ -529,7 +529,6 @@ def init_routes():
         if not request.is_json:
             return f"[Error] Expecting JSON input.", 400
         request_json = request.get_json()
-        print(request_json)
         uri = request_json['uri'] if 'uri' in request_json else ''
         access_token_id = request_json['access_token_id'] if 'access_token_id' in request_json else 0
         method = request_json['method'] if 'method' in request_json else 'GET'
@@ -566,7 +565,6 @@ def init_routes():
         if not request.is_json:
             return f"[Error] Expecting JSON input.", 400
         request_json = request.get_json()
-        print(request_json)
         template_name = request_json['template_name'] if 'template_name' in request_json else ''
         uri = request_json['uri'] if 'uri' in request_json else ''
         method = request_json['method'] if 'method' in request_json else 'GET'
@@ -620,7 +618,6 @@ def init_routes():
     @app.route("/api/list_request_templates")
     def api_list_request_templates():
         request_templates = query_db_json("SELECT * FROM request_templates")
-        print(request_templates)
         for i in range(len(request_templates)):
             request_templates[i]['headers'] = json.loads( request_templates[i]['headers'])
             request_templates[i]['variables'] = json.loads(request_templates[i]['variables'])
