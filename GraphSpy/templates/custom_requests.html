@@ -101,7 +101,10 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h1 class="modal-title fs-5" id="request_template_modal_label">Request Templates</h1>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <div style="float: right">
+                    <i class="fi fi-br-expand px-3" id="expand-icon" style="cursor: pointer; float: left; opacity: 0.5"></i>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
             </div>
             <div class="modal-body">
                 <div id="dTable" class="box-body table-responsive" style="padding:20px;">
@@ -370,6 +373,11 @@
 
     $("#response-card").on('click', 'i#copy-icon', function (e) {
         copyToClipboard($("#response_body").text());
+    })
+
+    $("#request_template_modal").on('click', 'i#expand-icon', function (e) {
+        $("#request_template_modal").find('.modal-dialog').toggleClass('modal-xl').toggleClass('modal-fullscreen')
+        $("i#expand-icon").toggleClass('fi-br-expand').toggleClass('fi-br-compress')
     })
 
 </script>
