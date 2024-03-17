@@ -278,11 +278,15 @@
             return;
         }
         let responseJSON = JSON.parse(response.responseText);
-        if (responseJSON.response_type == "json") {
-            $("#response_body").text(JSON.stringify(responseJSON.response_text, undefined, 4));
-        } else if (responseJSON.response_type == "xml") {
-            $("#response_body").text(prettifyXml(responseJSON.response_text));
-        } else {
+        try {
+            if (responseJSON.response_type == "json") {
+                $("#response_body").text(JSON.stringify(JSON.parse(responseJSON.response_text), undefined, 4));
+            } else if (responseJSON.response_type == "xml") {
+                $("#response_body").text(prettifyXml(responseJSON.response_text));
+            } else {
+                $("#response_body").text(responseJSON.response_text);
+            }
+        }catch (e) {
             $("#response_body").text(responseJSON.response_text);
         }
         $("#response_status_code").text(responseJSON.response_status_code);
