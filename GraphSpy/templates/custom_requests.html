@@ -1,0 +1,372 @@
+{% extends 'layout.html'%}
+
+{%block content%}
+
+<br>
+<div class="col-md-11">
+    <h1>Custom Requests</h1>
+    <form id="custom_request_form" class="row g-3">
+        <div class="col-2">
+            <label for="method" class="form-label">Method *</label>
+            <input list="methods" id="method" placeholder="GET" class="form-control" required>
+            <datalist id="methods">
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+                <option value="PUT">PUT</option>
+                <option value="PATCH">PATCH</option>
+                <option value="HEAD">HEAD</option>
+                <option value="DELETE">DELETE</option>
+                <option value="OPTIONS">OPTIONS</option>
+            </datalist>
+        </div>
+        <div class="col-2">
+            <label for="request_type" class="form-label">Body type</label>
+            <select id="request_type" class="form-select" aria-label="Request body">
+                <option value="text">Text</option>
+                <option value="urlencoded">URL Encoded</option>
+                <option value="json">JSON</option>
+                <option value="xml">XML</option>
+            </select>
+        </div>
+        <div class="col-2">
+            <label for="access_token_id" class="form-label">Access token id *</label>
+            <input type="text" id="access_token_id" name="access_token_id" class="form-control" required>
+        </div>
+        <div class="col-3"></div>
+        <div class="col-3">
+            <label for="request_template_name" class="form-label">Request Template</label>
+            <div class="input-group">
+                <input type="text" id="request_template_name" placeholder="Template Name" class="form-control">
+                <button class="btn btn-outline-primary" type="button" onclick="saveRequestTemplate()">Save</button>
+                <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#request_template_modal" onclick="$('#request_templates').DataTable().ajax.reload(null, false)">Load...</button>
+            </div>
+        </div>
+        <div>
+            <label for="request_uri" class="form-label">Request Uri *</label>
+            <input type="text" id="request_uri" placeholder="https://graph.microsoft.com/v1.0/me" class="form-control" required>
+        </div>
+        <div>
+            <button class="btn btn-outline-success" type="button" onclick="addHeaderRow()">Add Header</button>
+            <button class="btn btn-outline-success" type="button" onclick="addVariableRow()">Add Variable</button>
+        </div>
+        <div class="col-6" id="header_fields">
+            <div class="input-group">
+                <span class="input-group-text">Header</span>
+                <input type="text" placeholder="X-Header" class="form-control header_name">
+                <input type="text" placeholder="Custom" class="form-control header_value">
+                <button class="btn btn-outline-danger" type="button" onclick="return this.parentNode.remove()">Delete</button>
+            </div>
+        </div>
+        <div class="col-6" id="variable_fields">
+            <div class="input-group">
+                <span class="input-group-text">Variable</span>
+                <input type="text" placeholder="$$example_id$$" class="form-control variable_name">
+                <input type="text" placeholder="01234567-89ab-cdef-0123-456789abcdef" class="form-control variable_value">
+                <button class="btn btn-outline-danger" type="button" onclick="return this.parentNode.remove()">Delete</button>
+            </div>
+        </div>
+        <div>
+            <button class="btn btn-outline-primary" type="button" onclick="formatBodyJSON()">Format JSON</button>
+            <button class="btn btn-outline-primary" type="button" onclick="formatBodyXML()">Format XML</button>
+        </div>
+        <div class="form-floating">
+            <textarea type="text" id="body" class="form-control" placeholder="Body" style="height: 10em"></textarea>
+            <label for="body">Body</label>
+        </div>
+        <div>
+            <button type="Button" class="btn btn-primary" onclick="sendGenerateRequest()">Request</button>
+        </div>
+    </form>
+    <script>
+        getActiveAccessToken(document.getElementById("custom_request_form").access_token_id)
+    </script>
+</div>
+<br>
+<div class="row" id="response-card" style="display: none">
+    <div class="col-auto">
+        <div class="card mt-3">
+            <div class="card-header" style="text-align: center">
+                <b>Response [<span id="response_status_code"></span>]</b>
+                <i class="fi fi-rr-copy-alt" id="copy-icon" style="cursor: pointer; float: right"></i>
+            </div>
+            <div class="card-body">
+                <pre id="response_body" class="mb-0"></pre>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Modal -->
+<div class="modal fade" id="request_template_modal" tabindex="-1" aria-labelledby="request_template_modal_label" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="request_template_modal_label">Request Templates</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="dTable" class="box-body table-responsive" style="padding:20px;">
+                    <table id="request_templates" class="display" style="width:100%">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th></th>
+                                <th></th>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Body type</th>
+                                <th>Method</th>
+                                <th>URI</th>
+                            </tr>
+                        </thead>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script type="text/javascript" class="init">
+    // Populate the request_templates table
+    let myTable = new DataTable('#request_templates', {
+        ajax: {
+            url: '/api/list_request_templates', dataSrc: ""
+        },
+        columns: [
+            {
+                className: 'dt-control',
+                orderable: false,
+                data: null,
+                defaultContent: '',
+                'width': '20px'
+            },
+            {
+                className: 'active-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-br-check" style="cursor: pointer"></i>',
+                'width': '20px'
+            },
+            {
+                className: 'delete-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-rr-trash" style="cursor: pointer"></i>',
+                'width': '20px'
+            },
+            { data: 'id', 'width': '30px' },
+            { data: 'template_name', 'width': '150px' },
+            { data: 'request_type', 'width': '150px' },
+            { data: 'method', 'width': '100px' },
+            { data: 'uri'}
+        ],
+        order: [[3, 'desc']]
+    })
+
+    myTable.on('click', 'td.dt-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+
+        if (row.child.isShown()) {
+            // This row is already open - close it
+            row.child.hide();
+        }
+        else {
+            // Open this row
+            row.child(format(row.data())).show();
+        }
+    });
+
+    myTable.on('click', 'td.active-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+        request_template_info = row.data();
+        $("#request_uri").val(request_template_info.uri);
+        $("#method").val(request_template_info.method);
+        $("#request_type").val(request_template_info.request_type);
+        $("#body").val(request_template_info.body);
+        $("#request_template_name").val(request_template_info.template_name);
+        $('#header_fields').empty();
+        $('#variable_fields').empty();
+        for (var header_name in request_template_info.headers) {
+            if (request_template_info.headers.hasOwnProperty(header_name)) {
+                addHeaderRow(header_name, request_template_info.headers[header_name]);
+            }
+        }
+        for (var variable_name in request_template_info.variables) {
+            if (request_template_info.variables.hasOwnProperty(variable_name)) {
+                addVariableRow(variable_name, request_template_info.variables[variable_name]);
+            }
+        }
+        $('#request_template_modal').modal('hide');
+    });
+
+    myTable.on('click', 'td.delete-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+        if (!confirm("Are you sure you want to delete request template '" + row.data().template_name + "'?")) { return }
+        deleteRequestTemplate(row.data().id);
+    });
+
+    function format(d) {
+        var descList = $(
+            '<dl>' +
+            '<dt>Request Template:</dt>' +
+            '</dl>');
+        var descDetails = $('<dd></dd>');
+        var preText = $('<pre></pre>');
+        preText.text(JSON.stringify(d, undefined, 4));
+        descDetails.append(preText);
+        descList.append(descDetails);
+        return descList
+    }
+
+    function deleteRequestTemplate(id) {
+        let response = $.ajax({
+            type: "POST",
+            async: false,
+            url: "/api/delete_request_template",
+            data: {"template_id": id}
+        });
+        $('#request_templates').DataTable().ajax.reload(null, false);
+        bootstrapToast("Delete Request Template", response.responseText)
+    }
+</script>
+<script>
+    function getHeaders() {
+        let headers = {};
+        for (const header of $("#header_fields").children()) {
+            if (header.getElementsByClassName("header_name")[0].value != "") {
+                headers[header.getElementsByClassName("header_name")[0].value] = header.getElementsByClassName("header_value")[0].value;
+            };
+        };
+        return headers;
+    }
+    function getVariables() {
+        let variables = {};
+        for (const variable of $("#variable_fields").children()) {
+            if (variable.getElementsByClassName("variable_name")[0].value != "") {
+                variables[variable.getElementsByClassName("variable_name")[0].value] = variable.getElementsByClassName("variable_value")[0].value;
+            };
+        };
+        return variables;
+    }
+
+    function sendGenerateRequest() {
+        let request_form = document.getElementById("custom_request_form");
+        let response;
+        response = $.ajax({
+            type: "POST",
+            async: false,
+            url: "/api/custom_api_request",
+            dataType: "json",
+            contentType: "application/json; charset=utf-8",
+            data: JSON.stringify({
+                "uri": request_form.request_uri.value,
+                "access_token_id": request_form.access_token_id.value,
+                "method": request_form.method.value,
+                "request_type": request_form.request_type.value,
+                "body": request_form.body.value,
+                "headers": getHeaders(),
+                "variables": getVariables()
+            }),
+            success: null
+        });
+        if (response.status >= 400) {
+            bootstrapAlert(response.responseText, "danger");
+            return;
+        }
+        let responseJSON = JSON.parse(response.responseText);
+        if (responseJSON.response_type == "json") {
+            $("#response_body").text(JSON.stringify(responseJSON.response_text, undefined, 4));
+        } else if (responseJSON.response_type == "xml") {
+            $("#response_body").text(prettifyXml(responseJSON.response_text));
+        } else {
+            $("#response_body").text(responseJSON.response_text);
+        }
+        $("#response_status_code").text(responseJSON.response_status_code);
+        $("#response-card").show();
+    }
+
+    function saveRequestTemplate() {
+        let request_form = document.getElementById("custom_request_form");
+        let response;
+        // request_template_name
+        response = $.ajax({
+            type: "POST",
+            async: false,
+            url: "/api/save_request_template",
+            dataType: "json",
+            contentType: "application/json; charset=utf-8",
+            data: JSON.stringify({
+                "template_name": $("#request_template_name").val(),
+                "uri": request_form.request_uri.value,
+                "method": request_form.method.value,
+                "request_type": request_form.request_type.value,
+                "body": request_form.body.value,
+                "headers": getHeaders(),
+                "variables": getVariables()
+            }),
+            success: null
+        });
+        if (response.status >= 400) {
+            bootstrapAlert(response.responseText, "danger");
+            return;
+        }
+        bootstrapToast("Save Request Template", response.responseText)
+    }
+
+    function formatBodyJSON() {
+        try {
+            $("#body").val(JSON.stringify(JSON.parse($("#body").val()), undefined, 4));
+        } catch (e) {
+            bootstrapToast("Format JSON", "[Error] Request body is not valid JSON.")
+        }
+    }
+
+    function formatBodyXML() {
+        try {
+            $("#body").val(prettifyXml($("#body").val()), undefined, 4);
+        } catch (e) {
+            bootstrapToast("Format XML", "[Error] Request body is not valid XML.")
+        }
+    }
+
+    function addHeaderRow(headerName = "", headerValue = "") {
+        var headerWrapper = $('<div class="input-group">' +
+            '<span class="input-group-text">Header</span>' +
+            '</div>');
+        var headerNameInput = $('<input type="text" placeholder="X-Header" class="form-control header_name">');
+        headerNameInput.val(headerName);
+        var headerValueInput = $('<input type="text" placeholder="Custom" class="form-control header_value">');
+        headerValueInput.val(headerValue);
+        var headerButton = $('<button class="btn btn-outline-danger" type="button" onclick="return this.parentNode.remove()">Delete</button>');
+
+        headerWrapper.append(headerNameInput);
+        headerWrapper.append(headerValueInput);
+        headerWrapper.append(headerButton);
+        $("#header_fields").append(headerWrapper);
+    }
+    function addVariableRow(variableName = "", variableValue = "") {
+        var variableWrapper = $('<div class="input-group">' +
+            '<span class="input-group-text">Variable</span>' +
+            '</div>');
+        var variableNameInput = $('<input type="text" placeholder="$$example_id$$" class="form-control variable_name">');
+        variableNameInput.val(variableName);
+        var variableNameValue = $('<input type="text" placeholder="01234567-89ab-cdef-0123-456789abcdef" class="form-control variable_value">');
+        variableNameValue.val(variableValue);
+        var variableButton = $('<button class="btn btn-outline-danger" type="button" onclick="return this.parentNode.remove()">Delete</button>');
+
+        variableWrapper.append(variableNameInput);
+        variableWrapper.append(variableNameValue);
+        variableWrapper.append(variableButton);
+        $("#variable_fields").append(variableWrapper);
+    }
+
+    $("#response-card").on('click', 'i#copy-icon', function (e) {
+        copyToClipboard($("#response_body").text());
+    })
+
+</script>
+    {%endblock content%}

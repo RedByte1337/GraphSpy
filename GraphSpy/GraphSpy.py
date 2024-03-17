@@ -6,7 +6,7 @@ import jwt
 import sqlite3
 from datetime import datetime, timezone
 import time
-import os,sys,shutil
+import os,sys,shutil,traceback
 from threading import Thread
 import json
 import uuid
@@ -21,10 +21,11 @@ def init_db():
     con.execute('CREATE TABLE accesstokens (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at TEXT, issued_at TEXT, expires_at TEXT, description TEXT, user TEXT, resource TEXT, accesstoken TEXT)')
     con.execute('CREATE TABLE refreshtokens (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at TEXT, description TEXT, user TEXT, tenant_id TEXT, resource TEXT, foci INTEGER, refreshtoken TEXT)')
     con.execute('CREATE TABLE devicecodes (id INTEGER PRIMARY KEY AUTOINCREMENT, generated_at INTEGER, expires_at INTEGER, user_code TEXT, device_code TEXT, interval INTEGER, client_id TEXT, status TEXT, last_poll INTEGER)')
+    con.execute('CREATE TABLE request_templates (id INTEGER PRIMARY KEY AUTOINCREMENT, template_name TEXT, uri TEXT, method TEXT, request_type TEXT, body TEXT, headers TEXT, variables TEXT)')
     con.execute('CREATE TABLE settings (setting TEXT UNIQUE, value TEXT)')
     # Valid Settings: active_access_token_id, active_refresh_token_id, schema_version
     cur = con.cursor()
-    cur.execute("INSERT INTO settings (setting, value) VALUES ('schema_version', '1')")
+    cur.execute("INSERT INTO settings (setting, value) VALUES ('schema_version', '2')")
     con.commit()
     con.close()
 
@@ -71,6 +72,15 @@ def list_databases():
         } for db_file in db_folder_content if db_file.is_file() and db_file.name.endswith(".db")]
     return databases
 
+def update_db():
+    latest_schema_version = "2"
+    current_schema_version = query_db("SELECT value FROM settings where setting = 'schema_version'",one=True)[0]
+    if current_schema_version == "1":
+        print("[*] Current database is schema version 1, updating to schema version 2")
+        execute_db("CREATE TABLE request_templates (id INTEGER PRIMARY KEY AUTOINCREMENT, template_name TEXT, uri TEXT, method TEXT, request_type TEXT, body TEXT, headers TEXT, variables TEXT)")
+        execute_db("UPDATE settings SET value = '2' WHERE setting = 'schema_version'")
+        print("[*] Updated database to schema version 2")
+
 # ========== Helper Functions ==========
 
 def graph_request(graph_uri, access_token_id):
@@ -82,11 +92,42 @@ def graph_request(graph_uri, access_token_id):
 
 def graph_request_post(graph_uri, access_token_id, body):
     access_token = query_db("SELECT accesstoken FROM accesstokens where id = ?",[access_token_id],one=True)[0]
-    headers =  {"Authorization":f"Bearer {access_token}"}
+    headers = {"Authorization":f"Bearer {access_token}"}
     response = requests.post(graph_uri, headers=headers, json=body)
     resp_json = response.json()
     return json.dumps(resp_json)
     
+def generic_request(uri, access_token_id, method, request_type, body, headers):
+    access_token = query_db("SELECT accesstoken FROM accesstokens where id = ?",[access_token_id],one=True)[0]
+    headers["Authorization"] = f"Bearer {access_token}"
+
+    # Empty body
+    if not body:
+        response = requests.request(method, uri, headers=headers)
+    # Text, XML or urlencoded request
+    elif request_type in ["text", "urlencoded", "xml"]:
+        if request_type == "urlencoded" and not "Content-Type" in headers:
+            headers["Content-Type"] = "application/x-www-form-urlencoded"
+        if request_type == "xml" and not "Content-Type" in headers:
+            headers["Content-Type"] = "application/xml"
+        response = requests.request(method, uri, headers=headers, data=body)
+    # Json request
+    elif request_type == "json":
+        try:
+            response = requests.request(method, uri, headers=headers, json=json.loads(body))
+        except ValueError as e:
+            return f"[Error] The body message does not contain valid JSON, but a body type of JSON was specified.", 400
+    else:
+        return f"[Error] Invalid request type.", 400
+
+    # Format json if the Content-Type contains json
+    response_type = "json" if ("Content-Type" in response.headers and "json" in response.headers["Content-Type"]) else "xml" if ("Content-Type" in response.headers and "xml" in response.headers["Content-Type"]) else "text"
+    try:
+        response_text = json.dumps(response.json()) if response_type == "json" else response.text
+    except ValueError as e:
+        response_text = response.text
+    return {"response_status_code": response.status_code ,"response_type": response_type ,"response_text": response_text}
+
 def save_access_token(accesstoken, description):
     decoded_accesstoken = jwt.decode(accesstoken, options={"verify_signature": False})
     user = "unknown"
@@ -294,13 +335,13 @@ def init_routes():
     def device_codes():
         return render_template('device_codes.html', title="Device Codes")
 
-    @app.route("/graph_requests")
-    def graph_requests():
-        return render_template('requests.html', title="Graph Requests")
+    @app.route("/custom_requests")
+    def custom_requests():
+        return render_template('custom_requests.html', title="Custom Requests")
 
     @app.route("/generic_search")
     def generic_search():
-        return render_template('generic_search.html', title="Generic Search")
+        return render_template('generic_search.html', title="Generic MSGraph Search")
 
     @app.route("/recent_files")
     def recent_files():
@@ -466,7 +507,7 @@ def init_routes():
         active_access_token = query_db("SELECT value FROM settings WHERE setting = 'active_access_token_id'",one=True)
         return f"{active_access_token[0]}" if active_access_token else "0"
     
-        # ========== Graph Requests ==========
+        # ========== Generic Requests ==========
 
     @app.post("/api/generic_graph")
     def api_generic_graph():
@@ -482,7 +523,121 @@ def init_routes():
         body = json.loads(request.form['body'])
         graph_response = graph_request_post(graph_uri, access_token_id, body)
         return graph_response
+
+    @app.post("/api/custom_api_request")
+    def api_custom_api_request():
+        if not request.is_json:
+            return f"[Error] Expecting JSON input.", 400
+        request_json = request.get_json()
+        print(request_json)
+        uri = request_json['uri'] if 'uri' in request_json else ''
+        access_token_id = request_json['access_token_id'] if 'access_token_id' in request_json else 0
+        method = request_json['method'] if 'method' in request_json else 'GET'
+        request_type = request_json['request_type'] if 'request_type' in request_json else 'text'
+        body = request_json['body'] if 'body' in request_json else ''
+        headers = request_json['headers'] if 'headers' in request_json else {}
+        variables = request_json['variables'] if 'variables' in request_json else {}
+
+        if not (uri and access_token_id and method):
+            return f"[Error] URI, Access Token ID and Method are mandatory!", 400
+        elif request_type not in ["text", "json", "urlencoded", "xml"]:
+            return f"[Error] Invalid request type '{request_type}'. Should be one of the following values: text, json, urlencoded, xml", 400
+        elif type(headers) != dict or type(variables) != dict:
+            return f"[Error] Expecting json input for headers and variables. Received '{type(headers)}' and '{type(variables)}' respectively.", 400
+
+        for variable_name, variable_value in variables.items():
+            uri = uri.replace(variable_name, variable_value)
+            body = body.replace(variable_name, variable_value)
+            temp_headers = {}
+            for header_name, header_value in headers.items():
+                new_header_name = header_name.replace(variable_name, variable_value) if type(header_name) == str else header_name
+                new_header_value = header_value.replace(variable_name, variable_value) if type(header_value) == str else header_value
+                temp_headers[new_header_name] =new_header_value
+            headers = temp_headers
+        try:
+            api_response = generic_request(uri, access_token_id, method, request_type, body, headers)
+        except Exception as e:
+            traceback.print_exc()
+            return f"[Error] Unexpected error occurred. Check your input for any issues. Exception: {repr(e)}", 400
+        return api_response
+        
+    @app.post("/api/save_request_template")
+    def api_save_request_template():
+        if not request.is_json:
+            return f"[Error] Expecting JSON input.", 400
+        request_json = request.get_json()
+        print(request_json)
+        template_name = request_json['template_name'] if 'template_name' in request_json else ''
+        uri = request_json['uri'] if 'uri' in request_json else ''
+        method = request_json['method'] if 'method' in request_json else 'GET'
+        request_type = request_json['request_type'] if 'request_type' in request_json else 'text'
+        body = request_json['body'] if 'body' in request_json else ''
+        headers = request_json['headers'] if 'headers' in request_json else {}
+        variables = request_json['variables'] if 'variables' in request_json else {}
+
+        if not (template_name and uri and method):
+            return f"[Error] Template Name, URI and Method are mandatory!", 400
+        elif request_type not in ["text", "json", "urlencoded", "xml"]:
+            return f"[Error] Invalid request type '{request_type}'. Should be one of the following values: text, json, urlencoded, xml", 400
+        elif type(headers) != dict or type(variables) != dict:
+            return f"[Error] Expecting json input for headers and variables. Received '{type(headers)}' and '{type(variables)}' respectively.", 400
+        
+        template_exists = False
+        try:
+            # If a request template with the same name already exists, delete it first
+            existing_request_template = query_db_json("SELECT * FROM request_templates WHERE template_name = ?",[template_name],one=True)
+            if existing_request_template:
+                template_exists = True
+                execute_db("DELETE FROM request_templates where id = ?",[existing_request_template["id"]])
+            # Save the new request template
+            execute_db("INSERT INTO request_templates (template_name, uri, method, request_type, body, headers, variables) VALUES (?,?,?,?,?,?,?)",(
+                template_name,
+                uri,
+                method,
+                request_type,
+                body,
+                json.dumps(headers),
+                json.dumps(variables)
+                )
+            )
+        except Exception as e:
+            traceback.print_exc()
+            return f"[Error] Unexpected error occurred. Check your input for any issues. Exception: {repr(e)}", 400
+        if template_exists:
+            return f"[Success] Updated configuration for request template '{template_name}'."
+        return f"[Success] Saved template '{template_name}' to database."
     
+    @app.route("/api/get_request_templates/<template_id>")
+    def api_request_templates(template_id):
+        request_template = query_db_json("SELECT * FROM request_templates WHERE id = ?",[template_id],one=True)
+        if request_template:
+            request_template['headers'] = json.loads(request_template['headers'])
+            request_template['variables'] = json.loads(request_template['variables'])
+        if not request_template:
+            return f"[Error] Unable to find request template with ID '{template_id}'.", 400
+        return request_template
+
+    @app.route("/api/list_request_templates")
+    def api_list_request_templates():
+        request_templates = query_db_json("SELECT * FROM request_templates")
+        print(request_templates)
+        for i in range(len(request_templates)):
+            request_templates[i]['headers'] = json.loads( request_templates[i]['headers'])
+            request_templates[i]['variables'] = json.loads(request_templates[i]['variables'])
+        return request_templates
+    
+    @app.post("/api/delete_request_template")
+    def api_delete_request_template():
+        if not "template_id" in request.form:
+            return f"[Error] No template_id specified.", 400
+        template_id = request.form['template_id']
+        existing_request_template = query_db_json("SELECT * FROM request_templates WHERE id = ?",[template_id],one=True)
+        if not existing_request_template:
+             return f"[Error] Unable to find request template with ID '{template_id}'.", 400
+        execute_db("DELETE FROM request_templates where id = ?",[template_id])
+        return f"[Success] Deleted request template '{existing_request_template['template_name']}' from database."
+
+
         # ========== Database ==========
     
     @app.get("/api/list_databases")
@@ -515,6 +670,7 @@ def init_routes():
         if(not os.path.exists(db_path)):
             return f"[Error] Database file '{db_path}' not found."
         app.config['graph_spy_db_path'] = db_path
+        update_db()
         return f"[Success] Activated database '{database_name}'."
     
     @app.post("/api/duplicate_database")
@@ -624,10 +780,11 @@ def main():
     if(not os.path.exists(graph_spy_db_path)):
         sys.exit(f"Failed creating database file at '{graph_spy_db_path}'. Unable to proceed.")
     print(f"[*] Utilizing database '{graph_spy_db_path}'.")
-    
+    # Update the database to the latest schema version if required
+    with app.app_context():
+        update_db()
     # Disable datatable error messages by default.
     app.config['table_error_messages'] = "disabled"
-
     # Run flask
     print(f"[*] Starting GraphSpy. Open in your browser by going to the url displayed below.\n")
     app.run(debug=args.debug, host=args.interface, port=args.port)
