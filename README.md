@@ -18,6 +18,7 @@
 - [Quick Start](#quick-start)
 	- [Installation](#installation)
 	- [Execution](#execution)
+	- [Usage](#usage)
 - [Features](#features)
 - [Upcoming Features](#upcoming-features)
 - [Credits](#credits)
