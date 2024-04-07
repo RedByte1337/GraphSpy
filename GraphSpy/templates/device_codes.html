@@ -147,12 +147,19 @@
         });
         $('#device_codes').DataTable().ajax.reload(null, false);
     }
-    // Auto refresh the table every 5 seconds
+
     setInterval(function () {
+        let currentTime = new Date();
         myTable.ajax.reload(function (json) {
             json.forEach(device => {
                 if (device.status === "SUCCESS" && !notifiedDeviceCodes.includes(device.id)) {
-                    bootstrapToast("Device Code Auth Success", `Device code ${device.id} authenticated successfully.`, "bg-success");
+                    let expiresAt = new Date(device.expires_at);
+                    if (expiresAt < currentTime) {
+                        bootstrapToast("Warning", `Authenticated device code ${device.id} has expired.`, "bg-warning");
+                    } else {
+                        bootstrapToast("Success", `Device code ${device.id} authenticated successfully.`, "bg-success");
+                    }
+
                     notifiedDeviceCodes.push(device.id);
                 }
             });
