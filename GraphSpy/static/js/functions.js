@@ -306,9 +306,10 @@ function bootstrapAlert(message, type) {
     $('#alert_placeholder').append(dom);
 }
 
-function bootstrapToast(title, message) {
+function bootstrapToast(title, message, type) {
     // Wrapper for new Toast Message
     var toast_wrapper = $('<div class="toast" role="alert" aria-live="assertive" aria-atomic="true"></div>');
+    toast_wrapper.addClass(type);
     // Toast header
     var toast_header = $('<div class="toast-header"><small>Just now</small><button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button></div>');
     var toast_title = $('<strong class="me-auto"></strong>');
