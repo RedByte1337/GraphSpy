@@ -98,7 +98,26 @@
             { data: 'client_id', 'width': '310px' },
             { data: 'status' }
         ],
-        order: [[3, 'desc']]
+        order: [[3, 'desc']],
+        createdRow: function (row, data, dataIndex) {
+            let currentTheme = document.documentElement.getAttribute('data-bs-theme');
+
+            let colorScheme = {
+                SUCCESS: {
+                    light: '#d4edda', // Light green for success in light mode
+                    dark: '#14532d' // Darker green for success in dark mode
+                },
+                EXPIRED: {
+                    light: '#f8d7da', // Light red for expired in light mode
+                    dark: '#721c24' // Darker red for expired in dark mode
+                },
+            };
+            let isDarkMode = currentTheme === 'dark';
+            if (data.status in colorScheme) {
+                let color = isDarkMode ? colorScheme[data.status].dark : colorScheme[data.status].light;
+                $(row).css('background-color', color);
+            }
+        }
     })
 
     myTable.on('click', 'td.dt-control', function (e) {
@@ -152,6 +171,7 @@
     function checkDeviceCodeStatus() {
         myTable.ajax.reload(function (json) {
             json.forEach(device => {
+
                 let notificationKey = `${device.id}-${device.status}`;
                 if (device.status === "SUCCESS" && !notifiedDeviceCodes.includes(notificationKey)) {
                     bootstrapToast("Device Code Auth Success", `[Success] Device code ${device.id} authenticated successfully.`, "bg-success");
