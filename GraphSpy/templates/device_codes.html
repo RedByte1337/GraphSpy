@@ -148,7 +148,7 @@
         $('#device_codes').DataTable().ajax.reload(null, false);
     }
 
-    setInterval(function () {
+    function checkDeviceCodeStatus() {
         let currentTime = new Date();
         myTable.ajax.reload(function (json) {
             json.forEach(device => {
@@ -164,6 +164,13 @@
                 }
             });
         }, false);
-    }, 5000);
+    }
+
+    // Check at page load...
+    checkDeviceCodeStatus();
+
+    // ...then check periodically every 5 seconds
+    setInterval(checkDeviceCodeStatus, 5000);
+
 </script>
 {%endblock content%}
