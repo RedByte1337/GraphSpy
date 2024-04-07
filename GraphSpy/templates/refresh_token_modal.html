@@ -1,8 +1,8 @@
-<div class="modal fade" id="access_token_modal" tabindex="-1" aria-labelledby="access_token_modal_label" aria-hidden="true">
+<div class="modal fade" id="refresh_token_modal" tabindex="-1" aria-labelledby="refresh_token_modal_label" aria-hidden="true">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h1 class="modal-title fs-5" id="access_token_modal_label">Access Tokens</h1>
+                <h1 class="modal-title fs-5" id="refresh_token_modal_label">Refresh Tokens</h1>
                 <div style="float: right">
                     <i class="fi fi-br-expand px-3" id="expand-icon" style="cursor: pointer; float: left; opacity: 0.5"></i>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -10,7 +10,7 @@
             </div>
             <div class="modal-body">
                 <div id="dTable" class="box-body table-responsive" style="padding:20px;">
-                    <table id="access_token_modal_table" class="display" style="width:100%">
+                    <table id="refresh_token_modal_table" class="display" style="width:100%">
                         <thead>
                             <tr>
                                 <th></th>
@@ -18,10 +18,11 @@
                                 <th></th>
                                 <th></th>
                                 <th>ID</th>
-                                <th>Issued</th>
-                                <th>Expires</th>
+                                <th>Stored At</th>
                                 <th>User</th>
+                                <th>Tenant ID</th>
                                 <th>Resource</th>
+                                <th>Foci</th>
                                 <th>Description</th>
                             </tr>
                         </thead>
@@ -35,10 +36,10 @@
     </div>
 </div>
 <script type="text/javascript" class="init">
-    // Populate the access_token_modal_table table
-    let accessTokenModalTable = new DataTable('#access_token_modal_table', {
+    // Populate the refresh_token_modal_table table
+    let refreshTokenModalTable = new DataTable('#refresh_token_modal_table', {
         ajax: {
-            url: '/api/list_access_tokens', dataSrc: ""
+            url: '/api/list_refresh_tokens', dataSrc: ""
         },
         columns: [
             {
@@ -70,19 +71,20 @@
                 'width': '20px'
             },
             { data: 'id', 'width': '30px' },
-            { data: 'issued_at', 'width': '150px' },
-            { data: 'expires_at', 'width': '150px' },
-            { data: 'user', 'width': '350px' },
-            { data: 'resource', 'width': '350px' },
+            { data: 'stored_at', 'width': '150px' },
+            { data: 'user', 'width': '300px' },
+            { data: 'tenant_id', 'width': '300px' },
+            { data: 'resource', 'width': '300px' },
+            { data: 'foci', 'width': '30px' },
             { data: 'description' }
         ],
         order: [[4, 'desc']],
         autoWidth: false
     })
 
-    accessTokenModalTable.on('click', 'td.dt-control', function (e) {
+    refreshTokenModalTable.on('click', 'td.dt-control', function (e) {
         let tr = e.target.closest('tr');
-        let row = accessTokenModalTable.row(tr);
+        let row = refreshTokenModalTable.row(tr);
 
         if (row.child.isShown()) {
             // This row is already open - close it
@@ -90,54 +92,45 @@
         }
         else {
             // Open this row
-            row.child(formatAccessToken(row.data())).show();
+            row.child(formatRefreshToken(row.data())).show();
         }
     });
 
-    accessTokenModalTable.on('click', 'td.active-control', function (e) {
+    refreshTokenModalTable.on('click', 'td.active-control', function (e) {
         let tr = e.target.closest('tr');
-        let row = accessTokenModalTable.row(tr);
-        setActiveAccessToken(row.data().id);
-        $('#access_token_modal').modal('hide');
+        let row = refreshTokenModalTable.row(tr);
+        setActiveRefreshToken(row.data().id);
+        $('#refresh_token_modal').modal('hide');
     });
 
-    accessTokenModalTable.on('click', 'td.copy-control', function (e) {
+    refreshTokenModalTable.on('click', 'td.copy-control', function (e) {
         let tr = e.target.closest('tr');
-        let row = accessTokenModalTable.row(tr);
-        copyToClipboard(row.data().accesstoken);
+        let row = refreshTokenModalTable.row(tr);
+        copyToClipboard(row.data().refreshtoken);
     });
 
-
-    accessTokenModalTable.on('click', 'td.delete-control', function (e) {
+    refreshTokenModalTable.on('click', 'td.delete-control', function (e) {
         let tr = e.target.closest('tr');
-        let row = accessTokenModalTable.row(tr);
-        if (!confirm("Are you sure you want to delete access token with ID " + row.data().id + "?")) { return }
-        deleteAccessToken(row.data().id);
-        $('#access_token_modal_table').DataTable().ajax.reload(null, false);
+        let row = refreshTokenModalTable.row(tr);
+        if (!confirm("Are you sure you want to delete refresh token with ID " + row.data().id + "?")) { return }
+        deleteRefreshToken(row.data().id);
+        $('#refresh_token_modal_table').DataTable().ajax.reload(null, false);
     });
 
-    function formatAccessToken(d) {
+    function formatRefreshToken(d) {
         // `d` is the original data object for the row
-        let response = $.ajax({
-            type: "GET",
-            async: false,
-            url: "/api/decode_token/" + d.id
-        });
         var formatWrapper = $(
             '<dl style="word-wrap: break-word; word-break: break-all; max-width:100%">' +
             '<dt>Raw Token:</dt>' +
             '</dl>'
         );
-        var formatCode = $('<code></code>').text(d.accesstoken);
+        var formatCode = $('<code></code>').text(d.refreshtoken);
         formatWrapper.append($('<dd></dd>').append(formatCode));
-        formatWrapper.append($('<dt>Decoded Token:</dt>'));
-        var formatPre = $('<pre style="white-space: pre-wrap"></pre>').text(JSON.stringify(JSON.parse(response.responseText), undefined, 4));
-        formatWrapper.append($('<dd></dd>').append(formatPre));
         return formatWrapper;
     }
 
-    $("#access_token_modal").on('click', 'i#expand-icon', function (e) {
-        $("#access_token_modal .modal-dialog").toggleClass('modal-xl').toggleClass('modal-fullscreen')
-        $("#access_token_modal i#expand-icon").toggleClass('fi-br-expand').toggleClass('fi-br-compress')
+    $("#refresh_token_modal").on('click', 'i#expand-icon', function (e) {
+        $("#refresh_token_modal .modal-dialog").toggleClass('modal-xl').toggleClass('modal-fullscreen')
+        $("#refresh_token_modal i#expand-icon").toggleClass('fi-br-expand').toggleClass('fi-br-compress')
     })
 </script>

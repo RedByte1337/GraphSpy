@@ -172,7 +172,7 @@
                 <form id="side_menu_refresh_token_form" class="row row-cols-auto">
                     <div class="input-group">
                         <input type="text" id="refresh_token_id_side" class="form-control" size="1" required>
-                        <button type="Button" class="btn btn-outline-primary" onclick="setActiveRefreshToken(refresh_token_id_side.value);obtainRefreshTokenInfo()">Set active refresh token</button>
+                        <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#refresh_token_modal" onclick="$('#refresh_token_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
                     </div>
                 </form>
                 <div class="card text-bg-secondary mb-3 mt-3" id="refresh_token_card">
@@ -266,8 +266,9 @@
         obtainAccessTokenInfo();
         obtainRefreshTokenInfo();
     </script>
-    <!-- Access Token Modal -->
+    <!-- Modals -->
     {% include 'access_token_modal.html' %}
+    {% include 'refresh_token_modal.html' %}
     <!-- Template Content -->
     <div class="container-fluid">
         {%block content%}
