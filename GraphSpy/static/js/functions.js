@@ -203,6 +203,30 @@ function setTableErorMessages(state) {
     $('#dt-error-message-button-enabled').toggleClass("active")
 }
 
+// ========== User Agent ==========
+
+function getUserAgent() {
+    let response = $.ajax({
+        type: "GET",
+        async: false,
+        url: "/api/get_user_agent"
+    });
+    if (response.status == 200) {
+        return response.responseText
+    }
+    return "Unable to obtain user agent."
+}
+
+function setUserAgent(userAgent) {
+    let response = $.ajax({
+        type: "POST",
+        async: false,
+        url: "/api/set_user_agent",
+        data: { "user_agent": userAgent }
+    });
+    bootstrapToast("Set User Agent", response.responseText)
+}
+
 // ========== Cookies ==========
 
 function getCookie(name) {

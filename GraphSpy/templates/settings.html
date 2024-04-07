@@ -6,40 +6,48 @@
     <div class="col-6">
         <h1>Settings</h1>
         <div class="row g-4">
-            <div class="dropdown col-12">
-                <button class="btn btn-primary dropdown-toggle" id="bd-theme" type="button" aria-expanded="false" data-bs-toggle="dropdown" data-bs-display="static" aria-label="Toggle theme (dark)">
-                    Select theme
-                </button>
-                <ul class="dropdown-menu" aria-labelledby="bd-theme-text">
-                    <li>
-                        <button type="button" class="dropdown-item" data-bs-theme-value="light" aria-pressed="false">
-                            <i class="fi fi-rr-sun"></i> Light Mode
-                        </button>
-                    </li>
-                    <li>
-                        <button type="button" class="dropdown-item active" data-bs-theme-value="dark" aria-pressed="true">
-                            <i class="fi fi-rr-moon-stars"></i> Dark Mode
-                        </button>
-                    </li>
-                    <li>
-                        <button type="button" class="dropdown-item" data-bs-theme-value="auto" aria-pressed="false">
-                            <i class="fi fi-rr-magic-wand"></i> Auto
-                        </button>
-                    </li>
-                </ul>
+            <div class="col-12">
+                <div class="btn-group me-3 mt-3">
+                    <button class="btn btn-primary dropdown-toggle" id="bd-theme" type="button" aria-expanded="false" data-bs-toggle="dropdown" data-bs-display="static" aria-label="Toggle theme (dark)">
+                        Select theme
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="bd-theme-text">
+                        <li>
+                            <button type="button" class="dropdown-item" data-bs-theme-value="light" aria-pressed="false">
+                                <i class="fi fi-rr-sun"></i> Light Mode
+                            </button>
+                        </li>
+                        <li>
+                            <button type="button" class="dropdown-item active" data-bs-theme-value="dark" aria-pressed="true">
+                                <i class="fi fi-rr-moon-stars"></i> Dark Mode
+                            </button>
+                        </li>
+                        <li>
+                            <button type="button" class="dropdown-item" data-bs-theme-value="auto" aria-pressed="false">
+                                <i class="fi fi-rr-magic-wand"></i> Auto
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+                <div class="btn-group me-3 mt-3">
+                    <button class="btn btn-primary dropdown-toggle" id="dt-error-message-dropdown" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        DataTable Error Messages
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><button class="dropdown-item" id="dt-error-message-button-enabled" type="button" onclick="setTableErorMessages('enabled')">Enabled</button></li>
+                        <li><button class="dropdown-item" id="dt-error-message-button-disabled" type="button" onclick="setTableErorMessages('disabled')">Disabled</button></li>
+                    </ul>
+                </div>
             </div>
-            <div class="dropdown col-12">
-                <button class="btn btn-primary dropdown-toggle" id="dt-error-message-dropdown" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                    DataTable Error Messages
-                </button>
-                <ul class="dropdown-menu">
-                    <li><button class="dropdown-item" id="dt-error-message-button-enabled" type="button" onclick="setTableErorMessages('enabled')">Enabled</button></li>
-                    <li><button class="dropdown-item" id="dt-error-message-button-disabled" type="button" onclick="setTableErorMessages('disabled')">Disabled</button></li>
-                </ul>
+            <div class="col-12">
+                <div class="input-group">
+                    <input type="text" id="user_agent_field" placeholder="User Agent" class="form-control">
+                    <button class="btn btn-outline-primary" type="button" onclick="update_user_agent_button()">Set User Agent</button>
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-auto ms-auto">
+    <div class="col-auto ms-auto" style="max-width: 33%;">
         <div class="card mt-3">
             <div class="card-header" style="text-align: center"><b>Persistent Settings</b></div>
             <div class="card-body">
@@ -59,9 +67,9 @@
             </div>
         </div>
     </div>
-    <div class="col-lg-9">
+    <div class="col-lg-8">
         <h1>Databases</h1>
-        <div class="col-md-6">
+        <div class="col-md-9">
             <div class="input-group">
                 <span class="input-group-text">Database Folder</span>
                 <input class="form-control" id="db_folder" type="text" value="{{ config['graph_spy_db_folder'] }}" readonly>
@@ -81,7 +89,7 @@
             </thead>
         </table>
     </div>
-    <div class="col-lg-3">
+    <div class="col-lg-4">
         <h1>New Database</h1>
         <form class="row g-3">
             <div>
@@ -159,5 +167,15 @@
     } else {
         $('#dt-error-message-button-enabled').addClass("active")
     }
+
+    // User Agent
+    // Populate the user agent field
+    $("#user_agent_field").val(getUserAgent());
+    // Update User Agent
+    function update_user_agent_button() {
+        setUserAgent($("#user_agent_field").val());
+        $("#user_agent_field").val(getUserAgent());
+    }
+
 </script>
     {%endblock content%}

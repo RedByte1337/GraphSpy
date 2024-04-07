@@ -23,7 +23,7 @@ def init_db():
     con.execute('CREATE TABLE devicecodes (id INTEGER PRIMARY KEY AUTOINCREMENT, generated_at INTEGER, expires_at INTEGER, user_code TEXT, device_code TEXT, interval INTEGER, client_id TEXT, status TEXT, last_poll INTEGER)')
     con.execute('CREATE TABLE request_templates (id INTEGER PRIMARY KEY AUTOINCREMENT, template_name TEXT, uri TEXT, method TEXT, request_type TEXT, body TEXT, headers TEXT, variables TEXT)')
     con.execute('CREATE TABLE settings (setting TEXT UNIQUE, value TEXT)')
-    # Valid Settings: active_access_token_id, active_refresh_token_id, schema_version
+    # Valid Settings: active_access_token_id, active_refresh_token_id, schema_version, user_agent
     cur = con.cursor()
     cur.execute("INSERT INTO settings (setting, value) VALUES ('schema_version', '2')")
     con.commit()
@@ -83,16 +83,30 @@ def update_db():
 
 # ========== Helper Functions ==========
 
+def get_user_agent():
+    user_agent = query_db("SELECT value FROM settings where setting = 'user_agent'",one=True)
+    if user_agent:
+        return user_agent[0]
+    else:
+        return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+
+def set_user_agent(user_agent):
+    execute_db("INSERT OR REPLACE INTO settings (setting, value) VALUES ('user_agent',?)",(user_agent,))
+    if get_user_agent() == user_agent:
+        return True
+    else:
+        return False
+
 def graph_request(graph_uri, access_token_id):
     access_token = query_db("SELECT accesstoken FROM accesstokens where id = ?",[access_token_id],one=True)[0]
-    headers =  {"Authorization":f"Bearer {access_token}"}
+    headers = {"Authorization":f"Bearer {access_token}", "User-Agent":get_user_agent()}
     response = requests.get(graph_uri, headers=headers)
     resp_json = response.json()
     return json.dumps(resp_json)
 
 def graph_request_post(graph_uri, access_token_id, body):
     access_token = query_db("SELECT accesstoken FROM accesstokens where id = ?",[access_token_id],one=True)[0]
-    headers = {"Authorization":f"Bearer {access_token}"}
+    headers = {"Authorization":f"Bearer {access_token}", "User-Agent":get_user_agent()}
     response = requests.post(graph_uri, headers=headers, json=body)
     resp_json = response.json()
     return json.dumps(resp_json)
@@ -100,6 +114,7 @@ def graph_request_post(graph_uri, access_token_id, body):
 def generic_request(uri, access_token_id, method, request_type, body, headers):
     access_token = query_db("SELECT accesstoken FROM accesstokens where id = ?",[access_token_id],one=True)[0]
     headers["Authorization"] = f"Bearer {access_token}"
+    headers["User-Agent"] = get_user_agent()
 
     # Empty body
     if not body:
@@ -179,7 +194,8 @@ def is_valid_uuid(val):
         return False
 
 def get_tenant_id(tenant_domain):
-    response = requests.get(f"https://login.microsoftonline.com/{tenant_domain}/.well-known/openid-configuration")
+    headers = {"User-Agent":get_user_agent()}
+    response = requests.get(f"https://login.microsoftonline.com/{tenant_domain}/.well-known/openid-configuration", headers=headers)
     resp_json = response.json()
     tenant_id = resp_json["authorization_endpoint"].split("/")[3]
     return tenant_id
@@ -196,7 +212,8 @@ def refresh_to_access_token(refresh_token_id, resource = "defined_in_token", cli
         "scope": "openid"
     }
     url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/token?api-version=1.0"
-    response = requests.post(url, data=body)
+    headers = {"User-Agent":get_user_agent()}
+    response = requests.post(url, data=body, headers=headers)
     access_token = response.json()["access_token"]
     save_access_token(access_token, f"Created using refresh token {refresh_token_id}")
     access_token_id = query_db("SELECT id FROM accesstokens where accesstoken = ?",[access_token],one=True)[0]
@@ -225,7 +242,8 @@ def generate_device_code(resource = "https://graph.microsoft.com", client_id = "
         "client_id": client_id
     }
     url = "https://login.microsoftonline.com/common/oauth2/devicecode?api-version=1.0"
-    response = requests.post(url, data=body)
+    headers = {"User-Agent":get_user_agent()}
+    response = requests.post(url, data=body,headers=headers)
 
     execute_db("INSERT INTO devicecodes (generated_at, expires_at, user_code, device_code, interval, client_id, status, last_poll) VALUES (?,?,?,?,?,?,?,?)",(
             int(datetime.now().timestamp()),
@@ -264,7 +282,8 @@ def poll_device_codes():
                     "code": row["device_code"]
                 }
                 url = "https://login.microsoftonline.com/Common/oauth2/token?api-version=1.0"
-                response = requests.post(url, data=body)
+                headers = {"User-Agent":get_user_agent()}
+                response = requests.post(url, data=body, headers=headers)
                 execute_db("UPDATE devicecodes SET last_poll = ? WHERE device_code = ?",(int(datetime.now().timestamp()),row["device_code"]))
                 if response.status_code == 200 and "access_token" in response.json():
                     access_token = response.json()["access_token"]
@@ -711,6 +730,19 @@ def init_routes():
         #settings_json = [{setting["setting"] : setting["value"]} for setting in settings_raw]
         settings_json = {setting["setting"] : setting["value"] for setting in settings_raw}
         return settings_json
+        
+    @app.get("/api/get_user_agent")
+    def api_get_user_agent():
+        return get_user_agent()
+
+    @app.post("/api/set_user_agent")
+    def api_set_user_agent():
+        user_agent = request.form['user_agent'] if "user_agent" in request.form else ""
+        if not user_agent:
+            return "[Error] User agent not specified!", 400 
+        if not set_user_agent(user_agent):
+            return f"[Error] Unable to set user agent to '{user_agent}'!", 400 
+        return f"[Success] User agent set to '{user_agent}'!" 
 
     # ========== Other ==========
 
