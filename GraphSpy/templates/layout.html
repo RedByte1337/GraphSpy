@@ -79,7 +79,7 @@
                         <a class="nav-link" href="{{url_for('outlook')}}">Outlook</a>
                     </li>
                     <li class="nav-item">
-                        <span class="d-inline-block" id="nav-teams-disabled" data-bs-toggle="popover" data-bs-trigger="hover focus" data-bs-content="Coming soon!" data-bs-placement="bottom" >
+                        <span class="d-inline-block" id="nav-teams-disabled" data-bs-toggle="popover" data-bs-trigger="hover focus" data-bs-content="Coming soon!" data-bs-placement="bottom">
                             <a class="nav-link disabled">Teams</a>
                         </span>
                     </li>
@@ -146,8 +146,8 @@
                 <h4>Access Token</h4>
                 <form id="side_menu_access_token_form" class="row row-cols-auto">
                     <div class="input-group">
-                        <input type="text" id="access_token_id_side" class="form-control" size="1" required>
-                        <button type="Button" class="btn btn-outline-primary" onclick="setActiveAccessToken(access_token_id_side.value);">Set active access token</button>
+                        <input type="text" id="access_token_id_side" class="form-control" size="1" readonly>
+                        <button type="Button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#access_token_modal" onclick="$('#access_token_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
                     </div>
                 </form>
                 <div class="card text-bg-secondary mb-3 mt-3" id="access_token_card">
@@ -266,6 +266,8 @@
         obtainAccessTokenInfo();
         obtainRefreshTokenInfo();
     </script>
+    <!-- Access Token Modal -->
+    {% include 'access_token_modal.html' %}
     <!-- Template Content -->
     <div class="container-fluid">
         {%block content%}

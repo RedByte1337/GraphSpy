@@ -9,6 +9,7 @@
         <div class="col-md-6">
             <div class="input-group">
                 <input type="text" id="access_token_id" name="access_token_id" class="form-control" required>
+                <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#access_token_modal" onclick="$('#access_token_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
                 <button type="Button" class="btn btn-outline-primary" onclick="fillAccessToken(this.closest('form'))">Set access token</button>
             </div>
         </div>

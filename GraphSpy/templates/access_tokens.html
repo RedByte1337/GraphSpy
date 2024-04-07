@@ -200,19 +200,17 @@
             async: false,
             url: "/api/decode_token/" + d.id
         });
-        return (
-            //'<dl style = "word-wrap: break-word; word-break: break-all; width:100%">' +
+        var formatWrapper = $(
             '<dl>' +
             '<dt>Raw Token:</dt>' +
-            '<dd><code>' +
-            d.accesstoken +
-            '</code></dd>' +
-            '<dt>Decoded Token:</dt>' +
-            '<dd><pre>' +
-            JSON.stringify(JSON.parse(response.responseText), undefined, 4) +
-            '</pre></dd>' +
             '</dl>'
         );
+        var formatCode = $('<code></code>').text(d.accesstoken);
+        formatWrapper.append($('<dd></dd>').append(formatCode));
+        formatWrapper.append($('<dt>Decoded Token:</dt>'));
+        var formatPre = $('<pre></pre>').text(JSON.stringify(JSON.parse(response.responseText), undefined, 4));
+        formatWrapper.append($('<dd></dd>').append(formatPre));
+        return formatWrapper;
     }
 </script>
 

@@ -135,7 +135,6 @@ Use the dark mode by default, or switch to light mode.
 	* Password, ESTSAuth Cookie, PRT, ...
 * Advanced token customization options and optional v2 API support (CAE)
 * Automatic Access Token Refreshing
-* Set a custom user agent
 * Microsoft Teams
 	* Sadly, most MSGrapgh scopes required for Microsoft Teams can not be obtained through a FOCI client id, limiting the usecases where it could be accessed.
 	* So the best option would be to use the Skype API, which is a FOCI resource, although this API is not documented by Microsoft or intended for public use

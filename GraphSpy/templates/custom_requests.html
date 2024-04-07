@@ -8,8 +8,7 @@
     <form id="custom_request_form" class="row g-3">
         <div class="col-2">
             <label for="method" class="form-label">Method *</label>
-            <input list="methods" id="method" placeholder="GET" class="form-control" required>
-            <datalist id="methods">
+            <select id="method" placeholder="GET" class="form-select" required>
                 <option value="GET">GET</option>
                 <option value="POST">POST</option>
                 <option value="PUT">PUT</option>
@@ -17,11 +16,11 @@
                 <option value="HEAD">HEAD</option>
                 <option value="DELETE">DELETE</option>
                 <option value="OPTIONS">OPTIONS</option>
-            </datalist>
+            </select>
         </div>
         <div class="col-2">
             <label for="request_type" class="form-label">Body type</label>
-            <select id="request_type" class="form-select" aria-label="Request body">
+            <select id="request_type" class="form-select">
                 <option value="text">Text</option>
                 <option value="urlencoded">URL Encoded</option>
                 <option value="json">JSON</option>
@@ -30,7 +29,10 @@
         </div>
         <div class="col-2">
             <label for="access_token_id" class="form-label">Access token id *</label>
-            <input type="text" id="access_token_id" name="access_token_id" class="form-control" required>
+            <div class="input-group">
+                <input type="text" id="access_token_id" name="access_token_id" class="form-control" required>
+                <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#access_token_modal" onclick="$('#access_token_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
+            </div>
         </div>
         <div class="col-3"></div>
         <div class="col-3">
@@ -95,147 +97,6 @@
         </div>
     </div>
 </div>
-<!-- Modal -->
-<div class="modal fade" id="request_template_modal" tabindex="-1" aria-labelledby="request_template_modal_label" aria-hidden="true">
-    <div class="modal-dialog modal-xl">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h1 class="modal-title fs-5" id="request_template_modal_label">Request Templates</h1>
-                <div style="float: right">
-                    <i class="fi fi-br-expand px-3" id="expand-icon" style="cursor: pointer; float: left; opacity: 0.5"></i>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-            </div>
-            <div class="modal-body">
-                <div id="dTable" class="box-body table-responsive" style="padding:20px;">
-                    <table id="request_templates" class="display" style="width:100%">
-                        <thead>
-                            <tr>
-                                <th></th>
-                                <th></th>
-                                <th></th>
-                                <th>ID</th>
-                                <th>Name</th>
-                                <th>Body type</th>
-                                <th>Method</th>
-                                <th>URI</th>
-                            </tr>
-                        </thead>
-                    </table>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
-<script type="text/javascript" class="init">
-    // Populate the request_templates table
-    let myTable = new DataTable('#request_templates', {
-        ajax: {
-            url: '/api/list_request_templates', dataSrc: ""
-        },
-        columns: [
-            {
-                className: 'dt-control',
-                orderable: false,
-                data: null,
-                defaultContent: '',
-                'width': '20px'
-            },
-            {
-                className: 'active-control',
-                orderable: false,
-                data: null,
-                defaultContent: '<i class="fi fi-br-check" style="cursor: pointer"></i>',
-                'width': '20px'
-            },
-            {
-                className: 'delete-control',
-                orderable: false,
-                data: null,
-                defaultContent: '<i class="fi fi-rr-trash" style="cursor: pointer"></i>',
-                'width': '20px'
-            },
-            { data: 'id', 'width': '30px' },
-            { data: 'template_name', 'width': '150px' },
-            { data: 'request_type', 'width': '150px' },
-            { data: 'method', 'width': '100px' },
-            { data: 'uri'}
-        ],
-        order: [[3, 'desc']]
-    })
-
-    myTable.on('click', 'td.dt-control', function (e) {
-        let tr = e.target.closest('tr');
-        let row = myTable.row(tr);
-
-        if (row.child.isShown()) {
-            // This row is already open - close it
-            row.child.hide();
-        }
-        else {
-            // Open this row
-            row.child(format(row.data())).show();
-        }
-    });
-
-    myTable.on('click', 'td.active-control', function (e) {
-        let tr = e.target.closest('tr');
-        let row = myTable.row(tr);
-        request_template_info = row.data();
-        $("#request_uri").val(request_template_info.uri);
-        $("#method").val(request_template_info.method);
-        $("#request_type").val(request_template_info.request_type);
-        $("#body").val(request_template_info.body);
-        $("#request_template_name").val(request_template_info.template_name);
-        $('#header_fields').empty();
-        $('#variable_fields').empty();
-        for (var header_name in request_template_info.headers) {
-            if (request_template_info.headers.hasOwnProperty(header_name)) {
-                addHeaderRow(header_name, request_template_info.headers[header_name]);
-            }
-        }
-        for (var variable_name in request_template_info.variables) {
-            if (request_template_info.variables.hasOwnProperty(variable_name)) {
-                addVariableRow(variable_name, request_template_info.variables[variable_name]);
-            }
-        }
-        $('#request_template_modal').modal('hide');
-    });
-
-    myTable.on('click', 'td.delete-control', function (e) {
-        let tr = e.target.closest('tr');
-        let row = myTable.row(tr);
-        if (!confirm("Are you sure you want to delete request template '" + row.data().template_name + "'?")) { return }
-        deleteRequestTemplate(row.data().id);
-    });
-
-    function format(d) {
-        var descList = $(
-            '<dl>' +
-            '<dt>Request Template:</dt>' +
-            '</dl>');
-        var descDetails = $('<dd></dd>');
-        var preText = $('<pre></pre>');
-        preText.text(JSON.stringify(d, undefined, 4));
-        descDetails.append(preText);
-        descList.append(descDetails);
-        return descList
-    }
-
-    function deleteRequestTemplate(id) {
-        let response = $.ajax({
-            type: "POST",
-            async: false,
-            url: "/api/delete_request_template",
-            data: {"template_id": id}
-        });
-        $('#request_templates').DataTable().ajax.reload(null, false);
-        bootstrapToast("Delete Request Template", response.responseText)
-    }
-</script>
 <script>
     function getHeaders() {
         let headers = {};
@@ -289,7 +150,7 @@
             } else {
                 $("#response_body").text(responseJSON.response_text);
             }
-        }catch (e) {
+        } catch (e) {
             $("#response_body").text(responseJSON.response_text);
         }
         $("#response_status_code").text(responseJSON.response_status_code);
@@ -374,11 +235,154 @@
     $("#response-card").on('click', 'i#copy-icon', function (e) {
         copyToClipboard($("#response_body").text());
     })
+</script>
 
-    $("#request_template_modal").on('click', 'i#expand-icon', function (e) {
-        $("#request_template_modal").find('.modal-dialog').toggleClass('modal-xl').toggleClass('modal-fullscreen')
-        $("i#expand-icon").toggleClass('fi-br-expand').toggleClass('fi-br-compress')
+<!-- Request Template Modal -->
+<div class="modal fade" id="request_template_modal" tabindex="-1" aria-labelledby="request_template_modal_label" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="request_template_modal_label">Request Templates</h1>
+                <div style="float: right">
+                    <i class="fi fi-br-expand px-3" id="expand-icon" style="cursor: pointer; float: left; opacity: 0.5"></i>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div id="dTable" class="box-body table-responsive" style="padding:20px;">
+                    <table id="request_templates" class="display" style="width:100%">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th></th>
+                                <th></th>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Body type</th>
+                                <th>Method</th>
+                                <th>URI</th>
+                            </tr>
+                        </thead>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script type="text/javascript" class="init">
+    // Populate the request_templates table
+    let myTable = new DataTable('#request_templates', {
+        ajax: {
+            url: '/api/list_request_templates', dataSrc: ""
+        },
+        columns: [
+            {
+                className: 'dt-control',
+                orderable: false,
+                data: null,
+                defaultContent: '',
+                'width': '20px'
+            },
+            {
+                className: 'active-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-br-check" style="cursor: pointer"></i>',
+                'width': '20px'
+            },
+            {
+                className: 'delete-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-rr-trash" style="cursor: pointer"></i>',
+                'width': '20px'
+            },
+            { data: 'id', 'width': '30px' },
+            { data: 'template_name', 'width': '150px' },
+            { data: 'request_type', 'width': '130px' },
+            { data: 'method', 'width': '80px' },
+            { data: 'uri' }
+        ],
+        order: [[3, 'desc']],
+        autoWidth: false
     })
 
+    myTable.on('click', 'td.dt-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+
+        if (row.child.isShown()) {
+            // This row is already open - close it
+            row.child.hide();
+        }
+        else {
+            // Open this row
+            row.child(formatRequestTemplate(row.data())).show();
+        }
+    });
+
+    myTable.on('click', 'td.active-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+        request_template_info = row.data();
+        $("#request_uri").val(request_template_info.uri);
+        $("#method").val(request_template_info.method);
+        $("#request_type").val(request_template_info.request_type);
+        $("#body").val(request_template_info.body);
+        $("#request_template_name").val(request_template_info.template_name);
+        $('#header_fields').empty();
+        $('#variable_fields').empty();
+        for (var header_name in request_template_info.headers) {
+            if (request_template_info.headers.hasOwnProperty(header_name)) {
+                addHeaderRow(header_name, request_template_info.headers[header_name]);
+            }
+        }
+        for (var variable_name in request_template_info.variables) {
+            if (request_template_info.variables.hasOwnProperty(variable_name)) {
+                addVariableRow(variable_name, request_template_info.variables[variable_name]);
+            }
+        }
+        $('#request_template_modal').modal('hide');
+    });
+
+    myTable.on('click', 'td.delete-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+        if (!confirm("Are you sure you want to delete request template '" + row.data().template_name + "'?")) { return }
+        deleteRequestTemplate(row.data().id);
+    });
+
+    function formatRequestTemplate(d) {
+        var descList = $(
+            '<dl>' +
+            '<dt>Request Template:</dt>' +
+            '</dl>');
+        var descDetails = $('<dd></dd>');
+        var preText = $('<pre></pre>');
+        preText.text(JSON.stringify(d, undefined, 4));
+        descDetails.append(preText);
+        descList.append(descDetails);
+        return descList
+    }
+
+    function deleteRequestTemplate(id) {
+        let response = $.ajax({
+            type: "POST",
+            async: false,
+            url: "/api/delete_request_template",
+            data: { "template_id": id }
+        });
+        $('#request_templates').DataTable().ajax.reload(null, false);
+        bootstrapToast("Delete Request Template", response.responseText)
+    }
+
+    $("#request_template_modal").on('click', 'i#expand-icon', function (e) {
+        $("#request_template_modal .modal-dialog").toggleClass('modal-xl').toggleClass('modal-fullscreen')
+        $("#request_template_modal i#expand-icon").toggleClass('fi-br-expand').toggleClass('fi-br-compress')
+    })
 </script>
+
     {%endblock content%}

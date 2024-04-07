@@ -12,7 +12,10 @@
         </div>
         <div class="col-md-3">
             <label for="access_token_id" class="form-label">Access token id *</label>
-            <input type="text" id="access_token_id" name="access_token_id" class="form-control" required>
+            <div class="input-group">
+                <input type="text" id="access_token_id" name="access_token_id" class="form-control" required>
+                <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#access_token_modal" onclick="$('#access_token_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
+            </div>
         </div>
         <div>
             <label for="path" class="form-label">Path *</label>
