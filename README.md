@@ -20,6 +20,7 @@
 	- [Execution](#execution)
 	- [Usage](#usage)
 - [Features](#features)
+- [Release Notes](#release-notes)
 - [Upcoming Features](#upcoming-features)
 - [Credits](#credits)
 
@@ -67,7 +68,7 @@ For detailed instructions and other command line arguments, please refer to the 
 
 ## Usage
 
-Please refer to the [Github Wiki](https://github.com/RedByte1337/GraphSpy/wiki) for full usage details.
+Please refer to the [GitHub Wiki](https://github.com/RedByte1337/GraphSpy/wiki) for full usage details.
 
 For a quick feature overview, check out the [official release blog post](https://insights.spotit.be/2024/04/05/graphspy-the-swiss-army-knife-for-attacking-m365-entra/).
 
@@ -138,6 +139,10 @@ GraphSpy supports multiple databases. This is useful when working on multiple as
 ## Dark Mode
 
 Use the dark mode by default, or switch to light mode.
+
+# Release Notes
+
+Refer to the [Release Notes](https://github.com/RedByte1337/GraphSpy/wiki/Release-Notes) page on the GitHub Wiki
 
 # Upcoming Features
 
