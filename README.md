@@ -64,6 +64,12 @@ graphspy -i 0.0.0.0 -p 8080
 
 For detailed instructions and other command line arguments, please refer to the [Execution page](https://github.com/RedByte1337/GraphSpy/wiki/Execution) on the wiki.
 
+## Usage
+
+Please refer to the [Github Wiki](https://github.com/RedByte1337/GraphSpy/wiki) for full usage details.
+
+For a quick feature overview, check out the [official release blog post](https://insights.spotit.be/2024/04/05/graphspy-the-swiss-army-knife-for-attacking-m365-entra/).
+
 # Features
 
 ## Access and Refresh Tokens
@@ -106,17 +112,21 @@ Open the user's Outlook with a single click using just an Outlook access token (
 
 ## Graph Searching
 
-Search for keywords through all Microsoft 365 applications using the Microsoft 365 API.
+Search for keywords through all Microsoft 365 applications using the Microsoft Search API.
 
 For instance, use this to search for any files or emails containing keywords such as "password", "secret", ...
 
 ![Graph Search](images/graph_search_2.png)
 
-## Generic Graph Requests
+## Custom Requests
 
-Perform any other MS Graph requests and display the raw response.
+Perform custom API requests towards any endpoint using access tokens stored in GraphSpy.
 
-![Graph Request](images/generic_graph_requests.png)
+![Custom Request](images/custom_requests.png)
+
+Custom request templates with variables can be stored in the database to allow easy reuse of common custom API requests.
+
+![Custom Request](images/custom_request_templates.png)
 
 ## Multiple Databases
 
