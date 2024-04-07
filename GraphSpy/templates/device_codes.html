@@ -62,7 +62,7 @@
 </div>
 <script type="text/javascript" class="init">
     let notifiedDeviceCodes = JSON.parse(localStorage.getItem('notifiedDeviceCodes')) || [];
-    let deviceStatuses = {};
+    let deviceStatuses = JSON.parse(localStorage.getItem('deviceStatuses')) || {};
     // Populate the device_codes table
     let myTable = new DataTable('#device_codes', {
         ajax: {
@@ -152,22 +152,21 @@
     function checkDeviceCodeStatus() {
         myTable.ajax.reload(function (json) {
             json.forEach(device => {
-                if (device.status === "SUCCESS" && !notifiedDeviceCodes.includes(device.id)) {
+                let notificationKey = `${device.id}-${device.status}`;
+                if (device.status === "SUCCESS" && !notifiedDeviceCodes.includes(notificationKey)) {
                     bootstrapToast("Device Code Auth Success", `[Success] Device code ${device.id} authenticated successfully.`, "bg-success");
-                    notifiedDeviceCodes.push(device.id);
-                    localStorage.setItem('notifiedDeviceCodes', JSON.stringify(notifiedDeviceCodes));
+                    notifiedDeviceCodes.push(notificationKey);
                 }
-                if (device.status === "EXPIRED" && !notifiedDeviceCodes.includes(device.id)) {
+                if (device.status === "EXPIRED" && !notifiedDeviceCodes.includes(notificationKey)) {
                     bootstrapToast("Device Code Auth Warning", `[Warning] Device code ${device.id} has expired.`, "bg-warning");
-                    notifiedDeviceCodes.push(device.id);
-                    localStorage.setItem('notifiedDeviceCodes', JSON.stringify(notifiedDeviceCodes));
+                    notifiedDeviceCodes.push(notificationKey);
                 }
-                if (deviceStatuses[device.id] === "POLLING" && device.status === "EXPIRED") {
-                    bootstrapToast("Device Code Auth Warning", `[Warning] Device code ${device.id} transitioned from POLLING to EXPIRED.`, "bg-danger");
-                }
-                // Update the last known status
                 deviceStatuses[device.id] = device.status;
             });
+
+            localStorage.setItem('notifiedDeviceCodes', JSON.stringify(notifiedDeviceCodes));
+            localStorage.setItem('deviceStatuses', JSON.stringify(deviceStatuses));
+
         }, false);
     }
 
