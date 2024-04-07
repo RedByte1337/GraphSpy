@@ -153,15 +153,15 @@
         myTable.ajax.reload(function (json) {
             json.forEach(device => {
                 if (device.status === "SUCCESS" && !notifiedDeviceCodes.includes(device.id)) {
-                    bootstrapToast("Success", `Device code ${device.id} authenticated successfully.`, "bg-success");
+                    bootstrapToast("Device Code Auth Success", `[Success] Device code ${device.id} authenticated successfully.`, "bg-success");
                     notifiedDeviceCodes.push(device.id);
                 }
                 else if (device.status === "EXPIRED" && !notifiedDeviceCodes.includes(device.id)) {
-                    bootstrapToast("Warning", `Device code ${device.id} has expired.`, "bg-warning");
+                    bootstrapToast("Device Code Auth Warning", `[Warning] Device code ${device.id} has expired.`, "bg-warning");
                     notifiedDeviceCodes.push(device.id);
                 }
                 if (deviceStatuses[device.id] === "POLLING" && device.status === "EXPIRED") {
-                    bootstrapToast("Warning", `Device code ${device.id} transitioned from POLLING to EXPIRED.`, "bg-danger");
+                    bootstrapToast("Device Code Auth Warning", `[Warning] Device code ${device.id} transitioned from POLLING to EXPIRED.`, "bg-danger");
                 }
 
                 // Update the last known status
