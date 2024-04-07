@@ -7,7 +7,8 @@
     <form class="row g-3">
         <div>
             <label for="resource" class="form-label">Resource *</label>
-            <input list="resource_list" id="resource" class="form-control" required placeholder="https://graph.microsoft.com">
+            <input list="resource_list" id="resource" class="form-control" required
+                placeholder="https://graph.microsoft.com">
             <datalist id="resource_list">
                 <option value="https://graph.microsoft.com">MSGraph</option>
                 <option value="https://graph.windows.net/">AAD Graph</option>
@@ -19,7 +20,8 @@
         </div>
         <div>
             <label for="client_id" class="form-label">Client ID *</label>
-            <input list="client_id_list" id="client_id" class="form-control" required placeholder="d3590ed6-52b3-4102-aeff-aad2292ab01c">
+            <input list="client_id_list" id="client_id" class="form-control" required
+                placeholder="d3590ed6-52b3-4102-aeff-aad2292ab01c">
             <datalist id="client_id_list">
                 <option value="d3590ed6-52b3-4102-aeff-aad2292ab01c">Microsoft Office</option>
                 <option value="1fec8e78-bce4-4aaf-ab1b-5451cc387264">Microsoft Teams</option>
@@ -32,7 +34,8 @@
             </datalist>
         </div>
         <div>
-            <button type="button" class="btn btn-primary" onclick="generateDeviceCode(this.closest('form').resource.value,this.closest('form').client_id.value);">Submit</button>
+            <button type="button" class="btn btn-primary"
+                onclick="generateDeviceCode(this.closest('form').resource.value,this.closest('form').client_id.value);">Submit</button>
         </div>
     </form>
 </div>
@@ -58,6 +61,7 @@
     </table>
 </div>
 <script type="text/javascript" class="init">
+    let notifiedDeviceCodes = [];
     // Populate the device_codes table
     let myTable = new DataTable('#device_codes', {
         ajax: {
@@ -145,7 +149,14 @@
     }
     // Auto refresh the table every 5 seconds
     setInterval(function () {
-        $('#device_codes').DataTable().ajax.reload(null, false)
+        myTable.ajax.reload(function (json) {
+            json.forEach(device => {
+                if (device.status === "SUCCESS" && !notifiedDeviceCodes.includes(device.id)) {
+                    bootstrapToast("Device Code Auth Success", `Device code ${device.id} authenticated successfully.`, "bg-success");
+                    notifiedDeviceCodes.push(device.id);
+                }
+            });
+        }, false);
     }, 5000);
 </script>
 {%endblock content%}
