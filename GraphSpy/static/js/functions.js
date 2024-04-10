@@ -111,7 +111,7 @@ function generateDeviceCode(resource, client_id) {
         url: "/api/generate_device_code",
         data: { "resource": resource, "client_id": client_id }
     });
-    bootstrapToast("Device Code", `[Success] Generated Device Code with User Code '${response.responseText}'.`);
+    bootstrapToast("Device Code", `[Success] Generated Device Code with User Code '${response.responseText}'.`, "primary");
     reloadTables();
 }
 
@@ -299,16 +299,28 @@ function bootstrapAlert(message, type) {
     var type_class = `alert-${type}`;
     var dom = $('<div>');
     dom.addClass("alert alert-dismissible");
-    dom.addClass(type_class);
+    validTypes = ["primary", "secondary", "success", "danger", "warning", "info", "light", "dark"]
+    if (type && validTypes.includes(type.toLowerCase())) {
+        dom.addClass(`alert-${type.toLowerCase()}`);
+    }
     dom.attr("role", "alert");
     dom.text(message);
     dom.append($('<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>'));
     $('#alert_placeholder').append(dom);
 }
 
-function bootstrapToast(title, message) {
+function bootstrapToast(title, message, type = null, alternative = false) {
+    // Types: primary, secondary, success, danger, warning, info, light, dark
     // Wrapper for new Toast Message
     var toast_wrapper = $('<div class="toast" role="alert" aria-live="assertive" aria-atomic="true"></div>');
+    validTypes = ["primary", "secondary", "success", "danger", "warning", "info", "light", "dark"]
+    if (type && validTypes.includes(type.toLowerCase())) {
+        if (alternative) {
+            toast_wrapper.addClass(`bg-${type.toLowerCase()}-subtle`).addClass(`text-${type.toLowerCase()}-emphasis`);
+        } else {
+            toast_wrapper.addClass(`text-bg-${type.toLowerCase()}`);
+        }
+    }
     // Toast header
     var toast_header = $('<div class="toast-header"><small>Just now</small><button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button></div>');
     var toast_title = $('<strong class="me-auto"></strong>');

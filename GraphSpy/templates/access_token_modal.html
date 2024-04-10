@@ -78,7 +78,15 @@
             { data: 'description' }
         ],
         order: [[4, 'desc']],
-        autoWidth: false
+        autoWidth: false,
+        order: [[4, 'desc']],
+        createdRow: function (row, data, dataIndex) {
+            if (new Date(data.expires_at) > new Date()) {
+                $(row).addClass('bg-success-subtle').addClass('text-success-emphasis');
+            } else {
+                $(row).addClass('bg-danger-subtle').addClass('text-danger-emphasis');
+            }
+        }
     })
 
     accessTokenModalTable.on('click', 'td.dt-control', function (e) {

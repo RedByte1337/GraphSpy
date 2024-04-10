@@ -93,7 +93,19 @@
             { data: 'client_id', 'width': '310px' },
             { data: 'status' }
         ],
-        order: [[3, 'desc']]
+        order: [[3, 'desc']],
+        createdRow: function (row, data, dataIndex) {
+            switch (data.status) {
+                case "SUCCESS":
+                    $(row).addClass('bg-success-subtle').addClass('text-success-emphasis');
+                    break;
+                case "EXPIRED":
+                    $(row).addClass('bg-danger-subtle').addClass('text-danger-emphasis');
+                    break;
+                default:
+                    $(row).addClass('bg-primary-subtle').addClass('text-primary-emphasis');
+            }
+        }
     })
 
     myTable.on('click', 'td.dt-control', function (e) {
