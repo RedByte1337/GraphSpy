@@ -1,5 +1,8 @@
-# GraphSpy
+[![PyPi Version](https://img.shields.io/pypi/v/GraphSpy.svg)](https://pypi.org/project/GraphSpy/)
+![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)
+[![Twitter](https://img.shields.io/twitter/follow/RedByte1337?label=RedByte1337&style=social)](https://twitter.com/intent/follow?screen_name=RedByte1337)
 
+# GraphSpy
 
 ```
    ________                             _________
