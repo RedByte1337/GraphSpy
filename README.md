@@ -115,6 +115,12 @@ Open the user's Outlook with a single click using just an Outlook access token (
 
 ![Outlook](images/outlook_2.png)
 
+## MS Teams
+
+Read and send messages using the Microsoft Teams module with a FOCI access token of the skype API (https://api.spaces.skype.com/).
+
+![MS Teams GraphSpy](images/ms_teams.png)
+
 ## Graph Searching
 
 Search for keywords through all Microsoft 365 applications using the Microsoft Search API.
@@ -154,9 +160,10 @@ Refer to the [Release Notes](https://github.com/RedByte1337/GraphSpy/wiki/Releas
 	* Password, ESTSAuth Cookie, PRT, ...
 * Advanced token customization options and optional v2 API support (CAE)
 * Automatic Access Token Refreshing
-* Microsoft Teams
-	* Sadly, most MSGrapgh scopes required for Microsoft Teams can not be obtained through a FOCI client id, limiting the usecases where it could be accessed.
-	* So the best option would be to use the Skype API, which is a FOCI resource, although this API is not documented by Microsoft or intended for public use
+* Improve Microsoft Teams Module
+  * Download authenticated files
+  * Create new conversations
+  * Upload files and images
 * Azure AD
 	* List Users, Groups, Applications, Devices, Conditional Access Policies, ...
 * Cleaner exception handling
