@@ -2,7 +2,26 @@
 table.dataTable.display tbody tr.odd {
     background-color: var(--bs-secondary-bg);
 }
-/* Required to overwrite the background color of select drop downs in datatables for visibility*/
+/* Required to overwrite the background color of select drop downs in datatables for visibility */
 .form-select {
     background-color: var(--bs-body-bg) !important;
+}
+/* Change the color of the icons on hover */
+.icon-hover-change:hover {
+    color: var(--bs-primary-border-subtle);
+}
+
+
+#teams_message_container pre {
+    background: var(--bs-secondary-bg);
+    border-radius: var(--bs-border-radius-sm);
+    padding-left:.25rem;
+}
+#teams_message_container td {
+    border-width: 1px;
+    border-color: var(--bs-secondary-border-subtle);
+    padding: .25rem;
+}
+#teams_message_container .card-body p {
+    margin-bottom: .25rem;
 }

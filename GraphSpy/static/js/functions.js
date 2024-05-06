@@ -189,6 +189,70 @@ function duplicateDatabase(database_name) {
     bootstrapToast("Duplicate database", response.responseText)
 }
 
+// ========== Teams ==========
+
+function getTeamsConversations(access_token_id) {
+    let response = $.ajax({
+        type: "POST",
+        async: false,
+        url: "/api/get_teams_conversations",
+        data: { "access_token_id": access_token_id }
+    });
+    if (response.status >= 400) {
+        bootstrapToast("Teams Conversations", response.responseText, "danger");
+        return;
+    }
+    return response.responseJSON;
+}
+
+function getTeamsConversationMessages(access_token_id, conversation_link) {
+    let response = $.ajax({
+        type: "POST",
+        async: false,
+        url: "/api/get_teams_conversation_messages",
+        data: { "access_token_id": access_token_id, "conversation_link": conversation_link }
+    });
+    if (response.status >= 400) {
+        bootstrapToast("Teams Conversation Messages", response.responseText, "danger");
+        return;
+    }
+    return response.responseJSON;
+}
+
+function sendTeamsConversationMessage(access_token_id, conversation_link, message_content) {
+    let response = $.ajax({
+        type: "POST",
+        async: false,
+        url: "/api/send_teams_conversation_message",
+        data: {
+            "access_token_id": access_token_id,
+            "conversation_link": conversation_link,
+            "message_content": message_content
+        }
+    });
+    if (response.status >= 400) {
+        bootstrapToast("Send Teams Messages", response.responseText, "danger");
+        return;
+    }
+    bootstrapToast("Send Teams Messages", `Teams message with ID ${response.responseText} created.`, "success");
+    return response.responseText;
+}
+
+function getTeamsConversationMembers(access_token_id, conversation_id) {
+    let response = $.ajax({
+        type: "POST",
+        async: false,
+        url: "/api/get_teams_conversation_members",
+        data: { "access_token_id": access_token_id, "conversation_id": conversation_id }
+    });
+    if (response.status >= 400) {
+        bootstrapToast("Teams Members", response.responseText, "danger");
+        return;
+    }
+    return response.responseJSON;
+}
+
+
 // ========== Settings ==========
 
 function setTableErorMessages(state) {

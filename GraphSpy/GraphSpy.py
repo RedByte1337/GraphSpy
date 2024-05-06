@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-from flask import Flask,render_template,request,g,redirect
+from flask import Flask,render_template,request,g,redirect,Response
 import flask.helpers
 import requests
 import jwt
 import sqlite3
 from datetime import datetime, timezone
 import time
-import os,sys,shutil,traceback
+import os,sys,shutil,traceback,logging
 from threading import Thread
 import json
 import uuid
@@ -22,10 +22,11 @@ def init_db():
     con.execute('CREATE TABLE refreshtokens (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at TEXT, description TEXT, user TEXT, tenant_id TEXT, resource TEXT, foci INTEGER, refreshtoken TEXT)')
     con.execute('CREATE TABLE devicecodes (id INTEGER PRIMARY KEY AUTOINCREMENT, generated_at INTEGER, expires_at INTEGER, user_code TEXT, device_code TEXT, interval INTEGER, client_id TEXT, status TEXT, last_poll INTEGER)')
     con.execute('CREATE TABLE request_templates (id INTEGER PRIMARY KEY AUTOINCREMENT, template_name TEXT, uri TEXT, method TEXT, request_type TEXT, body TEXT, headers TEXT, variables TEXT)')
+    con.execute('CREATE TABLE teams_settings (access_token_id INTEGER PRIMARY KEY, skypeToken TEXT, skype_id TEXT, issued_at INTEGER, expires_at INTEGER, teams_settings_raw TEXT)')
     con.execute('CREATE TABLE settings (setting TEXT UNIQUE, value TEXT)')
     # Valid Settings: active_access_token_id, active_refresh_token_id, schema_version, user_agent
     cur = con.cursor()
-    cur.execute("INSERT INTO settings (setting, value) VALUES ('schema_version', '2')")
+    cur.execute("INSERT INTO settings (setting, value) VALUES ('schema_version', '3')")
     con.commit()
     con.close()
 
@@ -73,13 +74,18 @@ def list_databases():
     return databases
 
 def update_db():
-    latest_schema_version = "2"
+    latest_schema_version = "3"
     current_schema_version = query_db("SELECT value FROM settings where setting = 'schema_version'",one=True)[0]
     if current_schema_version == "1":
         print("[*] Current database is schema version 1, updating to schema version 2")
         execute_db("CREATE TABLE request_templates (id INTEGER PRIMARY KEY AUTOINCREMENT, template_name TEXT, uri TEXT, method TEXT, request_type TEXT, body TEXT, headers TEXT, variables TEXT)")
         execute_db("UPDATE settings SET value = '2' WHERE setting = 'schema_version'")
         print("[*] Updated database to schema version 2")
+    if current_schema_version == "2":
+        print("[*] Current database is schema version 2, updating to schema version 3")
+        execute_db('CREATE TABLE teams_settings (access_token_id INTEGER PRIMARY KEY, skypeToken TEXT, skype_id TEXT, issued_at INTEGER, expires_at INTEGER, teams_settings_raw TEXT)')
+        execute_db("UPDATE settings SET value = '3' WHERE setting = 'schema_version'")
+        print("[*] Updated database to schema version 3")
 
 # ========== Helper Functions ==========
 
@@ -111,7 +117,7 @@ def graph_request_post(graph_uri, access_token_id, body):
     resp_json = response.json()
     return json.dumps(resp_json)
     
-def generic_request(uri, access_token_id, method, request_type, body, headers):
+def generic_request(uri, access_token_id, method, request_type, body, headers={}, cookies={}):
     access_token = query_db("SELECT accesstoken FROM accesstokens where id = ?",[access_token_id],one=True)[0]
     headers["Authorization"] = f"Bearer {access_token}"
     headers["User-Agent"] = get_user_agent()
@@ -236,6 +242,8 @@ def refresh_to_access_token(refresh_token_id, resource = "defined_in_token", cli
         )
     return access_token_id
 
+# ========== Device Code Functions ==========
+
 def generate_device_code(resource = "https://graph.microsoft.com", client_id = "d3590ed6-52b3-4102-aeff-aad2292ab01c"):
     body =  {
         "resource": resource,
@@ -302,8 +310,8 @@ def poll_device_codes():
                         f"Created using device code auth ({user_code})", 
                         user, 
                         decoded_accesstoken["tid"] if "tid" in decoded_accesstoken else "unknown", 
-                        response.json()["resource"], 
-                        int(response.json()["foci"]))
+                        response.json()["resource"]if "resource" in response.json() else "unknown", 
+                        int(response.json()["foci"])) if "foci" in response.json() else 0
                     execute_db("UPDATE devicecodes SET status = ? WHERE device_code = ?",("SUCCESS",row["device_code"]))
 
 def start_device_code_thread():
@@ -320,6 +328,49 @@ def device_code_flow(resource = "https://graph.microsoft.com", client_id = "d359
     user_code = row["user_code"]
     start_device_code_thread()
     return user_code
+
+# ========== Teams Functions ==========
+
+def getTeamsSettings(access_token_id):
+    # If there are skype settings in the DB already that matches the access_token_id, and it is not expired yet, return those
+    teams_settings_db = query_db_json("SELECT * FROM teams_settings WHERE access_token_id = ?",[access_token_id],one=True)
+    if teams_settings_db and int(datetime.now().timestamp()) < teams_settings_db["expires_at"]:
+        gspy_log.debug("Found teams settings in database. Using those.")
+        return teams_settings_db
+    # Else, request a new skype token, store it in the DB, and return that
+    gspy_log.debug(f"No teams settings found in database for access token with ID {access_token_id}. Requesting new teams settings.")
+    access_token = query_db("SELECT accesstoken FROM accesstokens WHERE id = ? AND resource LIKE '%api.spaces.skype.com%'",[access_token_id],one=True)
+    if not access_token:
+        gspy_log.error(f"No access token with ID {access_token_id} and resource containing 'api.spaces.skype.com'!")
+        return False
+    access_token = access_token[0]
+    headers = {"Authorization":f"Bearer {access_token}", "User-Agent":get_user_agent()}
+    uri = "https://teams.microsoft.com/api/authsvc/v1.0/authz"
+    response = requests.post(uri, headers=headers)
+    if response.status_code != 200:
+        gspy_log.error(f"Failed obtaining teams settings. Received status code {response.status_code}")
+        return False
+    try:
+        teams_settings_json = response.json()
+        skype_token = teams_settings_json["tokens"]["skypeToken"]
+        decoded_skype_token = jwt.decode(skype_token, options={"verify_signature": False})
+        teams_settings_string = json.dumps(teams_settings_json)
+        execute_db("INSERT OR REPLACE INTO teams_settings (access_token_id, skypeToken, skype_id, issued_at, expires_at, teams_settings_raw) VALUES (?,?,?,?,?,?)",(
+                access_token_id,
+                skype_token,
+                decoded_skype_token["skypeid"],
+                decoded_skype_token["iat"],
+                decoded_skype_token["exp"],
+                teams_settings_string
+                )
+            )
+        teams_settings_db = query_db_json("SELECT * FROM teams_settings WHERE access_token_id = ?",[access_token_id],one=True)
+        if teams_settings_db:
+            return teams_settings_db
+    except Exception as e:
+        gspy_log.error(f"Failed extracting teams settings from response.")
+        traceback.print_exc()
+    return False
 
 def safe_join(directory, filename):
     # Safely join `directory` and `filename`.
@@ -385,10 +436,14 @@ def init_routes():
     @app.route("/sharepoint")
     def sharepoint():
         return render_template('SharePoint.html', title="SharePoint")
-
+        
     @app.route("/outlook")
     def outlook():
         return render_template('outlook.html', title="Outlook")
+
+    @app.route("/teams")
+    def teams():
+        return render_template('teams.html', title="Microsoft Teams")
 
     # ========== API ==========
 
@@ -653,6 +708,110 @@ def init_routes():
         execute_db("DELETE FROM request_templates where id = ?",[template_id])
         return f"[Success] Deleted request template '{existing_request_template['template_name']}' from database."
 
+        # ========== Teams ==========
+
+    @app.post("/api/get_teams_conversations")
+    def api_get_teams_conversations():
+        if not "access_token_id" in request.form:
+            return f"[Error] No access_token_id specified.", 400
+        access_token_id = request.form['access_token_id']
+        teams_settings = getTeamsSettings(access_token_id)
+        if not teams_settings:
+            return f"[Error] Unable to obtain teams settings with access token {access_token_id}.", 400
+        chat_service_uri = json.loads(teams_settings['teams_settings_raw'])['regionGtms']['chatService']
+        uri = f"{chat_service_uri}/v1/users/ME/conversations?view=msnp24Equivalent&pageSize=500"
+        headers = {"Authentication":f"skypetoken={teams_settings['skypeToken']}"}
+        response = generic_request(uri, access_token_id, "GET", "text", "", headers)
+        if response['response_status_code'] == 200 and response['response_type'] == "json":
+            return json.loads(response['response_text'])
+        return f"[Error] Something went wrong trying to obtain Teams Conversations. Received response status {response['response_status_code']} and response type {response['response_type']}", 400
+
+    @app.post("/api/get_teams_conversation_messages")
+    def api_get_teams_conversation_messages():
+        if not "access_token_id" in request.form:
+            return f"[Error] No access_token_id specified.", 400
+        access_token_id = request.form['access_token_id']
+        if not "conversation_link" in request.form:
+            return f"[Error] No conversation_link specified.", 400
+        conversation_link = request.form['conversation_link']
+        teams_settings = getTeamsSettings(access_token_id)
+        if not teams_settings:
+            return f"[Error] Unable to obtain teams settings with access token {access_token_id}.", 400
+        uri = f"{conversation_link}?startTime=0&view=msnp24Equivalent&pageSize=200"
+        headers = {"Authentication":f"skypetoken={teams_settings['skypeToken']}"}
+        response = generic_request(uri, access_token_id, "GET", "text", "", headers)
+        if response['response_status_code'] == 200 and response['response_type'] == "json":
+            conversation_messages = json.loads(response['response_text'])
+            # Add `isFromMe: True` to the message if the message is from the current user.
+            conversation_messages["messages"] = [{**message, "isFromMe": message["from"].endswith(teams_settings["skype_id"])} for message in conversation_messages["messages"]]
+            return conversation_messages
+        return f"[Error] Something went wrong trying to obtain Teams Conversations. Received response status {response['response_status_code']} and response type {response['response_type']}", 400
+
+    @app.post("/api/send_teams_conversation_message")
+    def api_send_teams_conversation_message():
+        if not "access_token_id" in request.form:
+            return f"[Error] No access_token_id specified.", 400
+        access_token_id = request.form['access_token_id']
+        if not "conversation_link" in request.form:
+            return f"[Error] No conversation_link specified.", 400
+        conversation_link = request.form['conversation_link']
+        if not "message_content" in request.form:
+            return f"[Error] No message_content specified.", 400
+        message_content = request.form['message_content']
+        teams_settings = getTeamsSettings(access_token_id)
+        if not teams_settings:
+            return f"[Error] Unable to obtain teams settings with access token {access_token_id}.", 400
+        headers = {"Authentication":f"skypetoken={teams_settings['skypeToken']}"}
+        body = {
+            "messagetype": "RichText/Html",
+            "content": message_content
+        }
+        response = requests.post(conversation_link, headers=headers, json=body)
+        if response.status_code >= 200 and response.status_code < 300:
+            message_id = response.json()["OriginalArrivalTime"] if "OriginalArrivalTime" in response.json() else "Unknown"
+            return f"{message_id}"
+        return f"[Error] Something went wrong trying to send Teams message. Received response status {response.status_code}", 400
+        gspy_log.error("Failed sending teams message. Received response status {response.status_code}. Response body:")
+        gspy_log.error(response.json())
+
+    @app.post("/api/get_teams_conversation_members")
+    def api_get_teams_conversation_members():
+        if not "access_token_id" in request.form:
+            return f"[Error] No access_token_id specified.", 400
+        access_token_id = request.form['access_token_id']
+        if not "conversation_id" in request.form:
+            return f"[Error] No conversation_id specified.", 400
+        conversation_id = request.form['conversation_id']
+        teams_settings = getTeamsSettings(access_token_id)
+        if not teams_settings:
+            return f"[Error] Unable to obtain teams settings with access token {access_token_id}.", 400
+        teams_and_channel_service_uri = json.loads(teams_settings['teams_settings_raw'])['regionGtms']['teamsAndChannelsService']
+        uri = f"{teams_and_channel_service_uri}/beta/teams/{conversation_id}/members"
+        response = generic_request(uri, access_token_id, "GET", "text", "", {})
+        if response['response_status_code'] == 200 and response['response_type'] == "json":
+            conversation_members = json.loads(response['response_text'])
+            # Add `isCurrentUser: True` to the member if the member is the current user.
+            conversation_members = [{**member, "isCurrentUser": member["mri"].endswith(teams_settings["skype_id"])} for member in conversation_members]
+            return conversation_members
+        return f"[Error] Something went wrong trying to obtain Teams Members. Received response status {response['response_status_code']} and response type {response['response_type']}", 400
+
+    @app.get("/api/get_teams_image")
+    def api_get_teams_image():
+        if not "access_token_id" in request.args:
+            return f"[Error] No access_token_id specified.", 400
+        access_token_id = request.args['access_token_id']
+        if not "image_uri" in request.args:
+            return f"[Error] No image_uri specified.", 400
+        image_uri = request.args['image_uri']
+        teams_settings = getTeamsSettings(access_token_id)
+        if not teams_settings:
+            return f"[Error] Unable to obtain teams settings with access token {access_token_id}.", 400
+        cookies = {"skypetoken_asm":teams_settings['skypeToken']}
+        response = requests.get(image_uri, cookies=cookies)
+        if response.status_code == 200:
+            return Response(response.content, mimetype=response.headers['Content-Type'])
+        return f"[Error] Something went wrong trying to obtain teams image. Received response status {response.status_code} and response type {response.headers['Content-Type'] if 'Content-Type' in response.headers else 'empty'}", 400
+
 
         # ========== Database ==========
     
@@ -770,6 +929,15 @@ def main():
     parser.add_argument("-d","--database", type=str, default="database.db", help="Database file to utilize. (Default = database.db)")
     parser.add_argument("--debug", action="store_true", help="Enable flask debug mode. Will show detailed stack traces when an error occurs.")
     args = parser.parse_args()
+
+    # Configure logging
+    global gspy_log
+    gspy_log = logging.getLogger(__name__)
+    gspy_log.setLevel(logging.DEBUG if args.debug else logging.ERROR)
+    log_handler = logging.StreamHandler()
+    log_format = "[%(funcName)s():%(lineno)s] %(levelname)s: %(message)s"
+    log_handler.setFormatter(logging.Formatter(log_format))
+    gspy_log.addHandler(log_handler)
 
     # Create global Flask app variable
     global app

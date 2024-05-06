@@ -1,0 +1,354 @@
+{% extends 'layout.html'%}
+
+{%block content%}
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/summernote/0.8.20/summernote-bs5.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/summernote/0.8.20/summernote-bs5.min.js"></script>
+<br>
+<div class="row g-3">
+    <h1>Microsoft Teams</h1>
+    <form id="ms_teams_form">
+        <div class="row g-3 align-items-center">
+            <div class="col-lg-3">
+                <div class="input-group">
+                    <input type="text" id="access_token_id" name="access_token_id" class="form-control" required readonly>
+                    <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#access_token_modal" onclick="$('#access_token_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
+                    <button type="Button" class="btn btn-outline-primary" onclick="loadTeamsConversations()">Reload</button>
+                </div>
+            </div>
+            <div class="col-lg-3">
+                <div class="row g-3">
+                    <div class="col-auto mt-0">
+                        <div class="form-check form-switch">
+                            <input type="checkbox" id="resolve_conversation_names" class="form-check-input" role="switch">
+                            <label for="resolve_conversation_names" class="form-check-label" id="resolve_conversation_names_tooltip" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Requests the members of all chat messages to display in the title. Note: This will perform one extra request per chat message, which can take a couple of seconds to complete!">Resolve conversation names</label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input type="checkbox" id="auto_reload_messages" class="form-check-input" role="switch">
+                            <label for="auto_reload_messages" class="form-check-label" id="auto_reload_messages_tooltip" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Automatically reload messages of the selected conversation every 5 seconds.">Auto reload messages</label>
+                        </div>
+                    </div>
+                    <div class="col-auto mt-0">
+                        <div class="form-check form-switch">
+                            <input type="checkbox" id="show_all_messages" class="form-check-input" role="switch">
+                            <label for="show_all_messages" class="form-check-label" id="show_all_messages_tooltip" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Also show empty and deleted messages.">Show all messages</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+    <script>
+        getActiveAccessToken(document.getElementById("ms_teams_form").access_token_id)
+        new bootstrap.Tooltip(document.getElementById('resolve_conversation_names_tooltip'))
+        new bootstrap.Tooltip(document.getElementById('auto_reload_messages_tooltip'))
+        new bootstrap.Tooltip(document.getElementById('show_all_messages_tooltip'))
+    </script>
+</div>
+<br>
+<div class="row g-3">
+    <div class="col-md-3">
+        <div id="conversation_list_group" class="list-group overflow-y-auto">
+        </div>
+    </div>
+    <div class="col-md-9">
+        <div id="teams_message_container" class="rounded-4 border border-secondary-subtle bg-secondary-subtle overflow-y-auto d-flex flex-column-reverse mb-3">
+            <center class="p-5">Select a conversation from the conversation list</center>
+        </div>
+        <div id="message_form_container">
+            <form id="message_form">
+                <div class="mb-2">
+                    <div id="message_text" class="text-body-secondary"></div>
+                </div>
+                <div class="d-flex justify-content-end">
+                    <button class="btn btn-outline-primary ms-3" type="button" id="send_message_button" onclick="sendTeamsMessage()">Send</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+    $(document).ready(function () {
+        $('#message_form #message_text').summernote(
+            {
+                placeholder: "Type a message",
+                toolbar: [
+                    ['style', ['style']],
+                    ['font', ['bold', 'italic', 'underline', 'clear']],
+                    ['fontname', ['fontname']],
+                    ['color', ['color']],
+                    ['para', ['ul', 'ol', 'paragraph']],
+                    ['table', ['table']],
+                    ['insert', ['link']],
+                    ['view', ['codeview', 'help']]
+                ]
+            }
+        );
+        // Fix bootstrap5 summernote dropdowns
+        $(".note-toolbar button[data-toggle='dropdown']").each(function (index) { $(this).removeAttr("data-toggle").attr("data-bs-toggle", "dropdown"); });
+        // Fix dropdowns not closing on click
+        window.noteDropdownIsOpen = false;
+        $(".note-toolbar button.dropdown-toggle").on('show.bs.dropdown', function (e) { window.clickedOpen = true; });
+        window.addEventListener("click", event => {
+            if (window.noteDropdownIsOpen) {
+                for (const noteDropdown of $(".note-toolbar button.dropdown-toggle.show")) {
+                    let noteDropdownJquery = $(noteDropdown);
+                    noteDropdownJquery.toggleClass("show");
+                    noteDropdownJquery.siblings('.dropdown-menu').toggleClass("show");
+                }
+                window.noteDropdownIsOpen = false;
+                window.clickedOpen = false;
+            }
+            if (window.clickedOpen) {
+                window.noteDropdownIsOpen = true;
+            }
+        });
+        // Set correct height of teams_message_container and message_form
+        $('div.note-editable').css({ 'max-height': 150 + 'px' });
+        updateTeamsMessageContainerSize();
+        // Update teams_message_container height every time the message_form content changes
+        $('#message_form #message_text').on("summernote.change", function () { updateTeamsMessageContainerSize() })
+    });
+
+    // Dynamically set the max-height of the "conversation_list_group" and "teams_message_container" to whatever space is left below it
+    $("#conversation_list_group").css("max-height", `calc(100vh - ${document.getElementById("conversation_list_group").getBoundingClientRect().top}px - 10px)`)
+    function updateTeamsMessageContainerSize() {
+        $("#teams_message_container").css("max-height", `calc(100vh - ${document.getElementById("teams_message_container").getBoundingClientRect().top}px - ${document.getElementById("message_form_container").getBoundingClientRect().height}px - 25px)`)
+    }
+
+    function loadTeamsConversations() {
+        teams_access_token_id = $("#ms_teams_form #access_token_id").val()
+        conversations = getTeamsConversations(teams_access_token_id).conversations;
+        conversationsNonEmpty = conversations.filter(function (conversation) { return conversation.properties.isemptyconversation == "False" })
+        conversations_sorted = conversationsNonEmpty.sort(function (a, b) {
+            return (b.lastMessage.originalarrivaltime > a.lastMessage.originalarrivaltime ? 1 : -1);
+        });
+        $("#conversation_list_group").empty();
+        for (const conversation of conversations_sorted) {
+            // Skip empty conversations or streamofnotifications
+            if (conversation.properties.isemptyconversation == "True" || conversation.threadProperties.threadType == "streamofnotifications") {
+                continue;
+            }
+            // Get a useful name for the conversation
+            var conversationName = conversation.threadProperties.topic || conversation.threadProperties.spaceThreadTopic || "";
+            console.log(conversation)
+            if (conversation.threadProperties.threadType == "chat" && !conversationName && $("#ms_teams_form #resolve_conversation_names").prop('checked')) {
+                let conversationMembers = getTeamsConversationMembers(teams_access_token_id, conversation.id);
+                //console.log(conversationMembers);
+                let otherMembers = conversationMembers.filter(member => !member.isCurrentUser);
+                for (const otherMember of otherMembers) {
+                    conversationName += `${otherMember.displayName}, `;
+                }
+                if (conversationName) {
+                    conversationName = conversationName.slice(0, -2)
+                }
+            }
+            if (!conversationName) {
+                conversationName = "Unknown";
+            }
+            // To do: get the name of the last message sender if it is empty and if resolve_conversation_names is set
+
+            let conversationItemWrapper = $('<a href="#" class="list-group-item list-group-item-action"></a>');
+            let conversationItemHeader = $('<div class="d-flex justify-content-between"></div>');
+            let conversationItemName = $('<b class="mb-1 text-truncate"></b>').text(`[${conversation.threadProperties.threadType}] ${conversationName}`);
+            // Show the time if the last message was sent today, otherwise show the date
+            lastMessageDate = new Date(conversation.lastMessage.originalarrivaltime);
+            lastMessageDate = (new Date().toLocaleDateString() == lastMessageDate.toLocaleDateString()) ? lastMessageDate.toLocaleTimeString() : lastMessageDate.toLocaleDateString();
+            let conversationItemDate = $('<small class="text-body-secondary"></small>').text(lastMessageDate);
+            let conversationItemPreview = $('<div class="d-flex justify-content-between"></div>')
+            let previewContent = ((["RichText/Html", "Text"].includes(conversation.lastMessage.messagetype)) ? `${conversation.lastMessage.imdisplayname}: ${new DOMParser().parseFromString(DOMPurify.sanitize(conversation.lastMessage.content), 'text/html').body.textContent.trim() || "[Unrenderable_Content]"}` : "[Unrenderable_Content]");
+            conversationItemPreview.append($('<small class="text-body-secondary text-truncate"></small>').text(previewContent));
+            conversationItemPreview.append($('<div class="d-flex"><i id="members-icon" class="fi fi-rr-user icon-hover-change mx-1"></i> <i id="info-icon" class="fi fi-rr-info icon-hover-change"></i></div>'));
+            let conversationRawHidden = $('<div class="raw-conversation" hidden></div>').text(JSON.stringify(conversation));
+            conversationItemHeader.append(conversationItemName).append(conversationItemDate);
+            conversationItemWrapper.append(conversationItemHeader);
+            conversationItemWrapper.append(conversationItemPreview);
+            conversationItemWrapper.append(conversationRawHidden);
+            $("#conversation_list_group").append(conversationItemWrapper);
+        }
+    }
+
+    function createTeamsMessageHtml(messageJson) {
+        let teamsMessageWrapper = $('<div class="d-flex m-3"></div>').addClass((messageJson.isFromMe ? "justify-content-end" : "justify-content-start"));
+        let teamsMessageCard = $('<div class="card overflow-hidden" style="max-width: 75%"></div>');
+        let teamsMessageCardHeader = $('<div class="card-header text-body-secondary"></div>');
+        if (messageJson.isFromMe) {
+            teamsMessageCard.addClass("bg-primary-subtle").addClass("text-primary-emphasis");
+            teamsMessageCardHeader.addClass("text-end");
+        };
+        teamsMessageCardHeader.text(`${messageJson.imdisplayname} - ${new Date(messageJson.composetime).toLocaleDateString([], { dateStyle: 'short' })} ${new Date(messageJson.composetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+        teamsMessageCardHeader.append('<i id="info-icon" class="fi fi-rr-info icon-hover-change ps-2"></i>');
+        let teamsMessageCardBody = $('<div class="card-body"></div>');
+        teamsMessageCardBody.append(DOMPurify.sanitize(messageJson.content, { ADD_ATTR: ['itemtype'] }));
+        // Replace AMSImage URLs with requests to the /api/get_teams_image GraphSpy endpoint
+        for (const image_element of teamsMessageCardBody.find("img[itemtype$='AMSImage']")) {
+            image_element_jquery = $(image_element)
+            image_element_jquery.attr("src", `${window.location.origin}/api/get_teams_image?access_token_id=${$("#ms_teams_form #access_token_id").val()}&image_uri=${encodeURIComponent(image_element_jquery.attr("src"))}`)
+        }
+        // If the message includes files, display them
+        // Files displayed in green can be downloaded anonymously, while orange require authentication
+        // To do: Use a MsGraph access token to download the files based on the SiteID and ItemID
+        if (messageJson.hasOwnProperty("properties") && messageJson.properties.hasOwnProperty("files")) {
+            for (const file of JSON.parse(messageJson.properties.files)) {
+                let fileContainer = $('<a class="link-underline link-underline-opacity-0" target="_blank"></a>');
+                fileContainer.attr("href", file.fileInfo.shareUrl);
+                let fileColor = file.permissionScope == "anonymous" ? "success" : "warning";
+                let fileBody = $(`<div class="border border-${fileColor}-subtle rounded p-2 bg-${fileColor}-subtle text-${fileColor}-emphasis"></div>`);
+                fileBody.append($('<i class="fi fi-rr-document"></i>'));
+                fileBody.append($('<span></span>').text(" " + file.fileName));
+                fileContainer.append(fileBody)
+                teamsMessageCardBody.append(fileContainer);
+            }
+        }
+        let teamsMessageRawHidden = $('<div class="raw-message" hidden></div>').text(JSON.stringify(messageJson));
+        teamsMessageCard.append(teamsMessageCardHeader);
+        teamsMessageCard.append(teamsMessageCardBody);
+        teamsMessageCard.append(teamsMessageRawHidden);
+        teamsMessageWrapper.append(teamsMessageCard);
+        return teamsMessageWrapper;
+    }
+
+    function populateTeamsMessages(messageURL) {
+        $("#teams_message_container").empty();
+        teams_access_token_id = $("#ms_teams_form #access_token_id").val();
+        let messagesJson = getTeamsConversationMessages(teams_access_token_id, messageURL);
+        if (!messagesJson) { return }
+        let messagesArray = messagesJson.messages.sort(function (a, b) { return b.sequenceId - a.sequenceId });
+        for (const message of messagesArray) {
+            console.log(message);
+            // Skip empty or deleted messages
+            if ((!message || message.properties.hasOwnProperty("deletetime")) && !$("#ms_teams_form #show_all_messages").prop('checked')) {
+                continue;
+            }
+            if ((!message.imdisplayname || message.imdisplayname.startsWith("orgid:")) && window.currentConversationMembers) {
+                // Resolve it from the members list
+                let messageSender = window.currentConversationMembers.filter(member => message.from.endsWith(member.mri));
+                message.imdisplayname = messageSender.length ? messageSender[0].displayName : message.from;
+            }
+            $("#teams_message_container").append(createTeamsMessageHtml(message));
+        }
+    }
+
+    function sendTeamsMessage() {
+        if (!window.currentConversation) {
+            bootstrapToast("Send Teams Message", "No conversation selected. Please select a conversation first before trying to send a message.", "warning");
+            return;
+        }
+        teams_access_token_id = $("#ms_teams_form #access_token_id").val();
+        message_content = $('#message_form #message_text').summernote('code');
+        sendTeamsConversationMessage(teams_access_token_id, window.currentConversation.messages, message_content);
+        populateTeamsMessages(window.currentConversation.messages);
+    }
+
+</script>
+<!-- Conversation Info Modal -->
+<div class="modal fade" id="conversation_info_modal" tabindex="-1" aria-labelledby="conversation_info_modal_label" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="conversation_info_modal_label">Conversation Info</h1>
+                <div style="float: right">
+                    <i class="fi fi-br-expand px-3" id="expand-icon" style="cursor: pointer; float: left; opacity: 0.5"></i>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <pre id="conversation_info_details">
+                </pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Conversation Members Modal -->
+<div class="modal fade" id="conversation_members_modal" tabindex="-1" aria-labelledby="conversation_members_modal_label" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="conversation_members_modal_label">Conversation Members</h1>
+                <div style="float: right">
+                    <i class="fi fi-br-expand px-3" id="expand-icon" style="cursor: pointer; float: left; opacity: 0.5"></i>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <pre id="conversation_members_details">
+                </pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Teams Message Info Modal -->
+<div class="modal fade" id="teams_message_info_modal" tabindex="-1" aria-labelledby="teams_message_info_modal_label" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="teams_message_info_modal_label">Teams Message Info</h1>
+                <div style="float: right">
+                    <i class="fi fi-br-expand px-3" id="expand-icon" style="cursor: pointer; float: left; opacity: 0.5"></i>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <pre id="teams_message_info_details">
+                </pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    // Show conversation info
+    $("#conversation_list_group").on('click', 'i#info-icon', function (e) {
+        let conversation_info = e.target.closest(".list-group-item").getElementsByClassName("raw-conversation")[0].textContent
+        $("#conversation_info_details").text(JSON.stringify(JSON.parse(conversation_info), undefined, 4));
+        $('#conversation_info_modal').modal('show');
+        e.stopPropagation();
+    });
+    // Show conversation members
+    $("#conversation_list_group").on('click', 'i#members-icon', function (e) {
+        let conversation_info = JSON.parse(e.target.closest(".list-group-item").getElementsByClassName("raw-conversation")[0].textContent, undefined, 4);
+        let teams_access_token_id = $("#ms_teams_form #access_token_id").val();
+        let conversation_members = getTeamsConversationMembers(teams_access_token_id, conversation_info.id)
+        $("#conversation_members_details").text(JSON.stringify(conversation_members, undefined, 4));
+        $('#conversation_members_modal').modal('show');
+        e.stopPropagation();
+    });
+    // Open conversation messages
+    $("#conversation_list_group").on('click', 'a.list-group-item', function (e) {
+        let conversation_info = JSON.parse(e.target.closest(".list-group-item").getElementsByClassName("raw-conversation")[0].textContent, undefined, 4);
+        $("#conversation_list_group .list-group-item.active").removeClass("active");
+        $(e.target.closest(".list-group-item")).addClass("active");
+        let teams_access_token_id = $("#ms_teams_form #access_token_id").val();
+        window.currentConversationMembers = getTeamsConversationMembers(teams_access_token_id, conversation_info.id)
+        window.currentConversation = conversation_info;
+        populateTeamsMessages(conversation_info.messages);
+    });
+    // Show teams message info
+    $("#teams_message_container").on('click', 'i#info-icon', function (e) {
+        let message_info = JSON.parse(e.target.closest("div.card").getElementsByClassName("raw-message")[0].textContent, undefined, 4);
+        $("#teams_message_info_details").text(JSON.stringify(message_info, undefined, 4));
+        $('#teams_message_info_modal').modal('show');
+    });
+    // Expand modals button
+    $(".modal").on('click', 'i#expand-icon', function (e) {
+        $(e.target).closest(".modal-dialog").toggleClass('modal-xl').toggleClass('modal-fullscreen');
+        $(e.target).toggleClass('fi-br-expand').toggleClass('fi-br-compress');
+    });
+    // Auto Reload Messages
+    setInterval(function () {
+        if ($("#ms_teams_form #auto_reload_messages").prop('checked') && window.currentConversation) {
+            populateTeamsMessages(window.currentConversation.messages);
+        }
+    }, 5000);
+
+
+</script>
+    {% endblock content %}

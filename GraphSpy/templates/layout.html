@@ -14,6 +14,8 @@
     <script type="text/javascript" language="javascript" src="https://code.jquery.com/jquery-3.5.1.js"></script>
     <script type="text/javascript" language="javascript" src="https://cdn.datatables.net/1.11.1/js/jquery.dataTables.min.js"></script>
     <script type="text/javascript" language="javascript" src="https://cdn.datatables.net/1.11.1/js/dataTables.bootstrap5.min.js"></script>
+    <!-- DOMPurify -->
+    <script type="text/javascript" language="javascript" src="{{url_for('static', filename='js/purify.min.js')}}"></script>
     <!-- Static JS $ CSS -->
     <script type="text/javascript" language="javascript" src="{{url_for('static', filename='js/theme.js')}}"></script>
     <script type="text/javascript" language="javascript" src="{{url_for('static', filename='js/functions.js')}}"></script>
@@ -79,8 +81,16 @@
                         <a class="nav-link" href="{{url_for('outlook')}}">Outlook</a>
                     </li>
                     <li class="nav-item">
-                        <span class="d-inline-block" id="nav-teams-disabled" data-bs-toggle="popover" data-bs-trigger="hover focus" data-bs-content="Coming soon!" data-bs-placement="bottom">
-                            <a class="nav-link disabled">Teams</a>
+                        <a class="nav-link" href="{{url_for('teams')}}">Teams</a>
+                    </li>
+                    <li class="nav-item">
+                        <span class="d-inline-block" id="nav-entra-disabled" data-bs-toggle="popover" data-bs-trigger="hover focus" data-bs-content="Coming soon!" data-bs-placement="bottom">
+                            <a class="nav-link disabled">Entra ID</a>
+                        </span>
+                    </li>
+                    <li class="nav-item">
+                        <span class="d-inline-block" id="nav-azure-disabled" data-bs-toggle="popover" data-bs-trigger="hover focus" data-bs-content="Coming soon!" data-bs-placement="bottom">
+                            <a class="nav-link disabled">Azure</a>
                         </span>
                     </li>
                 </ul>
@@ -95,7 +105,8 @@
         </div>
     </nav>
     <script>
-        const disabledPopover = new bootstrap.Popover(document.getElementById('nav-teams-disabled'))
+        const entraPopover = new bootstrap.Popover(document.getElementById('nav-entra-disabled'))
+        const azurePopover = new bootstrap.Popover(document.getElementById('nav-azure-disabled'))
     </script>
     <!-- Placeholders -->
     <div id="alert_placeholder"></div>
