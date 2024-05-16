@@ -85,20 +85,46 @@
 </div>
 <br>
 <div class="row" id="response-card" style="display: none">
-    <div class="col-auto">
+    <div class="col-auto" style="min-width:400px">
         <div class="card mt-3">
-            <div class="card-header" style="text-align: center">
-                <b>Response [<span id="response_status_code"></span>]</b>
-                <i class="fi fi-rr-copy-alt" id="copy-icon" style="cursor: pointer; float: right"></i>
+            <div class="card-header">
+                <div class="d-flex justify-content-between">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" id="response_card_body_button" class="btn btn-outline-primary active" onclick="toggleResponseCardContent()">Body</button>
+                        <button type="button" id="response_card_headers_button" class="btn btn-outline-primary" onclick="toggleResponseCardContent()">Headers</button>
+                    </div>
+                    <b>Response [<span id="response_status_code"></span>]</b>
+                    <i class="fi fi-rr-copy-alt" id="copy-icon" style="cursor: pointer"></i>
+                </div>
             </div>
-            <div class="card-body">
-                <pre id="response_body" class="mb-0"></pre>
+                <div class="card-body">
+                    <pre id="response_body" class="mb-0"></pre>
+                    <div id="response_headers" class="mb-0" style="display: none">
+                        <table id="response_header_table" class="display table-responsive" style="word-wrap: break-word; word-break: break-all; width:100%">
+                            <thead>
+                                <tr>
+                                    <th>Response Header</th>
+                                    <th>Value</th>
+                                </tr>
+                            </thead>
+                        </table>
+                    </div>
+                </div>
             </div>
-        </div>
     </div>
 </div>
+
 <script>
-    function getHeaders() {
+
+    function toggleResponseCardContent() {
+        $("#response_card_body_button").toggleClass("active");
+        $("#response_card_headers_button").toggleClass("active");
+        $("#response_body").toggle();
+        $("#response_headers").toggle();
+        $("#response_header_table").DataTable().columns.adjust()
+    }
+
+    function getInputHeaders() {
         let headers = {};
         for (const header of $("#header_fields").children()) {
             if (header.getElementsByClassName("header_name")[0].value != "") {
@@ -107,7 +133,7 @@
         };
         return headers;
     }
-    function getVariables() {
+    function getInputVariables() {
         let variables = {};
         for (const variable of $("#variable_fields").children()) {
             if (variable.getElementsByClassName("variable_name")[0].value != "") {
@@ -132,8 +158,8 @@
                 "method": request_form.method.value,
                 "request_type": request_form.request_type.value,
                 "body": request_form.body.value,
-                "headers": getHeaders(),
-                "variables": getVariables()
+                "headers": getInputHeaders(),
+                "variables": getInputVariables()
             }),
             success: null
         });
@@ -155,6 +181,31 @@
         }
         $("#response_status_code").text(responseJSON.response_status_code);
         $("#response-card").show();
+
+        generateRespHeadersTable(responseJSON.response_headers);
+    }
+
+    function generateRespHeadersTable(respHeaders) {
+        if ($.fn.dataTable.isDataTable('#response_header_table')) {
+            $('#response_header_table').DataTable().destroy();
+            $('#response_header_table').empty();
+        }
+        tableData = [];
+        for (const header in respHeaders) {
+            tableData.push({ "header": header, "value": respHeaders[header] })
+        };
+        let respHeadersTable = new DataTable('#response_header_table', {
+            data: tableData,
+            columns: [
+                { data: 'header', title:"Response Header" },
+                { data: 'value', title: "Value" }
+            ],
+            autoWidth: true,
+            info: false,
+            ordering: false,
+            paging: false,
+            searching: false
+        })
     }
 
     function saveRequestTemplate() {
@@ -173,8 +224,8 @@
                 "method": request_form.method.value,
                 "request_type": request_form.request_type.value,
                 "body": request_form.body.value,
-                "headers": getHeaders(),
-                "variables": getVariables()
+                "headers": getInputHeaders(),
+                "variables": getInputVariables()
             }),
             success: null
         });

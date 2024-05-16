@@ -147,7 +147,7 @@ def generic_request(uri, access_token_id, method, request_type, body, headers={}
         response_text = json.dumps(response.json()) if response_type == "json" else response.text
     except ValueError as e:
         response_text = response.text
-    return {"response_status_code": response.status_code ,"response_type": response_type ,"response_text": response_text}
+    return {"response_status_code": response.status_code ,"response_type": response_type ,"response_text": response_text, "response_headers": dict(response.headers)}
 
 def save_access_token(accesstoken, description):
     decoded_accesstoken = jwt.decode(accesstoken, options={"verify_signature": False})
