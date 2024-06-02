@@ -34,7 +34,7 @@
 
 <div>
     <h2>Sites Table</h2>
-    <table id="response_table" class="display" style="word-wrap: break-word; word-break: break-all; width:100%">
+    <table id="response_table" class="table table-striped" style="word-wrap: break-word; word-break: break-all; width:100%">
         <thead>
             <tr>
                 <th></th>
@@ -79,7 +79,7 @@
                         orderable: false,
                         data: null,
                         defaultContent: '',
-                        'width': '20px'
+                        'width': '40px'
                     },
                     {
                         className: 'action-control',
@@ -93,15 +93,15 @@
                             // Question mark icon
                             return '<i class="fi fi-br-question" style="cursor: pointer"></i>'
                         },
-                        'width': '20px'
+                        'width': '40px'
                     },
                     {
                         data: 'resource.createdDateTime',
-                        width: '150px'
+                        width: '175px'
                     },
                     {
                         data: 'resource.lastModifiedDateTime',
-                        width: '150px'
+                        width: '175px'
                     },
                     { data: 'resource.name' },
                     { data: 'resource.displayName' },
@@ -141,9 +141,9 @@
     function format(d) {
         // `d` is the original data object for the row
         return (
-            '<dl style = "word-wrap: break-word; word-break: break-all; width:100%">' +
+            '<dl>' +
             '<dt>Raw File Info:</dt>' +
-            '<dd><pre>' +
+            '<dd><pre style="white-space: pre-wrap;">' +
             JSON.stringify(d, undefined, 4) +
             '</pre></dd>' +
             '</dl>'

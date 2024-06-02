@@ -23,7 +23,7 @@
         <div class="col-sm-4">
             <label for="search_limit" class="form-label">Limit *</label>
             <input type="text" id="search_limit" name="search_limit" class="form-control" value="25" required>
-            <i class="form-text">Max 1000</i>
+            <i class="form-text">Max 500</i>
         </div>
         <div class="col-sm-4">
             <label for="access_token_id" class="form-label">Access token id *</label>
@@ -48,7 +48,7 @@
 
 <div>
     <h2>Response</h2>
-    <table id="response_table" class="display" style="word-wrap: break-word; word-break: break-all; width:100%">
+    <table id="response_table" class="table table-striped" style="word-wrap: break-word; word-break: break-all; width:100%">
         <thead>
             <tr>
                 <th></th>
@@ -93,7 +93,7 @@
                         orderable: false,
                         data: null,
                         defaultContent: '',
-                        'width': '20px'
+                        'width': '40px'
                     },
                     {
                         className: 'action-control',
@@ -110,7 +110,7 @@
                             // Question mark icon
                             return '<i class="fi fi-br-question" style="cursor: pointer"></i>'
                         },
-                        'width': '20px'
+                        'width': '40px'
                     },
                     { data: 'resource.createdBy.user.displayName' },
                     { data: 'resource.name' },
@@ -162,9 +162,9 @@
     function format(d) {
         // `d` is the original data object for the row
         return (
-            '<dl style = "word-wrap: break-word; word-break: break-all; width:100%">' +
+            '<dl>' +
             '<dt>Raw File Info:</dt>' +
-            '<dd><pre>' +
+            '<dd><pre style="white-space: pre-wrap;">' +
             JSON.stringify(d, undefined, 4) +
             '</pre></dd>' +
             '</dl>'

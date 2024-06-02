@@ -64,7 +64,7 @@
 <br>
 <div>
     <h1>Refresh Tokens</h1>
-    <table id="refresh_tokens" class="display" style="table-layout:fixed; width:100%">
+    <table id="refresh_tokens" class="table table-striped" style="table-layout:fixed; width:100%">
         <thead>
             <tr>
                 <th></th>
@@ -94,35 +94,35 @@
                 orderable: false,
                 data: null,
                 defaultContent: '',
-                'width': '20px'
+                'width': '40px'
             },
             {
                 className: 'active-control',
                 orderable: false,
                 data: null,
                 defaultContent: '<i class="fi fi-br-check" style="cursor: pointer"></i>',
-                'width': '20px'
+                'width': '40px'
             },
             {
                 className: 'copy-control',
                 orderable: false,
                 data: null,
                 defaultContent: '<i class="fi fi-rr-copy-alt" style="cursor: pointer"></i>',
-                'width': '20px'
+                'width': '40px'
             },
             {
                 className: 'delete-control',
                 orderable: false,
                 data: null,
                 defaultContent: '<i class="fi fi-rr-trash" style="cursor: pointer"></i>',
-                'width': '20px'
+                'width': '40px'
             },
-            { data: 'id', 'width': '30px' },
-            { data: 'stored_at', 'width': '150px' },
-            { data: 'user', 'width': '300px' },
-            { data: 'tenant_id', 'width': '300px' },
-            { data: 'resource', 'width': '300px' },
-            { data: 'foci', 'width': '30px' },
+            { data: 'id', 'width': '60px' },
+            { data: 'stored_at', 'width': '170px' },
+            { data: 'user', 'width': '320px' },
+            { data: 'tenant_id', 'width': '320px' },
+            { data: 'resource', 'width': '320px' },
+            { data: 'foci', 'width': '50px' },
             { data: 'description' }
         ],
         order: [[4, 'desc']]
@@ -164,7 +164,6 @@
 
     function format(d) {
         return (
-            //'<dl style = "word-wrap: break-word; word-break: break-all; width:100%">' +
             '<dl>' +
             '<dt>Raw Token:</dt>' +
             '<dd><code>' +

@@ -30,10 +30,18 @@
                     </div>
                     <div class="col-auto mt-0">
                         <div class="form-check form-switch">
-                            <input type="checkbox" id="show_all_messages" class="form-check-input" role="switch">
-                            <label for="show_all_messages" class="form-check-label" id="show_all_messages_tooltip" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Also show empty and deleted messages.">Show all messages</label>
+                            <input type="checkbox" id="show_all" class="form-check-input" role="switch">
+                            <label for="show_all" class="form-check-label" id="show_all_tooltip" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Also show empty and deleted messages/conversations.">Show all</label>
                         </div>
                     </div>
+                </div>
+            </div>
+            <div class="col-lg-3">
+                <!-- Empty for now -->
+            </div>
+            <div class="col-lg-3">
+                <div class="d-flex justify-content-end">
+                    <button type="Button" class="btn btn-outline-primary" onclick="showNewConversationModal()"><i class="fi fi-rr-add" style="vertical-align: -0.15em"></i> New Conversation</button>
                 </div>
             </div>
         </div>
@@ -42,7 +50,7 @@
         getActiveAccessToken(document.getElementById("ms_teams_form").access_token_id)
         new bootstrap.Tooltip(document.getElementById('resolve_conversation_names_tooltip'))
         new bootstrap.Tooltip(document.getElementById('auto_reload_messages_tooltip'))
-        new bootstrap.Tooltip(document.getElementById('show_all_messages_tooltip'))
+        new bootstrap.Tooltip(document.getElementById('show_all_tooltip'))
     </script>
 </div>
 <br>
@@ -68,6 +76,20 @@
     </div>
 </div>
 <script>
+    var FakeQuote = function (context) {
+        var ui = $.summernote.ui;
+        var button = ui.button({
+            contents: '<i class="fi fi-rr-quote-right"/></i>',
+            tooltip: 'Fake quote',
+            click: function () {
+                // invoke insertText method with 'hello' on editor module.
+                context.invoke('editor.pasteHTML', '<blockquote><strong>John Doe</strong> <small>01/01/2024, 12:00</small><p>Fake quote message here.</p>');
+            }
+        });
+
+        return button.render();   // return button as jquery object
+    }
+
     $(document).ready(function () {
         $('#message_form #message_text').summernote(
             {
@@ -79,9 +101,12 @@
                     ['color', ['color']],
                     ['para', ['ul', 'ol', 'paragraph']],
                     ['table', ['table']],
-                    ['insert', ['link']],
+                    ['insert', ['link', 'quote']],
                     ['view', ['codeview', 'help']]
-                ]
+                ],
+                buttons: {
+                    quote: FakeQuote
+                }
             }
         );
         // Fix bootstrap5 summernote dropdowns
@@ -119,20 +144,22 @@
     function loadTeamsConversations() {
         teams_access_token_id = $("#ms_teams_form #access_token_id").val()
         conversations = getTeamsConversations(teams_access_token_id).conversations;
-        conversationsNonEmpty = conversations.filter(function (conversation) { return conversation.properties.isemptyconversation == "False" })
+        conversationsNonEmpty = conversations.filter(function (conversation) { return (conversation.properties.isemptyconversation == "False" || $("#ms_teams_form #show_all").prop('checked')) })
         conversations_sorted = conversationsNonEmpty.sort(function (a, b) {
-            return (b.lastMessage.originalarrivaltime > a.lastMessage.originalarrivaltime ? 1 : -1);
+            let timeToCheckA = a.lastMessage.originalarrivaltime || a.threadProperties.createdat;
+            let timeToCheckB = b.lastMessage.originalarrivaltime || b.threadProperties.createdat;
+            return (timeToCheckB > timeToCheckA ? 1 : -1);
         });
         $("#conversation_list_group").empty();
         for (const conversation of conversations_sorted) {
-            // Skip empty conversations or streamofnotifications
-            if (conversation.properties.isemptyconversation == "True" || conversation.threadProperties.threadType == "streamofnotifications") {
+            // Skip streamofnotifications
+            if (conversation.threadProperties.threadType == "streamofnotifications") {
                 continue;
             }
             // Get a useful name for the conversation
-            var conversationName = conversation.threadProperties.topic || conversation.threadProperties.spaceThreadTopic || "";
+            let conversationName = conversation.threadProperties.topic || conversation.threadProperties.spaceThreadTopic || "";
             console.log(conversation)
-            if (conversation.threadProperties.threadType == "chat" && !conversationName && $("#ms_teams_form #resolve_conversation_names").prop('checked')) {
+            if (!conversationName && !conversationName && $("#ms_teams_form #resolve_conversation_names").prop('checked')) {
                 let conversationMembers = getTeamsConversationMembers(teams_access_token_id, conversation.id);
                 //console.log(conversationMembers);
                 let otherMembers = conversationMembers.filter(member => !member.isCurrentUser);
@@ -152,7 +179,7 @@
             let conversationItemHeader = $('<div class="d-flex justify-content-between"></div>');
             let conversationItemName = $('<b class="mb-1 text-truncate"></b>').text(`[${conversation.threadProperties.threadType}] ${conversationName}`);
             // Show the time if the last message was sent today, otherwise show the date
-            lastMessageDate = new Date(conversation.lastMessage.originalarrivaltime);
+            lastMessageDate = new Date((conversation.lastMessage.originalarrivaltime || conversation.threadProperties.createdat));
             lastMessageDate = (new Date().toLocaleDateString() == lastMessageDate.toLocaleDateString()) ? lastMessageDate.toLocaleTimeString() : lastMessageDate.toLocaleDateString();
             let conversationItemDate = $('<small class="text-body-secondary"></small>').text(lastMessageDate);
             let conversationItemPreview = $('<div class="d-flex justify-content-between"></div>')
@@ -177,7 +204,7 @@
             teamsMessageCardHeader.addClass("text-end");
         };
         teamsMessageCardHeader.text(`${messageJson.imdisplayname} - ${new Date(messageJson.composetime).toLocaleDateString([], { dateStyle: 'short' })} ${new Date(messageJson.composetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
-        teamsMessageCardHeader.append('<i id="info-icon" class="fi fi-rr-info icon-hover-change ps-2"></i>');
+        teamsMessageCardHeader.append('<i id="info-icon" class="fi fi-rr-info icon-hover-change ps-2" style="vertical-align: -0.15em; cursor: pointer"></i>');
         let teamsMessageCardBody = $('<div class="card-body"></div>');
         teamsMessageCardBody.append(DOMPurify.sanitize(messageJson.content, { ADD_ATTR: ['itemtype'] }));
         // Replace AMSImage URLs with requests to the /api/get_teams_image GraphSpy endpoint
@@ -217,7 +244,7 @@
         for (const message of messagesArray) {
             console.log(message);
             // Skip empty or deleted messages
-            if ((!message || message.properties.hasOwnProperty("deletetime")) && !$("#ms_teams_form #show_all_messages").prop('checked')) {
+            if ((!message || (message.hasOwnProperty("properties") && message.properties.hasOwnProperty("deletetime"))) && !$("#ms_teams_form #show_all").prop('checked')) {
                 continue;
             }
             if ((!message.imdisplayname || message.imdisplayname.startsWith("orgid:")) && window.currentConversationMembers) {
@@ -304,6 +331,96 @@
         </div>
     </div>
 </div>
+<!-- New Conversation Modal -->
+<div class="modal fade" id="new_conversation_modal" tabindex="-1" aria-labelledby="new_conversation_modal_label" aria-hidden="true">
+    <div class="modal-dialog modal-xl ">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="new_conversation_modal_label">New Conversation</h1>
+                <div style="float: right">
+                    <i class="fi fi-br-expand px-3" id="expand-icon" style="cursor: pointer; float: left; opacity: 0.5"></i>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+            </div>
+            <div class="modal-body m-2">
+                <form id="new_conversation_form" class="row align-items-center">
+                    <div class="col-auto">
+                        <div class="form-floating">
+                            <select id="conversation_type" class="form-select">
+                                <option value="direct_message">Direct Message(s)</option>
+                                <option value="group_chat">Group Chat</option>
+                            </select>
+                            <label for="conversation_type">Conversation Type</label>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <div class="form-floating">
+                            <input class="form-control" id="conversation_topic" placeholder="Conversation Name">
+                            <label for="conversation_topic"><small>Conversation Name <i>(optional)</i></small></label>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" id="send_message_switch">
+                            <label class="form-check-label" for="send_message_switch">Send message</label>
+                        </div>
+                    </div>
+                    <div class="my-2">
+                        <div id="new_conversation_message_text" class="text-body-secondary"></div>
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-outline-primary" type="button" id="create_conversation_button" onclick="createConversationButton()">Create Conversation(s)</button>
+                    </div>
+                </form>
+                <hr>
+                <div class="row">
+                    <h5>Recipients</h5>
+                    <div id="selected_users" class="d-flex flex-wrap justify-content-start overflow-y-auto" style="max-height: 165px;">
+                    </div>
+                </div>
+                <hr>
+                <div class="box-body table-responsive">
+                    <h5>Internal Users</h5>
+                    <table id="teams_users_table" class="table table-striped" style="width:100%">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th></th>
+                                <th></th>
+                                <th>Display Name</th>
+                                <th>UPN</th>
+                                <th>MRI</th>
+                            </tr>
+                        </thead>
+                    </table>
+                </div>
+                <hr>
+                <div class="row g-2">
+                    <h5>External Users</h5>
+                    <div class="col-auto">
+                        <div class="input-group">
+                            <span class="input-group-text">Email</span>
+                            <input type="text" id="external_users_searchbar" class="form-control">
+                            <button type="Button" class="btn btn-outline-primary" onclick="searchExternalUser()">Search</button>
+                            <button type="Button" class="btn btn-outline-primary" onclick="addExternalUser()">Add</button>
+                        </div>
+                    </div>
+                    <div class="w-100"></div>
+                    <div class="col-auto">
+                        <div class="card" id="external_user_details_card" style="display: none">
+                            <div class="card-body">
+                                <pre></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 <script>
     // Show conversation info
     $("#conversation_list_group").on('click', 'i#info-icon', function (e) {
@@ -337,6 +454,225 @@
         $("#teams_message_info_details").text(JSON.stringify(message_info, undefined, 4));
         $('#teams_message_info_modal').modal('show');
     });
+    // Show new conversation modal
+    function showNewConversationModal() {
+        if ($.fn.dataTable.isDataTable('#teams_users_table')) {
+            $('#teams_users_table').DataTable().destroy();
+            $('#teams_users_table').empty();
+        }
+        let teamsUsersTable = new DataTable('#teams_users_table', {
+            ajax: {
+                type: "POST",
+                url: `/api/list_teams_users`,
+                dataSrc: "",
+                data: function (d) {
+                    d.access_token_id = $("#ms_teams_form #access_token_id").val();
+                },
+                error: function (xhr, textStatus, errorThrown) {
+                    bootstrapToast("List teams users", xhr.responseText, "danger");
+                }
+            },
+            columns: [
+                {
+                    className: 'dt-control',
+                    orderable: false,
+                    data: null,
+                    defaultContent: '',
+                    'width': '20px'
+                },
+                {
+                    render: DataTable.render.select()
+                },
+                {
+                    className: 'add-control',
+                    orderable: false,
+                    data: null,
+                    defaultContent: '<i class="fi fi-rr-plus" style="cursor: pointer"></i>',
+                    'width': '20px'
+                },
+                { data: 'displayName', title: "Display Name" },
+                { data: 'userPrincipalName', title: "UPN" },
+                { data: 'mri', title: "MRI" }
+            ],
+            buttons: [
+                {
+                    text: "Add selected rows",
+                    attr: {
+                        id: "add_selected_rows_button",
+                        disabled: "true"
+                    },
+                    action: function () {
+                        let selected_rows = teamsUsersTable.rows({ selected: true })
+                        for (let i = 0; i < selected_rows.count(); i++) {
+                            let userPrincipalName = selected_rows.data()[i].userPrincipalName;
+                            let mri = selected_rows.data()[i].mri;
+                            addUserToConversation(userPrincipalName, mri);
+                        }
+                        teamsUsersTable.rows().deselect();
+                    }
+                },
+                {
+                    text: "Clear Recipients",
+                    attr: {
+                        id: "clear_recipients_button",
+                        disabled: "true"
+                    },
+                    action: function () {
+                        $("#selected_users").empty();
+                        $("#clear_recipients_button:enabled").attr("disabled", "true").addClass("btn-secondary").removeClass("btn-primary");
+                    }
+                }
+            ],
+            layout: {
+                top2Start: 'buttons'
+            },
+            autoWidth: true,
+            order: [],
+            select: {
+                style: "multi+shift",
+                selector: 'td:nth-child(2)',
+                headerCheckbox: 'select-page'
+            }
+        })
+        if ($("#selected_users").children().length) {
+            $("#clear_recipients_button:disabled").removeAttr("disabled").removeClass("btn-secondary").addClass("btn-primary");
+        }
+        $('#new_conversation_modal').modal('show');
+    }
+    $('#teams_users_table').on('click', 'td.dt-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = $('#teams_users_table').DataTable().row(tr);
+
+        if (row.child.isShown()) {
+            // This row is already open - close it
+            row.child.hide();
+        }
+        else {
+            // Open this row
+            row.child(formatTeamsUserDetails(row.data().mri)).show();
+        }
+    });
+    function addUserToConversation(userPrincipalName, mri) {
+        if ($(`#new_conversation_modal #selected_users span:hidden:contains("${mri}")`).length) {
+            bootstrapToast("Add user to conversation", `'${userPrincipalName}' is already selected.`, "warning");
+            return
+        }
+        let selectedUserInputGroup = $('<div class="input-group"></div>');
+        selectedUserInputGroup.append($('<span class="input-group-text"></span>').text(userPrincipalName));
+        selectedUserInputGroup.append($('<span hidden></span>').text(mri));
+        selectedUserInputGroup.append($('<button class="btn btn-outline-danger" type="button" onclick="return this.parentNode.parentNode.remove()">Remove</button>'));
+        let selectedUserWrapper = $('<div class="p-2"></div>').append(selectedUserInputGroup);
+        $('#new_conversation_modal #selected_users').append(selectedUserWrapper);
+        $("#clear_recipients_button:disabled").removeAttr("disabled").removeClass("btn-secondary").addClass("btn-primary");
+    }
+    $('#teams_users_table').on('click', 'td.add-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = $('#teams_users_table').DataTable().row(tr);
+        let userPrincipalName = row.data().userPrincipalName;
+        let mri = row.data().mri;
+        addUserToConversation(userPrincipalName, mri);
+    });
+    function searchExternalUser() {
+        let email = $("#external_users_searchbar").val();
+        if (!email) {
+            return false;
+        }
+        let teams_access_token_id = $("#ms_teams_form #access_token_id").val();
+        let external_user_details = getTeamsUserDetails(teams_access_token_id, email, true);
+        if (!external_user_details || !external_user_details.length) {
+            bootstrapToast("Search External User", `No external user with email '${email}' found`, "danger");
+            return false;
+        }
+        $("#external_user_details_card pre").text(JSON.stringify(external_user_details, undefined, 4));
+        $("#external_user_details_card").show();
+        return external_user_details;
+    }
+    function addExternalUser() {
+        let external_user_details = searchExternalUser();
+        if (!external_user_details) {
+            return;
+        }
+        if (!external_user_details[0].hasOwnProperty("mri")) {
+            bootstrapToast("Add External User", `External user does not seem to have an mri property.`, "danger");
+            return;
+        }
+        if (!external_user_details[0].hasOwnProperty("userPrincipalName")) {
+            bootstrapToast("Add External User", `External user does have a userPrincipalName property.`, "danger");
+            return;
+        }
+        addUserToConversation(external_user_details[0].userPrincipalName, external_user_details[0].mri)
+    }
+    function formatTeamsUserDetails(user_mri) {
+        let formatWrapper = $(
+            '<dl>' +
+            '<dt>User Details:</dt>' +
+            '</dl>'
+        );
+        let userDetailsPre = $('<pre style="white-space: pre-wrap;"></pre>');
+        let teams_access_token_id = $("#ms_teams_form #access_token_id").val();
+        let userDetails = getTeamsUserDetails(teams_access_token_id, user_mri, false)
+        userDetailsPre.text(JSON.stringify(userDetails, undefined, 4));
+        formatWrapper.append($("<dd></dd>").append(userDetailsPre));
+        return formatWrapper;
+    }
+    // Show the message box when the "Send message" switch is enabled
+    $('#send_message_switch').on('change', function (e) {
+        if (this.checked) {
+            $('#new_conversation_form #new_conversation_message_text').summernote(
+                {
+                    placeholder: "Type a message",
+                    toolbar: [
+                        ['style', ['style']],
+                        ['font', ['bold', 'italic', 'underline', 'clear']],
+                        ['fontname', ['fontname']],
+                        ['color', ['color']],
+                        ['para', ['ul', 'ol', 'paragraph']],
+                        ['table', ['table']],
+                        ['insert', ['link', 'quote']],
+                        ['view', ['codeview', 'help']]
+                    ],
+                    buttons: {
+                        quote: FakeQuote
+                    }
+                }
+            );
+            // Fix bootstrap5 summernote dropdowns
+            $(".note-toolbar button[data-toggle='dropdown']").each(function (index) { $(this).removeAttr("data-toggle").attr("data-bs-toggle", "dropdown"); });
+        } else {
+            $('#new_conversation_form #new_conversation_message_text').summernote("reset");
+            $('#new_conversation_form #new_conversation_message_text').summernote("destroy");
+            $('#new_conversation_form #new_conversation_message_text').empty();
+        }
+    })
+    function createConversationButton() {
+        let teams_access_token_id = $("#ms_teams_form #access_token_id").val();
+        let member_ids = [];
+        for (member of $("#new_conversation_modal #selected_users span:hidden")) {
+            member_ids.push(member.textContent);
+        }
+        let conversation_type = $("#new_conversation_form #conversation_type").val();
+        let conversation_topic = $("#new_conversation_form #conversation_topic").val() || null;
+        let message_content = $("#new_conversation_form #send_message_switch").prop('checked') ? $('#new_conversation_form #new_conversation_message_text').summernote('code') : null;
+        let conversationIds = createTeamsConversation(teams_access_token_id, member_ids, conversation_type, conversation_topic, message_content);
+        // Reload the conversations and try to open the last created conversation.
+        loadTeamsConversations();
+        let lastConversationId = conversationIds[conversationIds.length - 1];
+        let lastConversation = $(`#conversation_list_group a.list-group-item:has(div.raw-conversation:contains('${lastConversationId}'))`)
+        if (lastConversation.length) {
+            lastConversation[0].click();
+        }
+        $("#new_conversation_modal").modal("hide");
+    }
+    // Enable/Disable "Add Selected Rows"" button when entries are selected
+    $('#teams_users_table').on('select.dt deselect.dt', function (e) {
+        let rowsSelectedCount = $('#teams_users_table').DataTable().rows({ selected: true }).count();
+        if (rowsSelectedCount) {
+            $("#add_selected_rows_button:disabled").removeAttr("disabled").removeClass("btn-secondary").addClass("btn-primary");
+        } else {
+            $("#add_selected_rows_button:enabled").attr("disabled", "true").addClass("btn-secondary").removeClass("btn-primary");
+        }
+    });
+
     // Expand modals button
     $(".modal").on('click', 'i#expand-icon', function (e) {
         $(e.target).closest(".modal-dialog").toggleClass('modal-xl').toggleClass('modal-fullscreen');
@@ -349,6 +685,5 @@
         }
     }, 5000);
 
-
 </script>
-    {% endblock content %}
+        {% endblock content %}

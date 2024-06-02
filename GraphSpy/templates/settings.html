@@ -75,7 +75,7 @@
                 <input class="form-control" id="db_folder" type="text" value="{{ config['graph_spy_db_folder'] }}" readonly>
             </div>
         </div>
-        <table id="databases" class="display" style="table-layout:fixed; width:100%">
+        <table id="databases" class="table table-striped" style="table-layout:fixed; width:100%">
             <thead>
                 <tr>
                     <th></th>
@@ -114,25 +114,25 @@
                 orderable: false,
                 data: null,
                 defaultContent: '<i class="fi fi-br-check" style="cursor: pointer"></i>',
-                'width': '20px'
+                'width': '40px'
             },
             {
                 className: 'duplicate-control',
                 orderable: false,
                 data: null,
                 defaultContent: '<i class="fi fi-rr-duplicate" style="cursor: pointer"></i>',
-                'width': '20px'
+                'width': '40px'
             },
             {
                 className: 'delete-control',
                 orderable: false,
                 data: null,
                 defaultContent: '<i class="fi fi-rr-trash" style="cursor: pointer"></i>',
-                'width': '20px'
+                'width': '40px'
             },
-            { data: 'last_modified', 'width': '150px' },
-            { data: 'size', 'width': '75px' },
-            { data: 'state', 'width': '75px' },
+            { data: 'last_modified', 'width': '170px' },
+            { data: 'size', 'width': '100px' },
+            { data: 'state', 'width': '100px' },
             { data: 'name' }
         ],
         order: [[5, 'asc'], [3, 'desc']]

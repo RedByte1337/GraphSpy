@@ -10,6 +10,7 @@ import os,sys,shutil,traceback,logging
 from threading import Thread
 import json
 import uuid
+import re
 
 with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),"version.txt")) as f:
     __version__ = f.read()
@@ -761,7 +762,7 @@ def init_routes():
         teams_settings = getTeamsSettings(access_token_id)
         if not teams_settings:
             return f"[Error] Unable to obtain teams settings with access token {access_token_id}.", 400
-        headers = {"Authentication":f"skypetoken={teams_settings['skypeToken']}"}
+        headers = {"Authentication":f"skypetoken={teams_settings['skypeToken']}", "User-Agent":get_user_agent()}
         body = {
             "messagetype": "RichText/Html",
             "content": message_content
@@ -771,8 +772,7 @@ def init_routes():
             message_id = response.json()["OriginalArrivalTime"] if "OriginalArrivalTime" in response.json() else "Unknown"
             return f"{message_id}"
         return f"[Error] Something went wrong trying to send Teams message. Received response status {response.status_code}", 400
-        gspy_log.error("Failed sending teams message. Received response status {response.status_code}. Response body:")
-        gspy_log.error(response.json())
+        gspy_log.error(f"Failed sending teams message. Received response status {response.status_code}. Response body:\n {response.content}")
 
     @app.post("/api/get_teams_conversation_members")
     def api_get_teams_conversation_members():
@@ -792,7 +792,9 @@ def init_routes():
             conversation_members = json.loads(response['response_text'])
             # Add `isCurrentUser: True` to the member if the member is the current user.
             conversation_members = [{**member, "isCurrentUser": member["mri"].endswith(teams_settings["skype_id"])} for member in conversation_members]
+            gspy_log.debug(f"Found {len(conversation_members)} members in conversation '{conversation_id}'")
             return conversation_members
+        gspy_log.error(f"Failed listing members in conversation '{conversation_id}'. Received response status {response['response_status_code']}. Response body: \n{response['response_text']}")
         return f"[Error] Something went wrong trying to obtain Teams Members. Received response status {response['response_status_code']} and response type {response['response_type']}", 400
 
     @app.get("/api/get_teams_image")
@@ -807,11 +809,155 @@ def init_routes():
         if not teams_settings:
             return f"[Error] Unable to obtain teams settings with access token {access_token_id}.", 400
         cookies = {"skypetoken_asm":teams_settings['skypeToken']}
-        response = requests.get(image_uri, cookies=cookies)
+        headers = {"User-Agent":get_user_agent()}
+        response = requests.get(image_uri, cookies=cookies, headers=headers)
         if response.status_code == 200:
             return Response(response.content, mimetype=response.headers['Content-Type'])
         return f"[Error] Something went wrong trying to obtain teams image. Received response status {response.status_code} and response type {response.headers['Content-Type'] if 'Content-Type' in response.headers else 'empty'}", 400
+        
+    @app.post("/api/list_teams_users")
+    def api_list_teams_users():
+        if not "access_token_id" in request.form:
+            return f"[Error] No access_token_id specified.", 400
+        access_token_id = request.form['access_token_id']
+        teams_settings = getTeamsSettings(access_token_id)
+        if not teams_settings:
+            return f"[Error] Unable to obtain teams settings with access token {access_token_id}.", 400
+        teams_and_channel_service_uri = json.loads(teams_settings['teams_settings_raw'])['regionGtms']['teamsAndChannelsService']
+        base_uri = f"{teams_and_channel_service_uri}/beta/users?top=999"
+        teams_users = []
+        next_skiptoken = ""
+        while True:
+            uri = f"{base_uri}&skipToken={next_skiptoken}" if next_skiptoken else base_uri
+            response = generic_request(uri, access_token_id, "GET", "text", "")
+            if not (response['response_status_code'] == 200 and response['response_type'] == "json"):
+                break
+            responseJson = json.loads(response['response_text'])
+            if not "users" in responseJson:
+                break
+            teams_users += responseJson["users"]
+            if not "skipToken" in responseJson:
+                return teams_users
+            next_skiptoken = responseJson["skipToken"]
+        return f"[Error] Something went wrong trying to list Teams Users. Received response status {response['response_status_code']} and response type {response['response_type']}", 400
 
+    @app.get("/api/get_teams_user_details")
+    def api_get_teams_user_details():
+        if not "access_token_id" in request.args:
+            return f"[Error] No access_token_id specified.", 400
+        access_token_id = request.args['access_token_id']
+        teams_settings = getTeamsSettings(access_token_id)
+        if not teams_settings:
+            return f"[Error] Unable to obtain teams settings with access token {access_token_id}.", 400
+        teams_and_channel_service_uri = json.loads(teams_settings['teams_settings_raw'])['regionGtms']['teamsAndChannelsService']
+        if not "user_id" in request.args:
+            return f"[Error] No user_id specified. Specify a valid UPN, ObjectID or MRI of the user", 400
+        user_id = request.args['user_id']
+        uri = f"{teams_and_channel_service_uri}/beta/users/{user_id}"
+        headers = {"x-ms-client-version":"27/1.0.0.2020101241"}
+        if "external" in request.args and request.args["external"].lower() == "true":
+            uri += "/externalsearchv3"
+        response = generic_request(uri, access_token_id, "GET", "text", "", headers)
+        if response['response_status_code'] == 200 and response['response_type'] == "json":
+            return json.loads(response['response_text'])
+        elif response['response_status_code'] == 404:
+            return f"[Error] User '{user_id} not found'", 404
+        return f"[Error] Something went wrong trying to list Teams Users. Received response status {response['response_status_code']} and response type {response['response_type']}", 400
+
+    @app.post("/api/create_teams_conversation")
+    def api_create_teams_conversation(): # access_token_id, members, type, topic, message_content
+        if not request.is_json:
+            return f"[Error] Expecting JSON input.", 400
+        request_json = request.get_json()
+        if not "access_token_id" in request_json:
+            return f"[Error] No access_token_id specified.", 400
+        access_token_id = request_json['access_token_id']
+        if not "members" in request_json:
+            return f"[Error] No members specified.", 400
+        members = request_json['members']
+        if not "type" in request_json:
+            return f"[Error] No conversation type specified.", 400
+        conversation_type = request_json['type']
+        if not conversation_type in ["direct_message", "group_chat"]:
+            return f"[Error] Type needs to be either 'direct_message' or 'group_chat'.", 400
+        teams_settings = getTeamsSettings(access_token_id)
+        if not teams_settings:
+            return f"[Error] Unable to obtain teams settings with access token {access_token_id}.", 400
+        chat_service_uri = json.loads(teams_settings['teams_settings_raw'])['regionGtms']['chatService']
+        uri = f"{chat_service_uri}/v1/threads"
+        headers = {"Authentication":f"skypetoken={teams_settings['skypeToken']}", "User-Agent":get_user_agent()}
+        # Adding ourself first
+        conversation_members = [{
+            "id": f"8:{teams_settings['skype_id']}",
+            "role": "Admin"
+        }]
+        conversation_properties = {
+            "threadType": "chat",
+            "chatFilesIndexId": "2",
+            "fixedRoster": "true",
+            "uniquerosterthread": "true" if conversation_type == "direct_message" else "false"
+        }
+        if "topic" in request_json:
+            conversation_properties["topic"] = request_json["topic"]
+        created_conversations = []
+        if conversation_type == "direct_message":
+            for member in members:
+                body = {
+                    "members": conversation_members[:],
+                    "properties": conversation_properties
+                }
+                body["members"].append({
+                    "id": member,
+                    "role": "Admin"
+                })
+                response = requests.post(uri, headers=headers, json=body)
+                if response.status_code >= 200 and response.status_code < 300 and "Location" in response.headers:
+                    conversation_id_regex = re.search('https:\/\/emea\.ng\.msg\.teams\.microsoft\.com\/v1\/threads\/(.*)$', response.headers["Location"])
+                    if conversation_id_regex:
+                        conversation_id = conversation_id_regex.group(1)
+                        created_conversations.append(conversation_id)
+                        gspy_log.debug(f"Created conversation with member {member}. Conversation ID: {conversation_id}")
+                        continue
+                gspy_log.error(f"Failed creating direct message conversation with user {member}. Received response status {response.status_code}.\n{response.content}")
+        elif conversation_type == "group_chat":
+            for member in members:
+                conversation_members.append({
+                    "id": member,
+                    "role": "Admin"
+                })
+            body = {
+                "members": conversation_members,
+                "properties": conversation_properties
+            }
+            response = requests.post(uri, headers=headers, json=body)
+            if response.status_code >= 200 and response.status_code < 300 and "Location" in response.headers:
+                conversation_id_regex = re.search('https:\/\/emea\.ng\.msg\.teams\.microsoft\.com\/v1\/threads\/(.*)$', response.headers["Location"])
+                if conversation_id_regex:
+                    conversation_id = conversation_id_regex.group(1)
+                    created_conversations.append(conversation_id)
+                    gspy_log.debug(f"Created conversation with {len(members)} members. Conversation ID: {conversation_id}")
+                else:
+                    gspy_log.error(f"Failed creating group chat conversation. Received response status {response.status_code}\n{response.content}.")
+            else:
+                gspy_log.error(f"Failed creating group chat conversation. Received response status {response.status_code}.\n{response.content}")
+        gspy_log.debug(f"Created {len(created_conversations)} conversations.")
+        if len(created_conversations) == 0:
+            return f"[Error] Something went wrong creating the conversation(s).", 400
+        # If a message is specified, send an initial message to every created conversation
+        if "message_content" in request_json:
+            body = {
+                "messagetype": "RichText/Html",
+                "content": request_json["message_content"]
+            }
+            for conversation_id in created_conversations:
+                conversation_link = f"{chat_service_uri}/v1/users/ME/conversations/{conversation_id}/messages"
+                response = requests.post(conversation_link, headers=headers, json=body)
+                if response.status_code >= 200 and response.status_code < 300:
+                    message_id = response.json()["OriginalArrivalTime"] if "OriginalArrivalTime" in response.json() else "Unknown"
+                    gspy_log.debug(f"Sent message to conversation {conversation_id}. Message ID: {message_id}")
+                else:
+                    gspy_log.error(f"Failed sending message to {conversation_id}. Received response status {response.status_code}.\n{response.content}")
+        return created_conversations
 
         # ========== Database ==========
     

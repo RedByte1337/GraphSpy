@@ -1,17 +1,16 @@
-/* Change color of every other table row to the secondary background color */
-table.dataTable.display tbody tr.odd {
-    background-color: var(--bs-secondary-bg);
+/* Vertical align all text in datatables */
+table.dataTable tbody tr td {
+    vertical-align: middle;
 }
-/* Required to overwrite the background color of select drop downs in datatables for visibility */
-.form-select {
-    background-color: var(--bs-body-bg) !important;
+/* Center action icons used in datatables */
+td:has(i.fi), td.dt-control {
+    text-align: center;
 }
 /* Change the color of the icons on hover */
 .icon-hover-change:hover {
     color: var(--bs-primary-border-subtle);
 }
-
-
+/* Teams CSS */
 #teams_message_container pre {
     background: var(--bs-secondary-bg);
     border-radius: var(--bs-border-radius-sm);
@@ -24,4 +23,9 @@ table.dataTable.display tbody tr.odd {
 }
 #teams_message_container .card-body p {
     margin-bottom: .25rem;
+}
+blockquote {
+    border-radius: var(--bs-border-radius-lg);
+    border: var(--bs-border-width) var(--bs-border-style) var(--bs-border-color);
+    padding: .5rem;
 }

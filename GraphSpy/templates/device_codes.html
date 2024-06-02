@@ -40,7 +40,7 @@
 <div>
     <h1>Device Code List</h1>
     <button type="button" class="btn btn-primary" onclick="restartDeviceCodePolling()">Restart Polling</button>
-    <table id="device_codes" class="display" style="table-layout:fixed; width:100%">
+    <table id="device_codes" class="table" style="table-layout:fixed; width:100%">
         <thead>
             <tr>
                 <th></th>
@@ -69,41 +69,41 @@
                 orderable: false,
                 data: null,
                 defaultContent: '',
-                'width': '20px'
+                'width': '40px'
             },
             {
                 className: 'copy-control',
                 orderable: false,
                 data: null,
                 defaultContent: '<i class="fi fi-rr-copy-alt" style="cursor: pointer"></i>',
-                'width': '20px'
+                'width': '40px'
             },
             {
                 className: 'delete-control',
                 orderable: false,
                 data: null,
                 defaultContent: '<i class="fi fi-rr-trash" style="cursor: pointer"></i>',
-                'width': '20px'
+                'width': '40px'
             },
-            { data: 'id', 'width': '30px' },
-            { data: 'generated_at', 'width': '150px' },
-            { data: 'expires_at', 'width': '150px' },
-            { data: 'last_poll', 'width': '150px' },
-            { data: 'user_code', 'width': '125px' },
-            { data: 'client_id', 'width': '310px' },
+            { data: 'id', 'width': '60px' },
+            { data: 'generated_at', 'width': '170px' },
+            { data: 'expires_at', 'width': '170px' },
+            { data: 'last_poll', 'width': '170px' },
+            { data: 'user_code', 'width': '145px' },
+            { data: 'client_id', 'width': '330px' },
             { data: 'status' }
         ],
         order: [[3, 'desc']],
         createdRow: function (row, data, dataIndex) {
             switch (data.status) {
                 case "SUCCESS":
-                    $(row).addClass('bg-success-subtle').addClass('text-success-emphasis');
+                    $(row).children().addClass('bg-success-subtle').addClass('text-success-emphasis');
                     break;
                 case "EXPIRED":
-                    $(row).addClass('bg-danger-subtle').addClass('text-danger-emphasis');
+                    $(row).children().addClass('bg-danger-subtle').addClass('text-danger-emphasis');
                     break;
                 default:
-                    $(row).addClass('bg-primary-subtle').addClass('text-primary-emphasis');
+                    $(row).children().addClass('bg-primary-subtle').addClass('text-primary-emphasis');
             }
         }
     })
@@ -137,7 +137,6 @@
 
     function format(d) {
         return (
-            //'<dl style = "word-wrap: break-word; word-break: break-all; width:100%">' +
             '<dl>' +
             '<dt>Device Code:</dt>' +
             '<dd><code>' +

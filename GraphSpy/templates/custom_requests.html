@@ -97,25 +97,24 @@
                     <i class="fi fi-rr-copy-alt" id="copy-icon" style="cursor: pointer"></i>
                 </div>
             </div>
-                <div class="card-body">
-                    <pre id="response_body" class="mb-0"></pre>
-                    <div id="response_headers" class="mb-0" style="display: none">
-                        <table id="response_header_table" class="display table-responsive" style="word-wrap: break-word; word-break: break-all; width:100%">
-                            <thead>
-                                <tr>
-                                    <th>Response Header</th>
-                                    <th>Value</th>
-                                </tr>
-                            </thead>
-                        </table>
-                    </div>
+            <div class="card-body">
+                <pre id="response_body" class="mb-0"></pre>
+                <div id="response_headers" class="mb-0" style="display: none">
+                    <table id="response_header_table" class="table table-striped table-responsive" style="word-wrap: break-word; word-break: break-all; width:100%">
+                        <thead>
+                            <tr>
+                                <th>Response Header</th>
+                                <th>Value</th>
+                            </tr>
+                        </thead>
+                    </table>
                 </div>
             </div>
+        </div>
     </div>
 </div>
 
 <script>
-
     function toggleResponseCardContent() {
         $("#response_card_body_button").toggleClass("active");
         $("#response_card_headers_button").toggleClass("active");
@@ -197,7 +196,7 @@
         let respHeadersTable = new DataTable('#response_header_table', {
             data: tableData,
             columns: [
-                { data: 'header', title:"Response Header" },
+                { data: 'header', title: "Response Header" },
                 { data: 'value', title: "Value" }
             ],
             autoWidth: true,
@@ -300,8 +299,8 @@
                 </div>
             </div>
             <div class="modal-body">
-                <div id="dTable" class="box-body table-responsive" style="padding:20px;">
-                    <table id="request_templates" class="display" style="width:100%">
+                <div id="dTable" class="box-body table-responsive" style="padding:10px;">
+                    <table id="request_templates" class="table table-striped" style="width:100%">
                         <thead>
                             <tr>
                                 <th></th>
@@ -335,26 +334,26 @@
                 orderable: false,
                 data: null,
                 defaultContent: '',
-                'width': '20px'
+                'width': '40px'
             },
             {
                 className: 'active-control',
                 orderable: false,
                 data: null,
                 defaultContent: '<i class="fi fi-br-check" style="cursor: pointer"></i>',
-                'width': '20px'
+                'width': '40px'
             },
             {
                 className: 'delete-control',
                 orderable: false,
                 data: null,
                 defaultContent: '<i class="fi fi-rr-trash" style="cursor: pointer"></i>',
-                'width': '20px'
+                'width': '40px'
             },
-            { data: 'id', 'width': '30px' },
-            { data: 'template_name', 'width': '150px' },
-            { data: 'request_type', 'width': '130px' },
-            { data: 'method', 'width': '80px' },
+            { data: 'id', 'width': '60px' },
+            { data: 'template_name', 'width': '170px' },
+            { data: 'request_type', 'width': '150px' },
+            { data: 'method', 'width': '100px' },
             { data: 'uri' }
         ],
         order: [[3, 'desc']],

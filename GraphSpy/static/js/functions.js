@@ -252,6 +252,47 @@ function getTeamsConversationMembers(access_token_id, conversation_id) {
     return response.responseJSON;
 }
 
+function getTeamsUserDetails(access_token_id, user_id, external=false) {
+    let response = $.ajax({
+        type: "GET",
+        async: false,
+        url: `/api/get_teams_user_details?access_token_id=${access_token_id}&user_id=${user_id}&external=${external.toString()}`
+    });
+    if (response.status >= 400) {
+        bootstrapToast("Get Teams User Details", response.responseText, "danger");
+        return;
+    }
+    return response.responseJSON;
+}
+
+function createTeamsConversation(access_token_id, members, type = "group_chat", topic = null, message_content = null) {
+    body = {
+        "access_token_id": access_token_id,
+        "members": members,
+        "type": type
+    };
+    if (topic){
+        body["topic"] = topic
+    };
+    if (message_content){
+        body["message_content"] = message_content
+    };
+    let response = $.ajax({
+        type: "POST",
+        async: false,
+        url: "/api/create_teams_conversation",
+        dataType: "json",
+        contentType: "application/json; charset=utf-8",
+        data: JSON.stringify(body)
+    });
+    if (response.status >= 400) {
+        bootstrapToast("Create Teams Conversation", response.responseText, "danger");
+        return;
+    }
+    bootstrapToast("Create Teams Conversation", `Successfully created ${response.responseJSON.length} conversation(s).`, "success");
+    return response.responseJSON;
+}
+
 
 // ========== Settings ==========
 

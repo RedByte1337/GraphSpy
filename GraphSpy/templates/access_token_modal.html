@@ -10,8 +10,8 @@
                 </div>
             </div>
             <div class="modal-body">
-                <div id="dTable" class="box-body table-responsive" style="padding:20px;">
-                    <table id="access_token_modal_table" class="display" style="width:100%">
+                <div id="dTable" class="box-body table-responsive" style="padding:10px;">
+                    <table id="access_token_modal_table" class="table" style="width:100%">
                         <thead>
                             <tr>
                                 <th></th>
@@ -47,34 +47,34 @@
                 orderable: false,
                 data: null,
                 defaultContent: '',
-                'width': '20px'
+                'width': '40px'
             },
             {
                 className: 'active-control',
                 orderable: false,
                 data: null,
                 defaultContent: '<i class="fi fi-br-check" style="cursor: pointer"></i>',
-                'width': '20px'
+                'width': '40px'
             },
             {
                 className: 'copy-control',
                 orderable: false,
                 data: null,
                 defaultContent: '<i class="fi fi-rr-copy-alt" style="cursor: pointer"></i>',
-                'width': '20px'
+                'width': '40px'
             },
             {
                 className: 'delete-control',
                 orderable: false,
                 data: null,
                 defaultContent: '<i class="fi fi-rr-trash" style="cursor: pointer"></i>',
-                'width': '20px'
+                'width': '40px'
             },
-            { data: 'id', 'width': '30px' },
-            { data: 'issued_at', 'width': '150px' },
-            { data: 'expires_at', 'width': '150px' },
-            { data: 'user', 'width': '350px' },
-            { data: 'resource', 'width': '350px' },
+            { data: 'id', 'width': '60px' },
+            { data: 'issued_at', 'width': '170px' },
+            { data: 'expires_at', 'width': '170px' },
+            { data: 'user', 'width': '370px' },
+            { data: 'resource', 'width': '370px' },
             { data: 'description' }
         ],
         order: [[4, 'desc']],
@@ -82,9 +82,9 @@
         order: [[4, 'desc']],
         createdRow: function (row, data, dataIndex) {
             if (new Date(data.expires_at) > new Date()) {
-                $(row).addClass('bg-success-subtle').addClass('text-success-emphasis');
+                $(row).children().addClass('bg-success-subtle').addClass('text-success-emphasis');
             } else {
-                $(row).addClass('bg-danger-subtle').addClass('text-danger-emphasis');
+                $(row).children().addClass('bg-danger-subtle').addClass('text-danger-emphasis');
             }
         }
     })
