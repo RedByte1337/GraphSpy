@@ -598,6 +598,37 @@ def init_routes():
         body = json.loads(request.form['body'])
         graph_response = graph_request_post(graph_uri, access_token_id, body)
         return graph_response
+    
+    @app.route('/api/generic_graph_upload', methods=['POST'])
+    def api_generic_graph_upload():
+        try:
+            upload_uri = request.form['upload_uri']
+            access_token_id = request.form['access_token_id']
+            file = request.files['file']
+
+            if not upload_uri or not access_token_id or not file:
+                return json.dumps({"error": "Missing required parameters"}), 400
+
+            return graph_upload_request(upload_uri, access_token_id, file)
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            return json.dumps({"error": "An internal server error occurred.", "details": str(e)}), 500
+
+    def graph_upload_request(upload_uri, access_token_id, file):
+        access_token_entry = query_db("SELECT accesstoken FROM accesstokens WHERE id = ?", [access_token_id], one=True)
+        if not access_token_entry:
+            return json.dumps({"error": "Invalid access token ID"}), 400
+
+        access_token = access_token_entry[0]
+        headers = {"Authorization": f"Bearer {access_token}", "Content-Type": file.content_type}
+
+        response = requests.put(upload_uri, headers=headers, data=file.read())
+
+        if response.status_code in [200, 201]:
+            return json.dumps({"message": "File uploaded successfully."}), response.status_code
+        else:
+            return json.dumps({"error": "Failed to upload file.", "details": response.text}), response.status_code
+
 
     @app.post("/api/custom_api_request")
     def api_custom_api_request():

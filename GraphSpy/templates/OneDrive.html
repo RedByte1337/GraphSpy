@@ -44,6 +44,34 @@
         </thead>
     </table>
 </div>
+
+<br>
+<h2>Upload a New File</h2>
+<form id="upload_form" class="row g-3" enctype="multipart/form-data">
+    <div>
+        <label for="file" class="form-label">Choose file to upload:</label>
+        <input type="file" id="file" name="file" class="form-control" required>
+    </div>
+    <div>
+        <input type="hidden" id="upload_access_token_id" name="access_token_id">
+        <input type="hidden" id="upload_path" name="path">
+        <button type="button" class="btn btn-primary" onclick="uploadFile()">Upload</button>
+    </div>
+</form>
+
+<script>
+    function uploadFile() {
+        var file = document.getElementById("file").files[0];
+        var path = document.getElementById("onedrive_form").path.value;
+        var access_token_id = document.getElementById("onedrive_form").access_token_id.value;
+
+        graphUpload(path, file, access_token_id, function() {
+            generateTable(); // Delay to ensure the file is uploaded
+        });
+    }
+</script>
+
+
 <script>
     generateTable();
     // Populate the response_table table

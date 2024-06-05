@@ -141,6 +141,28 @@ function graphDownload(drive_id, item_id, access_token_id) {
     window.location = response_json["@microsoft.graph.downloadUrl"];
 }
 
+function graphUpload(path, file, access_token_id, callback) {
+    let formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_uri", "https://graph.microsoft.com/v1.0/me/drive/root:/" + path + "/" + file.name + ":/content");
+    formData.append("access_token_id", access_token_id);
+
+    $.ajax({
+        url: "/api/generic_graph_upload",
+        type: "POST",
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(response) {
+            bootstrapToast("File Upload", "File uploaded successfully.", "success");
+            if (callback) callback();
+        },
+        error: function(xhr, status, error) {
+            bootstrapToast("File Upload", "Failed to upload file. Status code: " + xhr.status + ", Response: " + xhr.responseText, "danger");
+        }
+    });
+}
+
 // ========== Database ==========
 
 function deleteDatabase(database_name) {
