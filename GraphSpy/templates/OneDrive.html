@@ -3,29 +3,42 @@
 {%block content%}
 
 <br>
-<div class="col-9">
-    <h1>OneDrive Files</h1>
-    <form id="onedrive_form" class="row g-3">
-        <div>
-            <label for="path" class="form-label">Path:</label>
-            <input type="text" id="path" name="path" value="/" class="form-control">
-        </div>
-        <div class="col-3">
-            <label for="access_token_id" class="form-label">Access token id *</label>
+<div class="row g-3">
+    <div class="col-lg-8">
+        <h1>OneDrive Files</h1>
+        <form id="onedrive_form" class="row g-3">
             <div class="input-group">
-                <input type="text" id="access_token_id" name="access_token_id" class="form-control" required>
-                <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#access_token_modal" onclick="$('#access_token_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
+                <label for="path" class="input-group-text">Path</label>
+                <input type="text" id="path" name="path" value="/" class="form-control">
+                <button type="Button" onclick="openParentFolder()" class="btn btn-outline-primary">Parent Folder</button>
             </div>
-        </div>
-        <div>
-            <button type="Button" class="btn btn-primary" onclick="generateTable()">Browse</button>
-        </div>
-    </form>
-    <br>
-    <button onclick="openParentFolder()" class="btn btn-primary">Parent Folder</button>
-    <script>
-        getActiveAccessToken(document.getElementById("onedrive_form").access_token_id)
-    </script>
+            <div class="col-auto">
+                <div class="input-group">
+                    <label for="access_token_id" class="input-group-text">Access token id</label>
+                    <input type="text" id="access_token_id" name="access_token_id" class="form-control" required>
+                    <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#access_token_modal" onclick="$('#access_token_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
+                </div>
+            </div>
+            <div class="col-auto">
+                <button type="Button" class="btn btn-primary" onclick="generateTable()">Browse</button>
+            </div>
+        </form>
+        <script>
+            getActiveAccessToken(document.getElementById("onedrive_form").access_token_id)
+        </script>
+    </div>
+    <div class="col-lg-4">
+        <h2 style="margin-bottom: 18px">Upload file</h2>
+        <form id="upload_form" class="row g-3">
+            <div class="input-group">
+                <input type="file" id="file" name="file" class="form-control" required>
+                <button id="upload_button" type="button" class="btn btn-outline-primary" onclick="uploadFile()">
+                    <span id="upload_spinner" class="spinner-border spinner-border-sm" aria-hidden="true" style="display: none;"></span>
+                    <span id="upload_text">Upload</span>
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
 <br>
 <div>
@@ -44,33 +57,6 @@
         </thead>
     </table>
 </div>
-
-<br>
-<h2>Upload a New File</h2>
-<form id="upload_form" class="row g-3" enctype="multipart/form-data">
-    <div>
-        <label for="file" class="form-label">Choose file to upload:</label>
-        <input type="file" id="file" name="file" class="form-control" required>
-    </div>
-    <div>
-        <input type="hidden" id="upload_access_token_id" name="access_token_id">
-        <input type="hidden" id="upload_path" name="path">
-        <button type="button" class="btn btn-primary" onclick="uploadFile()">Upload</button>
-    </div>
-</form>
-
-<script>
-    function uploadFile() {
-        var file = document.getElementById("file").files[0];
-        var path = document.getElementById("onedrive_form").path.value;
-        var access_token_id = document.getElementById("onedrive_form").access_token_id.value;
-
-        graphUpload(path, file, access_token_id, function() {
-            generateTable(); // Delay to ensure the file is uploaded
-        });
-    }
-</script>
-
 
 <script>
     generateTable();
@@ -99,7 +85,7 @@
                     },
                     data: function (d) {
                         d.graph_uri = "https://graph.microsoft.com/v1.0/me/drive/root:/" + document.getElementById("onedrive_form").path.value + ":/children",
-                        d.access_token_id = document.getElementById("onedrive_form").access_token_id.value
+                            d.access_token_id = document.getElementById("onedrive_form").access_token_id.value
                     }
                 },
                 columns: [
@@ -213,5 +199,26 @@
         document.getElementById("onedrive_form").path.value = temp_path
         $('#response_table').DataTable().ajax.reload(null, false);
     }
+
+    function uploadFile() {
+        let file = document.getElementById("file").files[0];
+        if (!file) {
+            bootstrapToast("Upload File", "No file selected to upload yet!", "warning");
+            return;
+        }
+        let path = document.getElementById("onedrive_form").path.value;
+        let access_token_id = document.getElementById("onedrive_form").access_token_id.value;
+
+        $("#upload_form #upload_spinner").show();
+        $("#upload_form #upload_text").text(" Uploading");
+        $("#upload_form #upload_button").addClass("disabled");
+        graphUpload("onedrive", path, file, access_token_id, function () {
+            // Delay to ensure the file is uploaded
+            generateTable();
+            $("#upload_form #upload_spinner").hide();
+            $("#upload_form #upload_text").text("Upload");
+            $("#upload_form #upload_button").removeClass("disabled");
+        });
+    }
 </script>
-{%endblock content%}
+    {%endblock content%}

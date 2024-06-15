@@ -3,33 +3,46 @@
 {%block content%}
 
 <br>
-<div class="col-md-9">
-    <h1>SharePoint Files</h1>
-    <form id="sharepoint_form" class="row g-3">
-        <div class="col-md-9">
-            <label for="drive_id" class="form-label">Drive ID *</label>
-            <input type="text" id="drive_id" name="drive_id" class="form-control" required>
-        </div>
-        <div class="col-md-3">
-            <label for="access_token_id" class="form-label">Access token id *</label>
+<div class="row g-3">
+    <div class="col-md-8">
+        <h1>SharePoint Files</h1>
+        <form id="sharepoint_form" class="row g-3">
             <div class="input-group">
-                <input type="text" id="access_token_id" name="access_token_id" class="form-control" required>
-                <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#access_token_modal" onclick="$('#access_token_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
+                <label for="drive_id" class="input-group-text">Drive ID</label>
+                <input type="text" id="drive_id" name="drive_id" class="form-control" required>
             </div>
-        </div>
-        <div>
-            <label for="path" class="form-label">Path *</label>
-            <input type="text" id="path" name="path" value="/" class="form-control" required>
-        </div>
-        <div>
-            <button type="Button" class="btn btn-primary" onclick="generateTable()">Browse</button>
-        </div>
-    </form>
-    <br>
-    <button class="btn btn-primary" onclick="openParentFolder()">Parent Folder</button>
-    <script>
-        getActiveAccessToken(document.getElementById("sharepoint_form").access_token_id)
-    </script>
+            <div class="input-group">
+                <label for="path" class="input-group-text">Path</label>
+                <input type="text" id="path" name="path" value="/" class="form-control" required>
+                <button type="Button" class="btn btn-outline-primary" onclick="openParentFolder()">Parent Folder</button>
+            </div>
+            <div class="col-auto">
+                <div class="input-group">
+                    <label for="access_token_id" class="input-group-text">Access token id</label>
+                    <input type="text" id="access_token_id" name="access_token_id" class="form-control" required>
+                    <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#access_token_modal" onclick="$('#access_token_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
+                </div>
+            </div>
+            <div class="col-auto">
+                <button type="Button" class="btn btn-primary" onclick="generateTable()">Browse</button>
+            </div>
+        </form>
+        <script>
+            getActiveAccessToken(document.getElementById("sharepoint_form").access_token_id)
+        </script>
+    </div>
+    <div class="col-lg-4">
+        <h2 style="margin-bottom: 18px">Upload file</h2>
+        <form id="upload_form" class="row g-3">
+            <div class="input-group">
+                <input type="file" id="file" name="file" class="form-control" required>
+                <button id="upload_button" type="button" class="btn btn-outline-primary" onclick="uploadFile()">
+                    <span id="upload_spinner" class="spinner-border spinner-border-sm" aria-hidden="true" style="display: none;"></span>
+                    <span id="upload_text">Upload</span>
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
 <br>
 
@@ -202,6 +215,28 @@
         }
         document.getElementById("sharepoint_form").path.value = temp_path
         $('#response_table').DataTable().ajax.reload(null, false);
+    }
+
+    function uploadFile() {
+        let file = document.getElementById("file").files[0];
+        if (!file) {
+            bootstrapToast("Upload File", "No file selected to upload yet!", "warning");
+            return;
+        }
+        let path = document.getElementById("sharepoint_form").path.value;
+        let access_token_id = document.getElementById("sharepoint_form").access_token_id.value;
+        let drive_id = document.getElementById("sharepoint_form").drive_id.value;
+
+        $("#upload_form #upload_spinner").show();
+        $("#upload_form #upload_text").text(" Uploading");
+        $("#upload_form #upload_button").addClass("disabled");
+        graphUpload(drive_id, path, file, access_token_id, function () {
+            // Delay to ensure the file is uploaded
+            generateTable();
+            $("#upload_form #upload_spinner").hide();
+            $("#upload_form #upload_text").text("Upload");
+            $("#upload_form #upload_button").removeClass("disabled");
+        });
     }
 </script>
 {%endblock content%}

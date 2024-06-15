@@ -141,10 +141,11 @@ function graphDownload(drive_id, item_id, access_token_id) {
     window.location = response_json["@microsoft.graph.downloadUrl"];
 }
 
-function graphUpload(path, file, access_token_id, callback) {
+function graphUpload(drive_id, path, file, access_token_id, callback) {
+    base_url = drive_id == "onedrive" ? "https://graph.microsoft.com/v1.0/me/drive" : `https://graph.microsoft.com/v1.0/drives/${drive_id}`;
     let formData = new FormData();
     formData.append("file", file);
-    formData.append("upload_uri", "https://graph.microsoft.com/v1.0/me/drive/root:/" + path + "/" + file.name + ":/content");
+    formData.append("upload_uri", `${base_url}/root:/${path}/${file.name}:/content`);
     formData.append("access_token_id", access_token_id);
 
     $.ajax({
@@ -159,6 +160,7 @@ function graphUpload(path, file, access_token_id, callback) {
         },
         error: function(xhr, status, error) {
             bootstrapToast("File Upload", "Failed to upload file. Status code: " + xhr.status + ", Response: " + xhr.responseText, "danger");
+            if (callback) callback();
         }
     });
 }

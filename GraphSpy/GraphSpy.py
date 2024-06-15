@@ -117,6 +117,21 @@ def graph_request_post(graph_uri, access_token_id, body):
     response = requests.post(graph_uri, headers=headers, json=body)
     resp_json = response.json()
     return json.dumps(resp_json)
+
+def graph_upload_request(upload_uri, access_token_id, file):
+    access_token_entry = query_db("SELECT accesstoken FROM accesstokens WHERE id = ?", [access_token_id], one=True)
+    if not access_token_entry:
+        return json.dumps({"error": "Invalid access token ID"}), 400
+
+    access_token = access_token_entry[0]
+    headers = {"Authorization": f"Bearer {access_token}", "Content-Type": file.content_type}
+
+    response = requests.put(upload_uri, headers=headers, data=file.read())
+
+    if response.status_code in [200, 201]:
+        return json.dumps({"message": "File uploaded successfully."}), response.status_code
+    else:
+        return json.dumps({"error": "Failed to upload file.", "details": response.text}), response.status_code
     
 def generic_request(uri, access_token_id, method, request_type, body, headers={}, cookies={}):
     access_token = query_db("SELECT accesstoken FROM accesstokens where id = ?",[access_token_id],one=True)[0]
@@ -613,22 +628,6 @@ def init_routes():
         except Exception as e:
             print(f"An error occurred: {e}")
             return json.dumps({"error": "An internal server error occurred.", "details": str(e)}), 500
-
-    def graph_upload_request(upload_uri, access_token_id, file):
-        access_token_entry = query_db("SELECT accesstoken FROM accesstokens WHERE id = ?", [access_token_id], one=True)
-        if not access_token_entry:
-            return json.dumps({"error": "Invalid access token ID"}), 400
-
-        access_token = access_token_entry[0]
-        headers = {"Authorization": f"Bearer {access_token}", "Content-Type": file.content_type}
-
-        response = requests.put(upload_uri, headers=headers, data=file.read())
-
-        if response.status_code in [200, 201]:
-            return json.dumps({"message": "File uploaded successfully."}), response.status_code
-        else:
-            return json.dumps({"error": "Failed to upload file.", "details": response.text}), response.status_code
-
 
     @app.post("/api/custom_api_request")
     def api_custom_api_request():
