@@ -124,7 +124,7 @@ def graph_upload_request(upload_uri, access_token_id, file):
         return json.dumps({"error": "Invalid access token ID"}), 400
 
     access_token = access_token_entry[0]
-    headers = {"Authorization": f"Bearer {access_token}", "Content-Type": file.content_type}
+    headers = {"Authorization": f"Bearer {access_token}", "Content-Type": file.content_type, "User-Agent":get_user_agent()}
 
     response = requests.put(upload_uri, headers=headers, data=file.read())
 

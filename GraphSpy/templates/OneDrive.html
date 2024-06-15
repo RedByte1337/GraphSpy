@@ -48,6 +48,7 @@
             <tr>
                 <th></th>
                 <th></th>
+                <th></th>
                 <th>Created</th>
                 <th>Last Modified</th>
                 <th>File Name</th>
@@ -114,6 +115,13 @@
                         'width': '40px'
                     },
                     {
+                        className: 'delete-control',
+                        orderable: false,
+                        data: null,
+                        defaultContent: '<i class="fi fi-rr-trash" style="cursor: pointer"></i>',
+                        'width': '40px'
+                    },
+                    {
                         data: 'createdDateTime',
                         width: '175px'
                     },
@@ -160,6 +168,19 @@
                 } else {
                     alert("No action defined for this type of entity.")
                 }
+            });
+
+            myTable.on('click', 'td.delete-control', function (e) {
+                let tr = e.target.closest('tr');
+                let row = myTable.row(tr);
+                let item_type = row.data().folder ? "folder" : "file";
+                if (!confirm(`Are you sure you want to delete the ${item_type} '${row.data().name}'?`)) { return; };
+                let drive_id = row.data().parentReference.driveId;
+                let item_id = row.data().id;
+                let access_token_id = document.getElementById("onedrive_form").access_token_id.value;
+                graphDelete(drive_id, item_id, access_token_id, function () {
+                    $('#response_table').DataTable().ajax.reload(null, false);
+                });
             });
         }
         return false;

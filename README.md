@@ -155,7 +155,7 @@ Refer to the [Release Notes](https://github.com/RedByte1337/GraphSpy/wiki/Releas
 
 # Upcoming Features
 
-* Delete and Rename Files
+* Rename files and create folders
 * More authentication options
 	* Password, ESTSAuth Cookie, PRT, ...
 * Advanced token customization options and optional v2 API support (CAE)

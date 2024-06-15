@@ -155,11 +155,39 @@ function graphUpload(drive_id, path, file, access_token_id, callback) {
         processData: false,
         contentType: false,
         success: function(response) {
-            bootstrapToast("File Upload", "File uploaded successfully.", "success");
+            bootstrapToast("Upload File", "File uploaded successfully.", "success");
             if (callback) callback();
         },
         error: function(xhr, status, error) {
-            bootstrapToast("File Upload", "Failed to upload file. Status code: " + xhr.status + ", Response: " + xhr.responseText, "danger");
+            bootstrapToast("Upload File", "Failed to upload file. Status code: " + xhr.status + ", Response: " + xhr.responseText, "danger");
+            if (callback) callback();
+        }
+    });
+}
+function graphDelete(drive_id, item_id, access_token_id, callback) {
+    let graph_uri = `https://graph.microsoft.com/v1.0/drives/${drive_id}/items/${item_id}`
+    let response = $.ajax({
+        type: "POST",
+        async: false,
+        url: "/api/custom_api_request",
+        dataSrc: "",
+        dataType: "json",
+        contentType: "application/json; charset=utf-8",
+        data: JSON.stringify({
+            "uri": graph_uri,
+            "access_token_id": access_token_id,
+            "method": "DELETE"
+        }),
+        success: function (response) {
+            if ([200, 204].includes(response.response_status_code)) {
+                bootstrapToast("Delete Item", "Item deleted successfully.", "success");
+            } else {
+                bootstrapToast("Delete Item", "Failed to delete item. Status code: " + responseJSON.response_status_code + ", Response: " + responseJSON.response_text, "danger");
+            }
+            if (callback) callback();
+        },
+        error: function (xhr, status, error) {
+            bootstrapToast("Delete Item", "Failed to delete item. Status code: " + xhr.status + ", Response: " + xhr.responseText, "danger");
             if (callback) callback();
         }
     });
