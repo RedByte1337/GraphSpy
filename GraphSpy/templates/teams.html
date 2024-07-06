@@ -159,16 +159,20 @@
             // Get a useful name for the conversation
             let conversationName = conversation.threadProperties.topic || conversation.threadProperties.spaceThreadTopic || "";
             console.log(conversation)
-            if (!conversationName && !conversationName && $("#ms_teams_form #resolve_conversation_names").prop('checked')) {
-                let conversationMembers = getTeamsConversationMembers(teams_access_token_id, conversation.id);
-                //console.log(conversationMembers);
-                let otherMembers = conversationMembers.filter(member => !member.isCurrentUser);
-                for (const otherMember of otherMembers) {
-                    conversationName += `${otherMember.displayName}, `;
+            try {
+                if (!conversationName && !conversationName && $("#ms_teams_form #resolve_conversation_names").prop('checked')) {
+                    let conversationMembers = getTeamsConversationMembers(teams_access_token_id, conversation.id);
+                    //console.log(conversationMembers);
+                    let otherMembers = conversationMembers.filter(member => !member.isCurrentUser);
+                    for (const otherMember of otherMembers) {
+                        conversationName += `${otherMember.displayName}, `;
+                    }
+                    if (conversationName) {
+                        conversationName = conversationName.slice(0, -2)
+                    }
                 }
-                if (conversationName) {
-                    conversationName = conversationName.slice(0, -2)
-                }
+            } catch (error) {
+                console.error(error);
             }
             if (!conversationName) {
                 conversationName = "Unknown";
