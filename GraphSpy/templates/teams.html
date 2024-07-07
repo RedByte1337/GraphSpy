@@ -82,12 +82,10 @@
             contents: '<i class="fi fi-rr-quote-right"/></i>',
             tooltip: 'Fake quote',
             click: function () {
-                // invoke insertText method with 'hello' on editor module.
                 context.invoke('editor.pasteHTML', '<blockquote><strong>John Doe</strong> <small>01/01/2024, 12:00</small><p>Fake quote message here.</p>');
             }
         });
-
-        return button.render();   // return button as jquery object
+        return button.render();
     }
 
     $(document).ready(function () {
