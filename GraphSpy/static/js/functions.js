@@ -1,6 +1,6 @@
 // ========== Access Tokens ==========
 
-function setActiveAccessToken(access_token_id) {
+function setActiveAccessToken(access_token_id, silent = false) {
     var active_access_token = access_token_id;
     setCookie("access_token_id", active_access_token);
     let response = $.ajax({
@@ -12,7 +12,9 @@ function setActiveAccessToken(access_token_id) {
         document.getElementById("access_token_id").value = active_access_token;
     }
     obtainAccessTokenInfo();
-    bootstrapToast("Activate Access Token", `[Succes] Activated access token with ID '${active_access_token}'`);
+    if (!silent) {
+        bootstrapToast("Activate Access Token", `[Succes] Activated access token with ID '${active_access_token}'`, "info");
+    }
 };
 
 function getActiveAccessToken(access_token_field = null) {
@@ -51,7 +53,7 @@ function setActiveRefreshToken(refresh_token_id) {
         document.getElementById("refresh_token_id").value = active_refresh_token;
     }
     obtainRefreshTokenInfo();
-    bootstrapToast("Activate Refresh Token", `[Succes] Activated refresh token with ID '${active_refresh_token}'`);
+    bootstrapToast("Activate Refresh Token", `[Succes] Activated refresh token with ID '${active_refresh_token}'`, "info");
 };
 
 function getActiveRefreshToken(refresh_token_field) {
@@ -67,11 +69,13 @@ function getActiveRefreshToken(refresh_token_field) {
     }
 };
 
-function refreshToAccessToken(refresh_token_id, resource, client_id, store_refresh_token = false, activate = false) {
+function refreshToAccessToken(refresh_token_id, client_id, resource = "", scope = "", store_refresh_token = false, activate = false, api_version = 1) {
     var post_data = {
         "refresh_token_id": refresh_token_id,
+        "client_id": client_id,
         "resource": resource,
-        "client_id": client_id
+        "scope": scope,
+        "api_version": api_version
     };
     if (store_refresh_token) {
         post_data["store_refresh_token"] = 1;
@@ -80,17 +84,20 @@ function refreshToAccessToken(refresh_token_id, resource, client_id, store_refre
         type: "POST",
         async: false,
         url: "/api/refresh_to_access_token",
-        data: post_data
-    });
-    access_token_id = response.responseText;
-    if (Number.isInteger(parseInt(access_token_id))) {
-        bootstrapToast("Refresh To Access Token", `[Succes] Obtained access token with ID '${access_token_id}'`);
-        if (activate) {
-            setActiveAccessToken(access_token_id);
+        data: post_data,
+        success: function (response) {
+            access_token_id = response;
+            if (activate) {
+                setActiveAccessToken(access_token_id, true);
+                bootstrapToast("Refresh To Access Token", `[Succes] Obtained and activated access token with ID '${access_token_id}'`, "success");
+            } else {
+                bootstrapToast("Refresh To Access Token", `[Succes] Obtained access token with ID '${access_token_id}'`, "success");
+            }
+        },
+        error: function (xhr, status, error) {
+            bootstrapToast("Refresh To Access Token", xhr.responseText, "danger");
         }
-    } else {
-        bootstrapToast("Refresh To Access Token", '[Error] Failed to obtain an access token.');
-    }
+    });
 };
 
 function deleteRefreshToken(token_id) {

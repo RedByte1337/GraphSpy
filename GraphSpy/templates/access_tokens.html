@@ -41,8 +41,17 @@
         <div class="col-11">
             <h1>Refresh To Access Token</h1>
             <form id="refresh_to_access_token_form" class="row g-3">
-                <div class="col-12">
-                    <label for="resource" class="form-label">Resource</label>
+                <div class="col-auto" id="api_version">
+                    <div class="btn-group" role="group">
+                        <span class="input-group-text">API Version</span>
+                        <input type="radio" class="btn-check" name="btnradio" id="api_version_1" autocomplete="off" value="1" checked>
+                        <label class="btn btn-outline-primary" for="api_version_1">v1</label>
+                        <input type="radio" class="btn-check" name="btnradio" id="api_version_2" autocomplete="off" value="2">
+                        <label class="btn btn-outline-primary" for="api_version_2">v2</label>
+                    </div>
+                </div>
+                <div id="resource_container" class="col-12">
+                    <label for="resource_list" class="form-label">Resource</label>
                     <input list="resource_list" id="resource_input" class="form-control" placeholder="https://graph.microsoft.com">
                     <datalist id="resource_list">
                         <option value="defined_in_token">Defined in Refresh Token</option>
@@ -54,8 +63,21 @@
                         <option value="https://management.azure.com">AzureManagement</option>
                     </datalist>
                 </div>
+                <div id="scope_container" class="col-12" style="display: none;">
+                    <label for="scope_list" class="form-label">Scope</label>
+                    <input list="scope_list" id="scope_input" class="form-control" placeholder="https://graph.microsoft.com/.default openid offline_access">
+                    <datalist id="scope_list">
+                        <option value="https://graph.microsoft.com/.default openid offline_access">MSGraph</option>
+                        <option value="https://graph.windows.net/.default openid offline_access">AAD Graph</option>
+                        <option value="https://outlook.office365.com/.default openid offline_access">Outlook</option>
+                        <option value="https://api.spaces.skype.com/.default openid offline_access">MSTeams</option>
+                        <option value="https://management.core.windows.net/.default openid offline_access">AzureCoreManagement</option>
+                        <option value="https://management.azure.com/.default openid offline_access">AzureManagement</option>
+                        <option value="0000000c-0000-0000-c000-000000000000/.default openid offline_access">MicrosoftAppAccessPanel</option>
+                    </datalist>
+                </div>
                 <div class="col-12">
-                    <label for="client_id" class="form-label">Client ID</label>
+                    <label for="client_id_list" class="form-label">Client ID</label>
                     <input list="client_id_list" id="client_id_input" class="form-control" placeholder="d3590ed6-52b3-4102-aeff-aad2292ab01c">
                     <datalist id="client_id_list">
                         <option value="d3590ed6-52b3-4102-aeff-aad2292ab01c">Microsoft Office</option>
@@ -83,7 +105,7 @@
                     <input type="text" id="refresh_token_id" name="refresh_token_id" class="form-control" required>
                 </div>
                 <div class="col-12">
-                    <button type="Button" class="btn btn-primary" onclick="refreshToAccessToken(refresh_token_id.value, resource_input.value, client_id_input.value, store_refresh_token.checked, activate_access_token.checked);reloadTables()">Submit</button>
+                    <button type="Button" class="btn btn-primary" onclick="refreshToAccessToken(refresh_token_id.value, client_id_input.value, resource_input.value, scope_input.value, store_refresh_token.checked, activate_access_token.checked, parseInt($('#api_version input:radio:checked').val()));reloadTables()">Submit</button>
                 </div>
             </form>
         </div>
@@ -92,6 +114,16 @@
 <script>
     getActiveAccessToken(document.getElementById("access_token_form").access_token_id);
     getActiveRefreshToken(document.getElementById("refresh_to_access_token_form").refresh_token_id);
+    // Show the resource field if the API version is 1 or show the scope field if the API version is 2
+    $("#refresh_to_access_token_form #api_version").on('click', 'input', function (e) {
+        if ($(e.target).val() == "1") {
+            $("#resource_container").show();
+            $("#scope_container").hide();
+        } else if ($(e.target).val() == "2") {
+            $("#resource_container").hide();
+            $("#scope_container").show();
+        }
+    });
 </script>
 <div>
     <br>

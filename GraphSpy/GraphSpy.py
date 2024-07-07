@@ -222,20 +222,28 @@ def get_tenant_id(tenant_domain):
     tenant_id = resp_json["authorization_endpoint"].split("/")[3]
     return tenant_id
 
-def refresh_to_access_token(refresh_token_id, resource = "defined_in_token", client_id = "d3590ed6-52b3-4102-aeff-aad2292ab01c", store_refresh_token = True):
+def refresh_to_access_token(refresh_token_id, client_id = "d3590ed6-52b3-4102-aeff-aad2292ab01c", resource = "defined_in_token", scope = "", store_refresh_token = True, api_version = 1):
     refresh_token = query_db("SELECT refreshtoken FROM refreshtokens where id = ?",[refresh_token_id],one=True)[0]
     tenant_id = query_db("SELECT tenant_id FROM refreshtokens where id = ?",[refresh_token_id],one=True)[0]
     resource = query_db("SELECT resource FROM refreshtokens where id = ?",[refresh_token_id],one=True)[0] if resource == "defined_in_token" else resource
     body =  {
-        "resource": resource,
         "client_id": client_id,
         "grant_type": "refresh_token",
-        "refresh_token": refresh_token,
-        "scope": "openid"
+        "refresh_token": refresh_token
     }
-    url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/token?api-version=1.0"
+    url = f"https://login.microsoftonline.com/{tenant_id}"
+    if api_version == 1:
+        body["resource"] = resource
+        url += "/oauth2/token?api-version=1.0"
+    if api_version == 2:
+        body["scope"] = scope
+        url += "/oauth2/v2.0/token"
+
     headers = {"User-Agent":get_user_agent()}
     response = requests.post(url, data=body, headers=headers)
+    if "error" in response.json():
+        error_msg = f"[{response.json()['error']}] {response.json()['error_description']}"
+        return error_msg
     access_token = response.json()["access_token"]
     save_access_token(access_token, f"Created using refresh token {refresh_token_id}")
     access_token_id = query_db("SELECT id FROM accesstokens where accesstoken = ?",[access_token],one=True)[0]
@@ -520,15 +528,23 @@ def init_routes():
     @app.post('/api/refresh_to_access_token')
     def api_refresh_to_access_token():
         refresh_token_id = request.form['refresh_token_id'] if "refresh_token_id" in request.form else ""
-        resource = request.form['resource'] if "resource" in request.form else ""
-        resource = resource if resource else "defined_in_token"
         client_id = request.form['client_id'] if "client_id" in request.form else ""
         client_id = client_id if client_id else "d3590ed6-52b3-4102-aeff-aad2292ab01c"
+        resource = request.form['resource'] if "resource" in request.form else ""
+        resource = resource if resource else "defined_in_token"
+        scope = request.form['scope'] if "scope" in request.form else ""
+        scope = scope if scope else "https://graph.microsoft.com/.default openid offline_access"
+        api_version = int(request.form['api_version']) if "api_version" in request.form else 1
+        api_version = api_version if api_version in [1,2] else 1
         store_refresh_token = True if "store_refresh_token" in request.form else False
-        access_token_id = 0
-        if refresh_token_id and resource and client_id:
-            access_token_id = refresh_to_access_token(refresh_token_id, resource, client_id, store_refresh_token)
-        return f"{access_token_id}"
+        result = 0
+        try:
+            result = refresh_to_access_token(refresh_token_id, client_id, resource, scope, store_refresh_token, api_version)
+            status_code = 200 if isinstance(result ,int) and result != 0 else 400
+            return f"{result}", status_code
+        except Exception as e:
+            traceback.print_exc()
+            return f"[Error] Unexpected error occurred. Check your input for any issues. Exception: {repr(e)}", 400
 
     @app.route("/api/delete_refresh_token/<id>")
     def api_delete_refresh_token(id):
