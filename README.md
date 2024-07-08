@@ -99,7 +99,7 @@ Easily create and poll multiple device codes at once. If a user used the device 
 
 Browse through files and folders in the user's OneDrive or any accessible SharePoint site through an intuitive file explorer interface.
 
-Of course, files can also be directly downloaded.
+Of course, files can also be directly downloaded, or new files can be uploaded.
 
 ![OneDrive](images/onedrive_2.png)
 
@@ -158,14 +158,13 @@ Refer to the [Release Notes](https://github.com/RedByte1337/GraphSpy/wiki/Releas
 * Rename files and create folders
 * More authentication options
 	* Password, ESTSAuth Cookie, PRT, ...
-* Advanced token customization options and optional v2 API support (CAE)
 * Automatic Access Token Refreshing
 * Improve Microsoft Teams Module
   * Download authenticated files
-  * Create new conversations
   * Upload files and images
-* Azure AD
+* Entra ID
 	* List Users, Groups, Applications, Devices, Conditional Access Policies, ...
+	* Add MFA methods
 * Cleaner exception handling
 	* While this should not have any direct impact on the user, edge cases might currently throw exceptions to the GraphSpy output instead of handling them in a cleaner way.
 
