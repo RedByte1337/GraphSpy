@@ -1,0 +1,151 @@
+{% extends 'layout.html'%}
+
+{%block content%}
+
+<br>
+<div class="row g-3">
+    <h1>MFA Methods</h1>
+    <form id="mfa_form">
+        <div class="row g-3 align-items-center">
+            <div class="col-lg-3">
+                <div class="input-group">
+                    <input type="text" id="access_token_id" name="access_token_id" class="form-control" required readonly>
+                    <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#access_token_modal" onclick="$('#access_token_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
+                    <button type="Button" class="btn btn-outline-primary" onclick="generateAuthMethodsTable()">Reload</button>
+                </div>
+            </div>
+            <div class="col-lg-3">
+                <!-- Empty for now -->
+            </div>
+            <div class="col-lg-3">
+                <!-- Empty for now -->
+            </div>
+            <div class="col-lg-3">
+                <div class="d-flex justify-content-end">
+                    <button type="Button" class="btn btn-outline-primary" onclick="alert('Placeholder')"><i class="fi fi-rr-add" style="vertical-align: -0.15em"></i> Placeholder</button>
+                </div>
+            </div>
+        </div>
+    </form>
+    <script>
+        getActiveAccessToken(document.getElementById("mfa_form").access_token_id)
+    </script>
+</div>
+<br>
+<div class="row g-3">
+    <div class="col-xl-6">
+        <h2>Available Auth Methods</h2>
+        <table id="available_auth_methods_table" class="table table-striped" style="word-wrap: break-word; word-break: break-all; width:100%">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th></th>
+                    <th>Method</th>
+                    <th>Is Registered</th>
+                    <th># Registered</th>
+                    <th>Can Add</th>
+                </tr>
+            </thead>
+        </table>
+    </div>
+</div>
+<script>
+    // Populate the available_auth_methods_table table
+    function generateAuthMethodsTable() {
+        if ($.fn.dataTable.isDataTable("#available_auth_methods_table")) {
+            // If the DataTable already exists, just reload it
+            $('#available_auth_methods_table').DataTable().ajax.reload(null, false);
+            return;
+        }
+        let myTable = new DataTable('#available_auth_methods_table', {
+            "destroy": true,
+            ajax: {
+                type: "POST",
+                url: '/api/get_available_authentication_info',
+                data: function (d) { d.access_token_id =  $("#mfa_form #access_token_id").val() },
+                dataSrc: "",
+                error: function (xhr, status, error) {
+                    bootstrapToast("Available Auth Methods Table", xhr.responseText, "danger");
+                    myTable.clear().draw();
+                }
+            },
+            columns: [
+                {
+                    className: 'dt-control',
+                    orderable: false,
+                    data: null,
+                    defaultContent: '',
+                    'width': '40px'
+                },
+                {
+                    className: 'action-control',
+                    orderable: false,
+                    data: null,
+                    render: function (d, t, r) {
+                        // Question mark icon
+                        return '<i class="fi fi-br-question" style="cursor: pointer"></i>'
+                    },
+                    'width': '40px'
+                },
+                {
+                    data: 'MethodName'
+                },
+                {
+                    data: 'IsRegistered'
+                },
+                {
+                    data: null,
+                    render: function (d, t, r) {
+                        registeredMethods = r.Data;
+                        registeredMethodsCount = registeredMethods ? registeredMethods.length : 0;
+                        return registeredMethodsCount;
+                    }
+                },
+                {
+                    data: 'CanAdd'
+                }
+            ],
+            order: [[2, 'desc']]
+        })
+
+        myTable.on('click', 'td.dt-control', function (e) {
+            let tr = e.target.closest('tr');
+            let row = myTable.row(tr);
+
+            if (row.child.isShown()) {
+                // This row is already open - close it
+                row.child.hide();
+            }
+            else {
+                // Open this row
+                row.child(format(row.data())).show();
+            }
+
+        });
+
+        myTable.on('click', 'td.action-control', function (e) {
+            let tr = e.target.closest('tr');
+            let row = myTable.row(tr);
+            //drive_id = row.data().remoteItem.parentReference.driveId
+            //item_id = row.data().id
+            access_token_id = $("#mfa_form #access_token_id").val();
+            //graphDownload(drive_id, item_id, access_token_id);
+        });
+        return;
+    }
+
+    function format(d) {
+        // `d` is the original data object for the row
+
+        let formatWrapper = $(
+            '<dl>' +
+            '<dt>Raw Info:</dt>' +
+            '</dl>'
+        );
+        let detailsPre = $('<pre style="white-space: pre-wrap;"></pre>');
+        detailsPre.text(JSON.stringify(d, undefined, 4));
+        formatWrapper.append($("<dd></dd>").append(detailsPre));
+        return formatWrapper;
+    }
+</script>
+    {%endblock content%}

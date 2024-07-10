@@ -353,6 +353,49 @@ def device_code_flow(resource = "https://graph.microsoft.com", client_id = "d359
     start_device_code_thread()
     return user_code
 
+# ========== MFA Functions ==========
+
+def getSessionCtx(access_token_id):
+    access_token = query_db("SELECT accesstoken FROM accesstokens WHERE id = ? AND resource LIKE '%0000000c-0000-0000-c000-000000000000%'",[access_token_id],one=True)
+    if not access_token:
+        gspy_log.error(f"No access token with ID {access_token_id} and resource containing '0000000c-0000-0000-c000-000000000000'!")
+        return False
+    access_token = access_token[0]
+    try:
+        headers = {"Authorization":f"Bearer {access_token}", "User-Agent":get_user_agent()}
+        uri = "https://account.activedirectory.windowsazure.com/securityinfo/Authorize"
+        response = requests.post(uri, headers=headers, json={})
+        if response.status_code != 200:
+            gspy_log.error(f"Failed to obtain SessionCtx value. Received status code {response.status_code}")
+            return False
+        sessionCtx = json.loads(response.text.split()[1])["sessionCtx"]
+        return sessionCtx
+    except Exception as e:
+        gspy_log.error(f"Failed to obtain SessionCtx value.")
+        return False
+
+def getAvailableAuthenticationInfo(access_token_id):
+    access_token = query_db("SELECT accesstoken FROM accesstokens WHERE id = ? AND resource LIKE '%0000000c-0000-0000-c000-000000000000%'",[access_token_id],one=True)
+    if not access_token:
+        gspy_log.error(f"No access token with ID {access_token_id} and resource containing '0000000c-0000-0000-c000-000000000000'!")
+        return False
+    access_token = access_token[0]
+    try:
+        sessionCtx = getSessionCtx(access_token_id)
+        headers = {"Authorization":f"Bearer {access_token}", "Sessionctx":sessionCtx, "User-Agent":get_user_agent()}
+        uri = "https://account.activedirectory.windowsazure.com/securityinfo/AvailableAuthenticationInfo"
+        response = requests.get(uri, headers=headers)
+        if response.status_code != 200:
+            gspy_log.error(f"Failed to obtain AvailableAuthenticationInfo. Received status code {response.status_code}")
+            return False
+        availableAuthenticationInfo = json.loads(response.text.split()[1])
+        availableAuthenticationInfo_parsed = [{**availableAuthenticationInfo[method], "MethodName":method} for method in availableAuthenticationInfo.keys()]
+        return availableAuthenticationInfo_parsed
+    except Exception as e:
+        gspy_log.error(f"Failed to obtain AvailableAuthenticationInfo.")
+        return False
+
+
 # ========== Teams Functions ==========
 
 def getTeamsSettings(access_token_id):
@@ -429,6 +472,10 @@ def init_routes():
     def device_codes():
         return render_template('device_codes.html', title="Device Codes")
 
+    @app.route("/mfa")
+    def mfa():
+        return render_template('mfa.html', title="MFA Methods")
+
     @app.route("/custom_requests")
     def custom_requests():
         return render_template('custom_requests.html', title="Custom Requests")
@@ -501,6 +548,18 @@ def init_routes():
         execute_db("DELETE FROM devicecodes where id = ?",[id])
         return "true"
     
+        # ========== MFA ==========
+
+    @app.post("/api/get_available_authentication_info")
+    def api_get_available_authentication_info():
+        if not "access_token_id" in request.form:
+            return f"[Error] No access_token_id specified.", 400
+        access_token_id = request.form['access_token_id']
+        availableAuthenticationInfo = getAvailableAuthenticationInfo(access_token_id)
+        if not availableAuthenticationInfo:
+            return f"[Error] Failed to obtain Available Authentication Info.", 400
+        return availableAuthenticationInfo
+
         # ========== Refresh Tokens ==========
 
     @app.route("/api/list_refresh_tokens")
