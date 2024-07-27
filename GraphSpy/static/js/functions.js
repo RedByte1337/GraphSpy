@@ -132,6 +132,109 @@ function restartDeviceCodePolling() {
     bootstrapToast("Restart polling", response.responseText);
 }
 
+// ========== MFA ==========
+
+function validateCaptcha(access_token_id, challenge_id, captcha_solution, azure_region, challenge_type) {
+    $.ajax({
+        type: "POST",
+        async: false,
+        url: "/api/validate_captcha",
+        data: {
+            "access_token_id": access_token_id,
+            "challenge_id": challenge_id,
+            "captcha_solution": captcha_solution,
+            "azure_region": azure_region,
+            "challenge_type": challenge_type
+        },
+        success: function (response) {
+            bootstrapToast("Validate Captcha", "Captcha solved! Try submitting the previous form again!", "success");
+        },
+        error: function (xhr, status, error) {
+            bootstrapToast("Validate Captcha", xhr.responseText, "danger");
+        }
+    });
+}
+
+function verifySecurityInfo(access_token_id, security_info_type, verification_context, verification_data) {
+    $.ajax({
+        type: "POST",
+        async: false,
+        url: "/api/verify_security_info",
+        data: {
+            "access_token_id": access_token_id,
+            "security_info_type": security_info_type,
+            "verification_context": verification_context,
+            "verification_data": verification_data
+        },
+        success: function (response) {
+            if (response.hasOwnProperty("ErrorCode") && response.ErrorCode) {
+                bootstrapToast("Verify Security Info", `An error occurred when trying to validate the provided info. Received Error Code ${response.ErrorCode}`, "danger");
+                return;
+            }
+            bootstrapToast("Verify Security Info", "Info validated. Check if the MFA method was added correctly.", "success");
+            $("#add_mfa_form #verification_container").hide();
+            $("#add_mfa_form #user_input").val("");
+        },
+        error: function (xhr, status, error) {
+            bootstrapToast("Verify Security Info", xhr.responseText, "danger");
+        }
+    });
+}
+
+function deleteSecurityInfo(access_token_id, security_info_type, data) {
+    $.ajax({
+        type: "POST",
+        async: false,
+        url: "/api/delete_security_info", dataType: "json",
+        contentType: "application/json; charset=utf-8",
+        data: JSON.stringify({
+            "access_token_id": access_token_id,
+            "security_info_type": security_info_type,
+            "data": data
+        }),
+        success: function (response) {
+            let successMessage = response.hasOwnProperty("DefaultMethodUpdated") && response.DefaultMethodUpdated ? `MFA Method deleted and default method updated to method type ${response.UpdatedDefaultMethod}` : "MFA Method deleted."
+            bootstrapToast("Delete MFA Method", successMessage, "success");
+        },
+        error: function (xhr, status, error) {
+            bootstrapToast("Delete MFA Method", xhr.responseText, "danger");
+        }
+    });
+}
+
+function generateOtpCode(secret_key) {
+    response = $.ajax({
+        type: "POST",
+        async: false,
+        url: "/api/generate_otp_code",
+        data: {
+            "secret_key": secret_key,
+        }
+    });
+    if (response.status != 200) {
+        bootstrapToast("Generate OTP Code", response.responseText, "danger");
+        return false;
+    }
+    return response.responseText
+}
+
+function deleteGraphspyOtp(otp_code_id) {
+    response = $.ajax({
+        type: "POST",
+        async: false,
+        url: "/api/delete_graphspy_otp",
+        data: {
+            "otp_code_id": otp_code_id,
+        },
+        success: function (response) {
+            bootstrapToast("Delete OTP Code", response, "success");
+        },
+        error: function (xhr, status, error) {
+            bootstrapToast("Delete OTP Code", xhr.responseText, "danger");
+        }
+    });
+}
+
 // ========== Graph ==========
 
 
@@ -189,7 +292,7 @@ function graphDelete(drive_id, item_id, access_token_id, callback) {
             if ([200, 204].includes(response.response_status_code)) {
                 bootstrapToast("Delete Item", "Item deleted successfully.", "success");
             } else {
-                bootstrapToast("Delete Item", "Failed to delete item. Status code: " + responseJSON.response_status_code + ", Response: " + responseJSON.response_text, "danger");
+                bootstrapToast("Delete Item", "Failed to delete item. Status code: " + response.response_status_code + ", Response: " + response.response_text, "danger");
             }
             if (callback) callback();
         },

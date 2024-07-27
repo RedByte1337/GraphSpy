@@ -11,6 +11,7 @@ from threading import Thread
 import json
 import uuid
 import re
+import pyotp
 
 with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),"version.txt")) as f:
     __version__ = f.read()
@@ -24,10 +25,11 @@ def init_db():
     con.execute('CREATE TABLE devicecodes (id INTEGER PRIMARY KEY AUTOINCREMENT, generated_at INTEGER, expires_at INTEGER, user_code TEXT, device_code TEXT, interval INTEGER, client_id TEXT, status TEXT, last_poll INTEGER)')
     con.execute('CREATE TABLE request_templates (id INTEGER PRIMARY KEY AUTOINCREMENT, template_name TEXT, uri TEXT, method TEXT, request_type TEXT, body TEXT, headers TEXT, variables TEXT)')
     con.execute('CREATE TABLE teams_settings (access_token_id INTEGER PRIMARY KEY, skypeToken TEXT, skype_id TEXT, issued_at INTEGER, expires_at INTEGER, teams_settings_raw TEXT)')
+    con.execute('CREATE TABLE mfa_otp (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at TEXT, secret_key TEXT, account_name INTEGER, description TEXT)')
     con.execute('CREATE TABLE settings (setting TEXT UNIQUE, value TEXT)')
     # Valid Settings: active_access_token_id, active_refresh_token_id, schema_version, user_agent
     cur = con.cursor()
-    cur.execute("INSERT INTO settings (setting, value) VALUES ('schema_version', '3')")
+    cur.execute("INSERT INTO settings (setting, value) VALUES ('schema_version', '4')")
     con.commit()
     con.close()
 
@@ -75,18 +77,26 @@ def list_databases():
     return databases
 
 def update_db():
-    latest_schema_version = "3"
+    latest_schema_version = "4"
     current_schema_version = query_db("SELECT value FROM settings where setting = 'schema_version'",one=True)[0]
     if current_schema_version == "1":
         print("[*] Current database is schema version 1, updating to schema version 2")
         execute_db("CREATE TABLE request_templates (id INTEGER PRIMARY KEY AUTOINCREMENT, template_name TEXT, uri TEXT, method TEXT, request_type TEXT, body TEXT, headers TEXT, variables TEXT)")
         execute_db("UPDATE settings SET value = '2' WHERE setting = 'schema_version'")
         print("[*] Updated database to schema version 2")
+        current_schema_version = query_db("SELECT value FROM settings where setting = 'schema_version'",one=True)[0]
     if current_schema_version == "2":
         print("[*] Current database is schema version 2, updating to schema version 3")
         execute_db('CREATE TABLE teams_settings (access_token_id INTEGER PRIMARY KEY, skypeToken TEXT, skype_id TEXT, issued_at INTEGER, expires_at INTEGER, teams_settings_raw TEXT)')
         execute_db("UPDATE settings SET value = '3' WHERE setting = 'schema_version'")
         print("[*] Updated database to schema version 3")
+        current_schema_version = query_db("SELECT value FROM settings where setting = 'schema_version'",one=True)[0]
+    if current_schema_version == "3":
+        print("[*] Current database is schema version 3, updating to schema version 4")
+        execute_db('CREATE TABLE mfa_otp (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at TEXT, secret_key TEXT, account_name INTEGER, description TEXT)')
+        execute_db("UPDATE settings SET value = '4' WHERE setting = 'schema_version'")
+        print("[*] Updated database to schema version 4")
+        current_schema_version = query_db("SELECT value FROM settings where setting = 'schema_version'",one=True)[0]
 
 # ========== Helper Functions ==========
 
@@ -355,7 +365,93 @@ def device_code_flow(resource = "https://graph.microsoft.com", client_id = "d359
 
 # ========== MFA Functions ==========
 
-def getSessionCtx(access_token_id):
+def get_security_info_type(type_id):
+    security_info_types_dict = {
+        -1: "done",
+        0: "unknown",
+        1: "appNotificationAndCode",
+        2: "appNotificationOnly",
+        3: "appCodeOnly",
+        4: "mobilePhoneCallAndSMS",
+        5: "mobilePhoneCall",
+        6: "mobilePhoneSMS",
+        7: "officePhone",
+        8: "email",
+        9: "securityQuestions",
+        10: "appPassword",
+        11: "altMobilePhoneCall",
+        12: "fido",
+        13: "phoneSignIn",
+        14: "temporaryAccessPass",
+        15: "hardwareOath",
+        16: "password",
+        18: "passkey",
+        19: "passkeyFromAuthenticator",
+        100: "unsupportedAuthMethods"
+    }
+    return security_info_types_dict[type_id] if type_id in security_info_types_dict else security_info_types_dict[0]
+
+
+def get_verification_state(verification_state_id):
+    verification_state_dict = {
+        0: "unknown",
+        1: "verificationPending",
+        2: "verified",
+        3: "verificationFailed",
+        4: "systemError",
+        5: "activationPending",
+        6: "activationFailure",
+        7: "activationSucceeded",
+        8: "challengeExpired",
+        9: "activationThrottled",
+        10: "captchaRequired"
+    }
+    return verification_state_dict[verification_state_id] if verification_state_id in verification_state_dict else verification_state_dict[0]
+
+
+def get_add_security_info_error(error_id):
+    add_security_info_error_dict = {
+        0: "none",
+        1: "userIsBlockedBySAS",
+        2: "systemError",
+        3: "invalidCanary",
+        4: "badRequest",
+        5: "dataNotFound",
+        6: "ngcMfaRequired", # Access token requires the "ngcmfa" value in the "amr" claim
+        7: "keyDisallowedByPolicy",
+        8: "challengeExpired",
+        9: "authorizationRequestDenied",
+        10: "authTokenNotForTargetTenant",
+        11: "authTokenNotFound",
+        12: "invalidAikChain",
+        13: "invalidAttestationDataFormat",
+        14: "requiredParamMissing",
+        15: "retryWebAuthN",
+        16: "userNotFound",
+        17: "badDirectoryRequest",
+        18: "replicaUnavailable",
+        19: "requestThrottled",
+        20: "userGroupRestriction",
+        21: "featureDisallowedByPolicy",
+        22: "invalidKeyDataFormat",
+        23: "attestationValidationFailed",
+        24: "verificationFailed",
+        25: "appSessionTimedOut",
+        26: "activationThrottled",
+        27: "appRequestTimedOut",
+        28: "captchaRequired", # Trigger captcha. Usually after multiple failed SMS codes
+        29: "badPhoneNumber",
+        30: "deviceNotFound",
+        31: "phoneAppNotificationDenied",
+        32: "KeyNotFound",
+        33: "InvalidSession",
+        34: "OtherDefaultAvailable",
+        35: "HardwareTokenAssigned"
+    }
+    return add_security_info_error_dict[error_id] if error_id in add_security_info_error_dict else add_security_info_error_dict[0]
+
+
+def get_session_ctx(access_token_id):
     access_token = query_db("SELECT accesstoken FROM accesstokens WHERE id = ? AND resource LIKE '%0000000c-0000-0000-c000-000000000000%'",[access_token_id],one=True)
     if not access_token:
         gspy_log.error(f"No access token with ID {access_token_id} and resource containing '0000000c-0000-0000-c000-000000000000'!")
@@ -368,31 +464,285 @@ def getSessionCtx(access_token_id):
         if response.status_code != 200:
             gspy_log.error(f"Failed to obtain SessionCtx value. Received status code {response.status_code}")
             return False
-        sessionCtx = json.loads(response.text.split()[1])["sessionCtx"]
+            # Remove the random garbage at the front of the response: )]}',\n
+        sessionCtx = json.loads(response.text[6:])["sessionCtx"]
+        gspy_log.debug(f"Received sessionCtx: '{sessionCtx}'")
         return sessionCtx
     except Exception as e:
         gspy_log.error(f"Failed to obtain SessionCtx value.")
+        traceback.print_exc()
         return False
 
-def getAvailableAuthenticationInfo(access_token_id):
+def get_available_authentication_info(access_token_id):
     access_token = query_db("SELECT accesstoken FROM accesstokens WHERE id = ? AND resource LIKE '%0000000c-0000-0000-c000-000000000000%'",[access_token_id],one=True)
     if not access_token:
         gspy_log.error(f"No access token with ID {access_token_id} and resource containing '0000000c-0000-0000-c000-000000000000'!")
         return False
     access_token = access_token[0]
     try:
-        sessionCtx = getSessionCtx(access_token_id)
+        sessionCtx = get_session_ctx(access_token_id)
         headers = {"Authorization":f"Bearer {access_token}", "Sessionctx":sessionCtx, "User-Agent":get_user_agent()}
         uri = "https://account.activedirectory.windowsazure.com/securityinfo/AvailableAuthenticationInfo"
         response = requests.get(uri, headers=headers)
         if response.status_code != 200:
             gspy_log.error(f"Failed to obtain AvailableAuthenticationInfo. Received status code {response.status_code}")
             return False
-        availableAuthenticationInfo = json.loads(response.text.split()[1])
+        gspy_log.debug(f"AvailableAuthenticationInfo Raw Response:\n{response.text}")
+        # Remove the random garbage at the front of the response: )]}',\n
+        availableAuthenticationInfo = json.loads(response.text[6:])
         availableAuthenticationInfo_parsed = [{**availableAuthenticationInfo[method], "MethodName":method} for method in availableAuthenticationInfo.keys()]
         return availableAuthenticationInfo_parsed
     except Exception as e:
         gspy_log.error(f"Failed to obtain AvailableAuthenticationInfo.")
+        traceback.print_exc()
+        return False
+
+def validate_captcha(access_token_id, challenge_id, captcha_solution, azure_region, challenge_type = "Visual"):
+    access_token = query_db("SELECT accesstoken FROM accesstokens WHERE id = ? AND resource LIKE '%0000000c-0000-0000-c000-000000000000%'",[access_token_id],one=True)
+    if not access_token:
+        gspy_log.error(f"No access token with ID {access_token_id} and resource containing '0000000c-0000-0000-c000-000000000000'!")
+        return False
+    access_token = access_token[0]
+    try:
+        sessionCtx = get_session_ctx(access_token_id)
+        headers = {"Authorization":f"Bearer {access_token}", "Sessionctx":sessionCtx, "User-Agent":get_user_agent()}
+        uri = "https://account.activedirectory.windowsazure.com/securityinfo/ValidateCaptcha"
+        body = {
+            "ChallengeType": challenge_type,
+            "ChallengeId": challenge_id,
+            "InputSolution": captcha_solution,
+            "AzureRegion": azure_region
+        }
+        response = requests.post(uri, headers=headers, json=body)
+        if response.status_code != 200:
+            gspy_log.error(f"Failed to validate captcha. Received status code {response.status_code}")
+            return False
+        gspy_log.debug(f"ValidateCaptcha Raw Response:\n{response.text}")
+        # Remove the random garbage at the front of the response: )]}',\n
+        captcha_response = json.loads(response.text[6:])
+        return captcha_response
+    except Exception as e:
+        gspy_log.error(f"ValidateCaptcha request failed.")
+        traceback.print_exc()
+        return False
+
+def initialize_mobile_app_registration(access_token_id, security_info_type):
+    access_token = query_db("SELECT accesstoken FROM accesstokens WHERE id = ? AND resource LIKE '%0000000c-0000-0000-c000-000000000000%'",[access_token_id],one=True)
+    if not access_token:
+        gspy_log.error(f"No access token with ID {access_token_id} and resource containing '0000000c-0000-0000-c000-000000000000'!")
+        return False
+    access_token = access_token[0]
+    try:
+        sessionCtx = get_session_ctx(access_token_id)
+        headers = {"Authorization":f"Bearer {access_token}", "Sessionctx":sessionCtx, "User-Agent":get_user_agent()}
+        uri = "https://account.activedirectory.windowsazure.com/securityinfo/InitializeMobileAppRegistration"
+        body = {
+            "securityInfoType": security_info_type
+        }
+        response = requests.post(uri, headers=headers, json=body)
+        if response.status_code != 200:
+            gspy_log.error(f"InitializeMobileAppRegistration request failed. Received status code {response.status_code}")
+            return False
+        gspy_log.debug(f"InitializeMobileAppRegistration Raw Response:\n{response.text}")
+        # Remove the random garbage at the front of the response: )]}',\n
+        registrationInfo = json.loads(response.text[6:])
+        return registrationInfo
+    except Exception as e:
+        gspy_log.error(f"InitializeMobileAppRegistration request failed.")
+        traceback.print_exc()
+        return False
+
+def delete_security_info(access_token_id, security_info_type, data):
+    # Types:
+    #   1 - AuthenticatorApp
+    #   6 - MobilePhone
+    access_token = query_db("SELECT accesstoken FROM accesstokens WHERE id = ? AND resource LIKE '%0000000c-0000-0000-c000-000000000000%'",[access_token_id],one=True)
+    if not access_token:
+        gspy_log.error(f"No access token with ID {access_token_id} and resource containing '0000000c-0000-0000-c000-000000000000'!")
+        return False
+    access_token = access_token[0]
+    try:
+        sessionCtx = get_session_ctx(access_token_id)
+        headers = {"Authorization":f"Bearer {access_token}", "Sessionctx":sessionCtx, "User-Agent":get_user_agent()}
+        uri = "https://account.activedirectory.windowsazure.com/securityinfo/DeleteSecurityInfo"
+        body_data = json.dumps(data) if type(data) == dict else data
+        body = {
+            "Type": security_info_type,
+            "Data": body_data
+        }
+        response = requests.post(uri, headers=headers, json=body)
+        if response.status_code != 200:
+            gspy_log.error(f"DeleteSecurityInfo request failed. Received status code {response.status_code}")
+            return False
+        gspy_log.debug(f"DeleteSecurityInfo Raw Response:\n{response.text}")
+        # Remove the random garbage at the front of the response: )]}',\n
+        security_info_response = json.loads(response.text[6:])
+        if (not security_info_response) or ((not ("Deleted" in security_info_response)) or (not (security_info_response["Deleted"]))):
+            gspy_log.error(f"DeleteSecurityInfo request failed. Received response: \n{security_info_response}")
+            return False
+        return security_info_response
+    except Exception as e:
+        gspy_log.error(f"DeleteSecurityInfo request failed.")
+        traceback.print_exc()
+        return False
+
+def add_security_info(access_token_id, security_info_type, data):
+    access_token = query_db("SELECT accesstoken FROM accesstokens WHERE id = ? AND resource LIKE '%0000000c-0000-0000-c000-000000000000%'",[access_token_id],one=True)
+    if not access_token:
+        gspy_log.error(f"No access token with ID {access_token_id} and resource containing '0000000c-0000-0000-c000-000000000000'!")
+        return False
+    access_token = access_token[0]
+    try:
+        sessionCtx = get_session_ctx(access_token_id)
+        headers = {"Authorization":f"Bearer {access_token}", "Sessionctx":sessionCtx, "User-Agent":get_user_agent()}
+        uri = "https://account.activedirectory.windowsazure.com/securityinfo/AddSecurityInfo"
+        body_data = json.dumps(data) if type(data) == dict else data
+        body = {
+            "Type": security_info_type,
+            "Data": body_data
+        }
+        response = requests.post(uri, headers=headers, json=body)
+        if response.status_code != 200:
+            gspy_log.error(f"AddSecurityInfo request failed. Received status code {response.status_code}")
+            return False
+        gspy_log.debug(f"AddSecurityInfo Raw Response:\n{response.text}")
+        # Remove the random garbage at the front of the response: )]}',\n
+        security_info_response = json.loads(response.text[6:])
+        if (not security_info_response) or (not "VerificationContext" in security_info_response):
+            gspy_log.error(f"AddSecurityInfo request failed. Received response: \n{security_info_response}")
+            return False
+        if (not security_info_response["VerificationContext"]) and security_info_response["ErrorCode"] == 28:
+            # ErrorCode 28 indicates that a Captcha needs to be solved (happens after a couple of failed attempts in a short timeframe)
+            gspy_log.debug(f"We need to solve a captcha...")
+            captcha_uri = "https://account.activedirectory.windowsazure.com/securityinfo/Captcha?challengeType=Visual"
+            captcha_response = requests.get(captcha_uri, headers=headers)
+            gspy_log.debug(f"Captcha Raw Response:\n{captcha_response.text}")
+            captcha_response_json = json.loads(captcha_response.text[6:])
+            security_info_response["captcha"] = captcha_response_json
+        return security_info_response
+    except Exception as e:
+        gspy_log.error(f"AddSecurityInfo request failed.")
+        traceback.print_exc()
+        return False
+
+def verify_security_info(access_token_id, security_info_type, verification_context, verification_data):
+    # Types:
+    #   2 - Microsoft Authenticator App
+    #   3 - OTP
+    #   6 - MobilePhone
+    #   7 - OfficePhone
+    #   8 - Email
+    #   11 - AltMobilePhone
+    #   12 - FIDO
+    access_token = query_db("SELECT accesstoken FROM accesstokens WHERE id = ? AND resource LIKE '%0000000c-0000-0000-c000-000000000000%'",[access_token_id],one=True)
+    if not access_token:
+        gspy_log.error(f"No access token with ID {access_token_id} and resource containing '0000000c-0000-0000-c000-000000000000'!")
+        return False
+    access_token = access_token[0]
+    try:
+        sessionCtx = get_session_ctx(access_token_id)
+        headers = {"Authorization":f"Bearer {access_token}", "Sessionctx":sessionCtx, "User-Agent":get_user_agent()}
+        uri = "https://account.activedirectory.windowsazure.com/securityinfo/VerifySecurityInfo"
+        body = {
+            "Type": security_info_type,
+            "VerificationData": verification_data,
+            "VerificationContext": verification_context
+        }
+        response = requests.post(uri, headers=headers, json=body)
+        if response.status_code != 200:
+            gspy_log.error(f"VerifySecurityInfo request failed. Received status code {response.status_code}")
+            return False
+        gspy_log.debug(f"VerifySecurityInfo Raw Response:\n{response.text}")
+        # Remove the random garbage at the front of the response: )]}',\n
+        verifysecurity_info_response = json.loads(response.text[6:])
+        return verifysecurity_info_response
+    except Exception as e:
+        gspy_log.error(f"VerifySecurityInfo request failed.")
+        traceback.print_exc()
+        return False
+
+def add_phone_number(access_token_id, country_code, phone_number, phone_type = "MobilePhone_sms"):
+    data = {
+        "phoneNumber": phone_number,
+        "countryCode": country_code
+    }
+
+    if not phone_type in ["MobilePhone_call", "MobilePhone_sms", "AltMobilePhone", "OfficePhone"]:
+        gspy_log.error(f"Invalid phone type provided: {phone_type}.")
+        return False
+    phone_type_dict = {
+        "MobilePhone_call": 5,
+        "MobilePhone_sms": 6,
+        "OfficePhone": 7,
+        "AltMobilePhone": 11
+    }
+
+    security_info_response = add_security_info(access_token_id, phone_type_dict[phone_type], data)
+    if (not security_info_response):
+        gspy_log.error(f"Adding phone number failed.")
+        return False
+    if "captcha" in security_info_response:
+        return security_info_response
+    if (not ("VerificationContext" in security_info_response)) or (not (security_info_response["VerificationContext"])):
+        gspy_log.error(f"Adding phone number failed. Received response: \n{security_info_response}")
+        return False
+    return security_info_response
+
+def add_mfa_app(access_token_id, security_info_type, secret_key):
+    data = {
+        "secretKey": secret_key,
+        "affinityRegion": None,
+        "isResendNotificationChallenge": False
+    }
+    security_info_response = add_security_info(access_token_id, security_info_type, data)
+    if (not security_info_response):
+        gspy_log.error(f"Adding MFA app failed.")
+        return False
+    if "captcha" in security_info_response:
+        return security_info_response
+    if (not ("VerificationContext" in security_info_response)) or (not (security_info_response["VerificationContext"])):
+        gspy_log.error(f"Adding MFA app failed. Received response: \n{security_info_response}")
+        return False
+    return security_info_response
+
+def add_graphspy_otp(access_token_id, description = ""):
+    try:
+        initialize_mobile_app_registration_response = initialize_mobile_app_registration(access_token_id, 3)
+        if not initialize_mobile_app_registration_response:
+            gspy_log.error(f"Failed to initialize mobile app registration.")
+            return False
+        account_name = initialize_mobile_app_registration_response["AccountName"] if "AccountName" in initialize_mobile_app_registration_response else "Unknown"
+        secret_key = initialize_mobile_app_registration_response["SecretKey"]
+        data = {
+            "secretKey": secret_key,
+            "affinityRegion": None,
+            "isResendNotificationChallenge": False
+        }
+        security_info_response = add_security_info(access_token_id, 3, data)
+        if (not security_info_response):
+            gspy_log.error(f"No valid security info response received.")
+            return False
+        if "captcha" in security_info_response:
+            gspy_log.error(f"A captcha was requested. Aborting.")
+            return False
+        if (not ("VerificationContext" in security_info_response)) or (not (security_info_response["VerificationContext"])):
+            gspy_log.error(f"No VerificationContext in the security info response. Received response: \n{security_info_response}")
+            return False
+        otp_code = pyotp.TOTP(secret_key).now()
+        verify_security_info_response = verify_security_info(access_token_id, 3, security_info_response["VerificationContext"], otp_code)
+        if ("ErrorCode" in verify_security_info_response and verify_security_info_response["ErrorCode"]):
+            gspy_log.error(f"An error occurred when trying to validate the provided info. Received Error Code {response.ErrorCode}")
+            return False
+        execute_db("INSERT INTO mfa_otp (stored_at, secret_key, account_name, description) VALUES (?,?,?,?)",(
+            f"{datetime.now()}".split(".")[0],
+            secret_key,
+            account_name,
+            description
+        ))
+        return secret_key
+    except Exception as e:
+        gspy_log.error(f"An error occurred when trying to add GraphSpy OTP.")
+        traceback.print_exc()
         return False
 
 
@@ -555,10 +905,185 @@ def init_routes():
         if not "access_token_id" in request.form:
             return f"[Error] No access_token_id specified.", 400
         access_token_id = request.form['access_token_id']
-        availableAuthenticationInfo = getAvailableAuthenticationInfo(access_token_id)
+        availableAuthenticationInfo = get_available_authentication_info(access_token_id)
         if not availableAuthenticationInfo:
             return f"[Error] Failed to obtain Available Authentication Info.", 400
         return availableAuthenticationInfo
+
+    @app.post("/api/add_phone_number")
+    def api_add_phone_number():
+        if not "access_token_id" in request.form:
+            return f"[Error] No access_token_id specified.", 400
+        access_token_id = request.form['access_token_id']
+        if not "country_code" in request.form:
+            return f"[Error] No country_code specified.", 400
+        country_code = request.form['country_code']
+        if not "phone_number" in request.form:
+            return f"[Error] No phone_number specified.", 400
+        phone_number = request.form['phone_number']
+        phone_type = request.form['phone_type'] if "phone_type" in request.form else "MobilePhone"
+        if not phone_type in ["MobilePhone_sms", "MobilePhone_call", "AltMobilePhone", "OfficePhone"]:
+            return f"[Error] Unknown phone_type specified. Allowed options: MobilePhone_sms, MobilePhone_call, AltMobilePhone, OfficePhone", 400
+        
+        add_phone_number_response = add_phone_number(access_token_id, country_code, phone_number, phone_type)
+        if not add_phone_number_response:
+            return f"[Error] Failed to add phone number.", 400
+        return add_phone_number_response
+
+    @app.post("/api/add_email")
+    def api_add_email():
+        if not "access_token_id" in request.form:
+            return f"[Error] No access_token_id specified.", 400
+        access_token_id = request.form['access_token_id']
+        if not "email" in request.form:
+            return f"[Error] No email specified.", 400
+        email = request.form['email']
+
+        security_info_response = add_security_info(access_token_id, 8, email)
+        if (not security_info_response):
+            gspy_log.error(f"Failed adding email address.")
+            return f"[Error] Failed adding email address.", 400
+        if "captcha" in security_info_response:
+            return security_info_response
+        if (not ("VerificationContext" in security_info_response)) or (not (security_info_response["VerificationContext"])):
+            gspy_log.error(f"Adding email address failed. Received response: \n{security_info_response}")
+            return f"[Error] Failed adding email address.", 400
+        return security_info_response
+
+    @app.post("/api/add_mfa_app")
+    def api_add_mfa_app():
+        if not "access_token_id" in request.form:
+            return f"[Error] No access_token_id specified.", 400
+        access_token_id = request.form['access_token_id']
+        if not "security_info_type" in request.form:
+            return f"[Error] No security_info_type specified.", 400
+        security_info_type = request.form['security_info_type']
+        if not "secret_key" in request.form:
+            return f"[Error] No secret_key specified.", 400
+        secret_key = request.form['secret_key']
+        
+        add_mfa_app_response = add_mfa_app(access_token_id, security_info_type, secret_key)
+        if not add_mfa_app_response:
+            return f"[Error] Failed to add MFA app.", 400
+        return add_mfa_app_response
+        
+    @app.post("/api/list_graphspy_otp")
+    def api_list_graphspy_otp():
+        rows = query_db_json("select * from mfa_otp")
+        return json.dumps(rows)
+
+    @app.post("/api/add_graphspy_otp")
+    def api_add_graphspy_otp():
+        if not "access_token_id" in request.form:
+            return f"[Error] No access_token_id specified.", 400
+        access_token_id = request.form['access_token_id']
+        description = request.form['description'] if "description" in request.form else ""
+        
+        add_graphspy_otp_response = add_graphspy_otp(access_token_id, description)
+        if not add_graphspy_otp_response:
+            return "[Error] Failed to add GraphSpy OTP code to account.", 400
+        return f"[Success] Added GraphSpy OTP code with secret '{add_graphspy_otp_response}' to account!"
+        
+    @app.post("/api/delete_graphspy_otp")
+    def api_delete_graphspy_otp():
+        try:
+            if not "otp_code_id" in request.form:
+                return f"[Error] No otp_code_id specified.", 400
+            otp_code_id = request.form["otp_code_id"]
+            execute_db("DELETE FROM mfa_otp WHERE id = ?",[otp_code_id])
+            return f"[Success] OTP code with ID {otp_code_id} deleted from database."
+        except Exception as e:
+            traceback.print_exc()
+            return "[Error] Failed to delete OTP code.", 400
+
+    @app.post("/api/generate_otp_code")
+    def api_generate_otp_code():
+        try:
+            if not "secret_key" in request.form:
+                return f"[Error] No secret_key specified.", 400
+            secret_key = request.form['secret_key']
+            otp_code = pyotp.TOTP(secret_key).now()
+            return otp_code
+        except Exception as e:
+            traceback.print_exc()
+            return "[Error] Failed to create OTP code from the provided secret key.", 400
+
+    @app.post("/api/verify_security_info")
+    def api_verify_security_info():
+        if not "access_token_id" in request.form:
+            return f"[Error] No access_token_id specified.", 400
+        access_token_id = request.form['access_token_id']
+        if not "security_info_type" in request.form:
+            return f"[Error] No security_info_type specified.", 400
+        security_info_type = request.form['security_info_type']
+        if not "verification_context" in request.form:
+            return f"[Error] No verification_context specified.", 400
+        verification_context = request.form['verification_context']
+        if not "verification_data" in request.form:
+            return f"[Error] No verification_data specified.", 400
+        verification_data = request.form['verification_data']
+        
+        verify_security_info_response = verify_security_info(access_token_id, security_info_type, verification_context, verification_data)
+        if not verify_security_info_response:
+            return f"[Error] Failed to verify security info.", 400
+        return verify_security_info_response
+
+    @app.post("/api/delete_security_info")
+    def api_delete_security_info():
+        if not request.is_json:
+            return f"[Error] Expecting JSON input.", 400
+        request_json = request.get_json()
+        if not "access_token_id" in request_json:
+            return f"[Error] No access_token_id specified.", 400
+        access_token_id = request_json['access_token_id']
+        if not "security_info_type" in request_json:
+            return f"[Error] No security_info_type specified.", 400
+        security_info_type = request_json['security_info_type']
+        if not "data" in request_json:
+            return f"[Error] No data specified.", 400
+        data = request_json['data']
+        
+        delete_security_info_response = delete_security_info(access_token_id, security_info_type, data)
+        if not delete_security_info_response:
+            return f"[Error] Failed to delete MFA method.", 400
+        return delete_security_info_response
+
+    @app.post("/api/validate_captcha")
+    def api_validate_captcha():
+        if not "access_token_id" in request.form:
+            return f"[Error] No access_token_id specified.", 400
+        access_token_id = request.form['access_token_id']
+        if not "challenge_id" in request.form:
+            return f"[Error] No challenge_id specified.", 400
+        challenge_id = request.form['challenge_id']
+        if not "captcha_solution" in request.form:
+            return f"[Error] No captcha_solution specified.", 400
+        captcha_solution = request.form['captcha_solution']
+        if not "azure_region" in request.form:
+            return f"[Error] No azure_region specified.", 400
+        azure_region = request.form['azure_region']
+        challenge_type = request.form['challenge_type'] if "challenge_type" in request.form else "Visual"
+        
+        captcha_response = validate_captcha(access_token_id, challenge_id, captcha_solution, azure_region, challenge_type)
+        if not captcha_response:
+            return f"[Error] Failed to validate captcha.", 400
+        if not captcha_response["CaptchaSolved"]:
+            return f"[Error] Captcha not solved. Received error: {captcha_response['ErrorCode']}", 400
+        return captcha_response
+
+    @app.post("/api/initialize_mobile_app_registration")
+    def api_initialize_mobile_app_registration():
+        if not "access_token_id" in request.form:
+            return f"[Error] No access_token_id specified.", 400
+        access_token_id = request.form['access_token_id']
+        if not "security_info_type" in request.form:
+            return f"[Error] No security_info_type specified.", 400
+        security_info_type = request.form['security_info_type']
+        
+        initialize_mobile_app_registration_response = initialize_mobile_app_registration(access_token_id, security_info_type)
+        if not initialize_mobile_app_registration_response:
+            return f"[Error] Failed to initialize mobile app registration.", 400
+        return initialize_mobile_app_registration_response
 
         # ========== Refresh Tokens ==========
 

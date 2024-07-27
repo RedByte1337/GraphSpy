@@ -21,9 +21,7 @@
                 <!-- Empty for now -->
             </div>
             <div class="col-lg-3">
-                <div class="d-flex justify-content-end">
-                    <button type="Button" class="btn btn-outline-primary" onclick="alert('Placeholder')"><i class="fi fi-rr-add" style="vertical-align: -0.15em"></i> Placeholder</button>
-                </div>
+                <!-- Empty for now -->
             </div>
         </div>
     </form>
@@ -33,11 +31,12 @@
 </div>
 <br>
 <div class="row g-3">
-    <div class="col-xl-6">
+    <div class="col-xxl-8">
         <h2>Available Auth Methods</h2>
         <table id="available_auth_methods_table" class="table table-striped" style="word-wrap: break-word; word-break: break-all; width:100%">
             <thead>
                 <tr>
+                    <th></th>
                     <th></th>
                     <th></th>
                     <th>Method</th>
@@ -57,16 +56,16 @@
             $('#available_auth_methods_table').DataTable().ajax.reload(null, false);
             return;
         }
-        let myTable = new DataTable('#available_auth_methods_table', {
+        let authMethodsTable = new DataTable('#available_auth_methods_table', {
             "destroy": true,
             ajax: {
                 type: "POST",
                 url: '/api/get_available_authentication_info',
-                data: function (d) { d.access_token_id =  $("#mfa_form #access_token_id").val() },
+                data: function (d) { d.access_token_id = $("#mfa_form #access_token_id").val() },
                 dataSrc: "",
                 error: function (xhr, status, error) {
                     bootstrapToast("Available Auth Methods Table", xhr.responseText, "danger");
-                    myTable.clear().draw();
+                    authMethodsTable.clear().draw();
                 }
             },
             columns: [
@@ -75,17 +74,38 @@
                     orderable: false,
                     data: null,
                     defaultContent: '',
-                    'width': '40px'
+                    width: '40px'
                 },
                 {
                     className: 'action-control',
                     orderable: false,
                     data: null,
                     render: function (d, t, r) {
-                        // Question mark icon
-                        return '<i class="fi fi-br-question" style="cursor: pointer"></i>'
+                        if (!r.CanAdd) {
+                            // Only allow to add if CanAdd is true
+                            return '<i class="fi fi-rr-add text-secondary"></i>'
+                        }
+                        if (["MobilePhone", "AltMobilePhone", "OfficePhone", "Email"].includes(r.MethodName) && r.Data) {
+                            // You can only have one value for these methods. So adding a new one will replace the existing one.
+                            return '<i class="fi fi-rr-replace" style="cursor: pointer"></i>'
+                        }
+                        return '<i class="fi fi-rr-add" style="cursor: pointer"></i>'
+
                     },
-                    'width': '40px'
+                    width: '40px'
+                },
+                {
+                    className: 'delete-control',
+                    orderable: false,
+                    data: null,
+                    render: function (d, t, r) {
+                        if (r.CanDelete && r.Data) {
+                            // Only allow delete if CanDelete is true and the method is configured
+                            return '<i class="fi fi-rr-trash" style="cursor: pointer"></i>'
+                        }
+                        return '<i class="fi fi-rr-trash text-secondary"></i>'
+                    },
+                    width: '40px'
                 },
                 {
                     data: 'MethodName'
@@ -97,7 +117,7 @@
                     data: null,
                     render: function (d, t, r) {
                         registeredMethods = r.Data;
-                        registeredMethodsCount = registeredMethods ? registeredMethods.length : 0;
+                        registeredMethodsCount = registeredMethods ? (registeredMethods instanceof Array ? registeredMethods.length : 1) : 0;
                         return registeredMethodsCount;
                     }
                 },
@@ -105,12 +125,12 @@
                     data: 'CanAdd'
                 }
             ],
-            order: [[2, 'desc']]
+            order: [[3, 'desc']]
         })
 
-        myTable.on('click', 'td.dt-control', function (e) {
+        authMethodsTable.on('click', 'td.dt-control', function (e) {
             let tr = e.target.closest('tr');
-            let row = myTable.row(tr);
+            let row = authMethodsTable.row(tr);
 
             if (row.child.isShown()) {
                 // This row is already open - close it
@@ -123,13 +143,73 @@
 
         });
 
-        myTable.on('click', 'td.action-control', function (e) {
+        authMethodsTable.on('click', 'td.action-control', function (e) {
             let tr = e.target.closest('tr');
-            let row = myTable.row(tr);
-            //drive_id = row.data().remoteItem.parentReference.driveId
-            //item_id = row.data().id
-            access_token_id = $("#mfa_form #access_token_id").val();
-            //graphDownload(drive_id, item_id, access_token_id);
+            let row = authMethodsTable.row(tr);
+            let method = row.data().MethodName;
+            // Hide all containers in the modal, and only show the relevant one
+            $("#add_mfa_form .default-disabled").hide();
+            $("#add_mfa_form input[type=text]").val("");
+            if (["MobilePhone", "AltMobilePhone", "OfficePhone"].includes(method)) {
+                if (row.data().Data) {
+                    $("#add_mfa_form #add_phone_container #replace_phone_warning").show();
+                } else {
+                    $("#add_mfa_form #add_phone_container #replace_phone_warning").hide();
+                }
+                $("#add_mfa_form #add_phone_container #phone_verify_option_call").prop("checked", true)
+                if (method == "MobilePhone") {
+                    $("#add_mfa_form #add_phone_container #phone_verify_option_sms").removeAttr("disabled")
+                } else {
+                    $("#add_mfa_form #add_phone_container #phone_verify_option_sms").attr("disabled", "")
+                }
+                $("#add_mfa_form #add_phone_container #phone_type").val(method);
+                $("#add_mfa_form #add_phone_container").show();
+            } else if (method == "AuthenticatorApp") {
+                registeredMethods = row.data().Data;
+                registeredMethodsCount = registeredMethods ? (registeredMethods instanceof Array ? registeredMethods.length : 1) : 0;
+                if (registeredMethodsCount >= 5) {
+                    bootstrapToast("Add MFA Method", "Microsoft only allows 5 authenticator apps of any type to be enrolled on a single account. If you want to add an additional one, you'll first have to remove some!", "danger");
+                    return false;
+                }
+                $("#add_mfa_form #add_authenticator_app_container").show();
+            } else if (method == "Email") {
+                if (row.data().Data) {
+                    $("#add_mfa_form #add_email_container #replace_email_warning").show();
+                } else {
+                    $("#add_mfa_form #add_email_container #replace_email_warning").hide();
+                }
+                $("#add_mfa_form #add_email_container").show();
+            }
+            $('#add_mfa_method_modal').modal('show');
+        });
+
+        function addDeleteMfaOption(method) {
+            let number = $("#delete_mfa_form #delete_mfa_options").children().length + 1;
+            let methodRadio = $('<div class="form-check"></div>');
+            methodRadio.append($(`<input class="form-check-input" type="radio" name="delete_radio_options" id="delete_method_${number}">`));
+            methodRadio.append($(`<label class="form-check-label" for="delete_method_${number}"></label>`).append($('<pre style="white-space: pre-wrap;"></pre>').text(JSON.stringify(method, undefined, 4))));
+            $("#delete_mfa_form #delete_mfa_options").append(methodRadio);
+        }
+
+        authMethodsTable.on('click', 'td.delete-control', function (e) {
+            let tr = e.target.closest('tr');
+            let row = authMethodsTable.row(tr);
+            if (!row.data().CanDelete || !row.data().Data) {
+                // Only allow delete if CanDelete is true and the method is configured
+                return;
+            }
+            let registeredMethods = row.data().Data;
+            $("#delete_mfa_form #delete_mfa_options").empty();
+            if (registeredMethods instanceof Array) {
+                ;
+                for (registeredMethod of registeredMethods) {
+                    addDeleteMfaOption(registeredMethod);
+                }
+            } else {
+                addDeleteMfaOption(registeredMethods);
+            }
+            $("#delete_mfa_form #security_info_type").val(row.data().Type);
+            $('#delete_mfa_method_modal').modal('show');
         });
         return;
     }
@@ -148,4 +228,486 @@
         return formatWrapper;
     }
 </script>
-    {%endblock content%}
+<br>
+<div class="row g-3">
+    <div class="col-12">
+        <h2>GraphSpy OTP Codes</h2>
+        <table id="graphspy_otp_table" class="table table-striped" style="word-wrap: break-word; word-break: break-all; width:100%">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th></th>
+                    <th>ID</th>
+                    <th>Created</th>
+                    <th>Account Name</th>
+                    <th>Secret Key</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+        </table>
+    </div>
+</div>
+<script type="text/javascript" class="init">
+    // Populate the graphspy_otp_table table
+
+    // To Do: Reload button
+    // $('#graphspy_otp_table').DataTable().ajax.reload(null, false);
+    let authMethodsTable = new DataTable('#graphspy_otp_table', {
+        "destroy": true,
+        ajax: {
+            type: "POST",
+            url: '/api/list_graphspy_otp',
+            data: "",
+            dataSrc: "",
+            error: function (xhr, status, error) {
+                bootstrapToast("GraphSpy OTP Table", "Unable to obtain stored OTP codes from database.", "danger");
+                authMethodsTable.clear().draw();
+            }
+        },
+        columns: [
+            {
+                className: 'action-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-rr-copy-alt" style="cursor: pointer"></i>',
+                width: '40px'
+            },
+            {
+                className: 'delete-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-rr-trash" style="cursor: pointer"></i>',
+                width: '40px'
+            },
+            {
+                data: 'id',
+                width: '60px'
+            },
+            {
+                data: 'stored_at',
+                width: '175px'
+            },
+            {
+                data: 'account_name',
+                width: '450px'
+            },
+            {
+                data: 'secret_key',
+                width: '175px'
+            },
+            {
+                data: 'description'
+            }
+        ],
+        order: [[2, 'desc']]
+    })
+
+    authMethodsTable.on('click', 'td.action-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = authMethodsTable.row(tr);
+        let secretKey = row.data().secret_key;
+        let otp_code = generateOtpCode(secretKey);
+        if (!otp_code) {
+            return false;
+        }
+        copyToClipboard(otp_code);
+    });
+
+    authMethodsTable.on('click', 'td.delete-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = authMethodsTable.row(tr);
+        let otpId = row.data().id;
+        if (!confirm(`Are you sure you want to delete the OTP method with ID ${otpId} from the GraphSpy database? \r\nNote: This will not remove the MFA method from the account it is linked to.`)) {
+            return false;
+        }
+        deleteGraphspyOtp(otpId);
+        $('#graphspy_otp_table').DataTable().ajax.reload(null, false);
+    });
+</script>
+<!-- Add MFA Method Modal -->
+<div class="modal fade" id="add_mfa_method_modal" tabindex="-1" aria-labelledby="add_mfa_method_modal_label" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="add_mfa_method_modal_label">Add MFA Method</h1>
+                <div style="float: right">
+                    <i class="fi fi-br-expand px-3" id="expand-icon" style="cursor: pointer; float: left; opacity: 0.5"></i>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <form id="add_mfa_form">
+                    <div class="row g-3">
+                        <div id="add_phone_container" class="col-auto default-disabled" style="display: none;">
+                            <p id="replace_phone_warning" style="display: none;"><i>Note: A phone number of this type is already added to this account.<br>Adding a new one will overwrite the existing number.</i></p>
+                            <div class="input-group mb-3">
+                                <span class="input-group-text">Phone Type</span>
+                                <input type="text" id="phone_type" class="form-control rounded-end" disabled>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="phone_verify_options" id="phone_verify_option_call" value="call" checked>
+                                    <label class="form-check-label" for="phone_verify_option_call">Call me</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="phone_verify_options" id="phone_verify_option_sms" value="sms" disabled>
+                                    <label class="form-check-label" for="phone_verify_option_sms">Text a code</label>
+                                </div>
+                            </div>
+                            <label class="form-label" for="country_code">Specify the country code and phone number.</label>
+                            <div class="input-group">
+                                <input type="text" id="country_code" class="form-control" placeholder="+1" required>
+                                <input type="text" id="phone_number" class="form-control" placeholder="234567890" required>
+                                <button type="Button" class="btn btn-outline-primary" onclick="addPhoneNumberButton()">Add</button>
+                            </div>
+                        </div>
+                        <div id="add_email_container" class="col-auto default-disabled" style="display: none;">
+                            <p id="replace_email_warning" style="display: none;"><i>Note: An existing email address is already configured for this MFA method.<br>Adding a new one will overwrite the existing email address.</i></p>
+                            <label class="form-label" for="country_code">Specify the email address to add.</label>
+                            <div class="input-group">
+                                <input type="text" id="email" class="form-control" placeholder="john.doe@example.com" required>
+                                <button type="Button" class="btn btn-outline-primary" onclick="addEmailButton()">Add</button>
+                            </div>
+                        </div>
+                        <div id="add_authenticator_app_container" class="col-auto default-disabled" style="display: none;">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="authenticatiorAppOptions" id="authenticatiorAppOption1" value="graphspy_otp">
+                                <label class="form-check-label" for="authenticatiorAppOption1">
+                                    GraphSpy OTP
+                                </label>
+                            </div>
+                            <div class="ps-4">
+                                <input type="text" id="graphspyOtpDescription" class="form-control default-disabled" placeholder="Description" style="display: none;">
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="authenticatiorAppOptions" id="authenticatiorAppOption2" value="custom_otp">
+                                <label class="form-check-label" for="authenticatiorAppOption2">
+                                    Custom OTP App
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="authenticatiorAppOptions" id="authenticatiorAppOption3" value="ms_auth_app">
+                                <label class="form-check-label" for="authenticatiorAppOption3">
+                                    Microsoft Authenticator
+                                </label>
+                            </div>
+                            <div class="pt-3">
+                                <button type="Button" class="btn btn-outline-primary" onclick="addAuthenticatorAppButton()">Add</button>
+                            </div>
+                        </div>
+                        <div class="w-100 m-0"></div>
+                        <div id="qr_code_container" class="col-auto default-disabled" style="display: none;">
+                            <div>Scan the following code with your authenticator app:</div>
+                            <img id="qr_code_image">
+                            <div class="pt-3">
+                                <input type="text" id="registration_type" class="form-control" hidden>
+                                <input type="text" id="secret_key" class="form-control" hidden>
+                                <button type="Button" class="btn btn-outline-primary" onclick="scannedQrButton()">Next</button>
+                            </div>
+                        </div>
+                        <div class="w-100 m-0"></div>
+                        <div id="captcha_container" class="col-auto default-disabled" style="display: none;">
+                            <div>Solve the captcha:</div>
+                            <img id="captcha_image">
+                            <div class="input-group pt-3">
+                                <input type="text" id="captcha_solution" class="form-control" placeholder="Captcha text..." required>
+                                <input type="text" id="challenge_id" class="form-control" hidden>
+                                <input type="text" id="azure_region" class="form-control" hidden>
+                                <input type="text" id="challenge_type" class="form-control" hidden>
+                                <button type="Button" class="btn btn-outline-primary" onclick="validateCaptchaButton()">Validate</button>
+                            </div>
+                        </div>
+                        <div class="w-100 m-0"></div>
+                        <div id="verification_container" class="col-auto default-disabled" style="display: none;">
+                            <div id="verification_description"></div>
+                            <div class="input-group pt-3">
+                                <input type="text" id="user_input" class="form-control" required>
+                                <input type="text" id="security_info_type" class="form-control" hidden>
+                                <input type="text" id="verification_context" class="form-control" hidden>
+                                <button type="Button" class="btn btn-outline-primary" onclick="verifySecurityInfoButton()">Validate</button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    $('#add_authenticator_app_container input[type="radio"]').change(function (e) {
+        if (e.target.value == "graphspy_otp") {
+            $("#add_mfa_form #graphspyOtpDescription").show();
+        } else {
+            $("#add_mfa_form #graphspyOtpDescription").hide();
+        }
+    });
+
+    function addPhoneNumberButton() {
+        let access_token_id = $("#mfa_form #access_token_id").val();
+        let country_code = $("#add_mfa_form #country_code").val();
+        let phone_number = $("#add_mfa_form #phone_number").val();
+        let phone_type = $("#add_mfa_form #phone_type").val();
+        if (phone_type == "MobilePhone") {
+            let selectedVerifyMethod = $("#add_mfa_form input[name='phone_verify_options']:checked").val();
+            phone_type = `MobilePhone_${selectedVerifyMethod}`;
+        }
+        let response = $.ajax({
+            type: "POST",
+            async: false,
+            url: "/api/add_phone_number",
+            data: {
+                "access_token_id": access_token_id,
+                "country_code": country_code,
+                "phone_number": phone_number,
+                "phone_type": phone_type
+            },
+            error: function (xhr, status, error) {
+                bootstrapToast("Add Phone Number", xhr.responseText, "danger");
+            }
+        });
+        if (response.status != 200) {
+            return false;
+        }
+        response_json = response.responseJSON;
+        if (response_json.hasOwnProperty("captcha")) {
+            // Show captcha
+            bootstrapToast("Add Phone Number", "A captcha is required!", "warning");
+            $("#add_mfa_form #captcha_image").attr('src', `data:image/png;base64, ${response_json.captcha.ChallengeData}`)
+            $("#add_mfa_form #challenge_id").val(response_json.captcha.ChallengeId);
+            $("#add_mfa_form #azure_region").val(response_json.captcha.AzureRegion);
+            $("#add_mfa_form #challenge_type").val(response_json.captcha.ChallengeType);
+            $("#add_mfa_form #captcha_container").show();
+            return false;
+        }
+        if (phone_type == "OfficePhone" || phone_type == "AltMobilePhone" || phone_type == "MobilePhone_call") {
+            bootstrapToast("Add Phone Number", "Approve the call using the '#' symbol.", "primary");
+            $("#add_mfa_form #verification_container #verification_description").text("Approve the call to your provided phone number using the '#' symbol.");
+            if (phone_type == "OfficePhone") {
+                $("#add_mfa_form #verification_container #security_info_type").val(7);
+            } else if (phone_type == "AltMobilePhone") {
+                $("#add_mfa_form #verification_container #security_info_type").val(11);
+            } else {
+                $("#add_mfa_form #verification_container #security_info_type").val(5);
+            }
+            $("#add_mfa_form #verification_container #user_input").hide();
+        } else {
+            bootstrapToast("Add Phone Number", "Fill in the code received on your phone.", "primary");
+            $("#add_mfa_form #verification_container #verification_description").text("Fill in the code received on your phone.");
+            $("#add_mfa_form #verification_container #security_info_type").val(6);
+            $("#add_mfa_form #verification_container #user_input").show();
+        }
+        $("#add_mfa_form #verification_container #verification_context").val(response_json.VerificationContext);
+        $("#add_mfa_form #verification_container").show();
+    }
+
+    function addEmailButton() {
+        let access_token_id = $("#mfa_form #access_token_id").val();
+        let email = $("#add_mfa_form #add_email_container #email").val();
+        let response = $.ajax({
+            type: "POST",
+            async: false,
+            url: "/api/add_email",
+            data: {
+                "access_token_id": access_token_id,
+                "email": email
+            },
+            error: function (xhr, status, error) {
+                bootstrapToast("Add Email", xhr.responseText, "danger");
+            }
+        });
+        if (response.status != 200) {
+            return false;
+        }
+        response_json = response.responseJSON;
+        if (response_json.hasOwnProperty("captcha")) {
+            // Show captcha
+            bootstrapToast("Add Phone Number", "A captcha is required!", "warning");
+            $("#add_mfa_form #captcha_image").attr('src', `data:image/png;base64, ${response_json.captcha.ChallengeData}`)
+            $("#add_mfa_form #challenge_id").val(response_json.captcha.ChallengeId);
+            $("#add_mfa_form #azure_region").val(response_json.captcha.AzureRegion);
+            $("#add_mfa_form #challenge_type").val(response_json.captcha.ChallengeType);
+            $("#add_mfa_form #captcha_container").show();
+            return false;
+        }
+        bootstrapToast("Add Phone Number", "Fill in the code received on your email address.", "primary");
+        $("#add_mfa_form #verification_container #verification_description").text("Fill in the code received on your email address.");
+        $("#add_mfa_form #verification_container #security_info_type").val(8);
+        $("#add_mfa_form #verification_container #user_input").show();
+        $("#add_mfa_form #verification_container #verification_context").val(response_json.VerificationContext);
+        $("#add_mfa_form #verification_container").show();
+    }
+
+    function addAuthenticatorAppButton() {
+        let access_token_id = $("#mfa_form #access_token_id").val();
+        let selectedMethod = $("#add_mfa_form #add_authenticator_app_container input[name='authenticatiorAppOptions']:checked").val();
+        if (!selectedMethod) {
+            bootstrapToast("Add Authenticator App", "No Authenticator App method selected.", "warning");
+            return false;
+        }
+        if (selectedMethod == "graphspy_otp") {
+            let graphspyOtpDescription = $("#add_mfa_form #graphspyOtpDescription").val();
+            let response = $.ajax({
+                type: "POST",
+                async: false,
+                url: "/api/add_graphspy_otp",
+                data: {
+                    "access_token_id": access_token_id,
+                    "description": graphspyOtpDescription
+                },
+                success: function (response) {
+                    bootstrapToast("Add GraphSpy OTP", response, "success");
+                    $('#graphspy_otp_table').DataTable().ajax.reload(null, false);
+                },
+                error: function (xhr, status, error) {
+                    bootstrapToast("Add GraphSpy OTP", xhr.responseText, "danger");
+                }
+            });
+            return;
+        }
+        let security_info_type = (selectedMethod == "custom_otp" ? 3 : 2);
+        let response = $.ajax({
+            type: "POST",
+            async: false,
+            url: "/api/initialize_mobile_app_registration",
+            data: {
+                "access_token_id": access_token_id,
+                "security_info_type": security_info_type
+            },
+            error: function (xhr, status, error) {
+                bootstrapToast("Add Authenticator App", xhr.responseText, "danger");
+            }
+        });
+        if (response.status != 200) {
+            return false;
+        }
+        initialize_mobile_app_registration_json = response.responseJSON;
+        $("#add_mfa_form #qr_code_container #qr_code_image").attr('src', `data:image/png;base64, ${initialize_mobile_app_registration_json.QrCode}`)
+        $("#add_mfa_form #qr_code_container #registration_type").val(initialize_mobile_app_registration_json.RegistrationType);
+        let secret_key = (initialize_mobile_app_registration_json.RegistrationType == 2 ? initialize_mobile_app_registration_json.ActivationCode : initialize_mobile_app_registration_json.SecretKey);
+        $("#add_mfa_form #qr_code_container #secret_key").val(secret_key);
+        $("#add_mfa_form #qr_code_container").show();
+    }
+
+    function scannedQrButton() {
+        let access_token_id = $("#mfa_form #access_token_id").val();
+        let registration_type = $("#add_mfa_form #qr_code_container #registration_type").val();
+        let secret_key = $("#add_mfa_form #qr_code_container #secret_key").val();
+
+        let response = $.ajax({
+            type: "POST",
+            async: false,
+            url: "/api/add_mfa_app",
+            data: {
+                "access_token_id": access_token_id,
+                "security_info_type": registration_type,
+                "secret_key": secret_key
+            },
+            error: function (xhr, status, error) {
+                bootstrapToast("Add MFA App", xhr.responseText, "danger");
+            }
+        });
+        if (response.status != 200) {
+            return false;
+        }
+        response_json = response.responseJSON;
+        if (response_json.hasOwnProperty("captcha")) {
+            // Show captcha
+            bootstrapToast("Add MFA App", "A captcha is required!", "warning");
+            $("#add_mfa_form #captcha_image").attr('src', `data:image/png;base64, ${response_json.captcha.ChallengeData}`)
+            $("#add_mfa_form #challenge_id").val(response_json.captcha.ChallengeId);
+            $("#add_mfa_form #azure_region").val(response_json.captcha.AzureRegion);
+            $("#add_mfa_form #challenge_type").val(response_json.captcha.ChallengeType);
+            $("#add_mfa_form #captcha_container").show();
+            return false;
+        }
+        if (response_json.Type == 1) {
+            bootstrapToast("Add MFA App", "Fill in the code in your Microsoft Authenticator app.", "primary");
+            let verificationCode = response_json.Data.EntropyNumber;
+            $("#add_mfa_form #verification_container #verification_description").text(`Submit the code '${verificationCode}' in the notification on your Microsoft Authenticator App and click on Validate.`);
+            $("#add_mfa_form #verification_container #user_input").hide();
+        } else if (response_json.Type == 2) {
+            // Not sure if this type is correct? Not tested yet
+            bootstrapToast("Add MFA App", "Approve the notification send to your Microsoft Authenticator app.", "primary");
+            $("#add_mfa_form #verification_container #verification_description").text("Approve the notification send to your Microsoft Authenticator app and click on Validate.");
+            $("#add_mfa_form #verification_container #user_input").hide();
+        } else if (response_json.Type == 3) {
+            bootstrapToast("Add MFA App", "Fill in the code displayed on your app.", "primary");
+            $("#add_mfa_form #verification_container #verification_description").text("Fill in the code displayed in your app.");
+            $("#add_mfa_form #verification_container #user_input").show();
+        } else {
+            bootstrapToast("Add MFA App", `Unknown Verification Type '${response_json.Type}'`, "error");
+            return false;
+        }
+        $("#add_mfa_form #verification_container #security_info_type").val(response_json.Type);
+        $("#add_mfa_form #verification_container #verification_context").val(response_json.VerificationContext);
+        $("#add_mfa_form #verification_container").show();
+    }
+
+    function validateCaptchaButton() {
+        let access_token_id = $("#mfa_form #access_token_id").val();
+        let challenge_id = $("#add_mfa_form #challenge_id").val();
+        let captcha_solution = $("#add_mfa_form #captcha_solution").val();
+        let azure_region = $("#add_mfa_form #azure_region").val();
+        let challenge_type = $("#add_mfa_form #challenge_type").val();
+        validateCaptcha(access_token_id, challenge_id, captcha_solution, azure_region, challenge_type);
+        $("#add_mfa_form #captcha_container").hide();
+        $("#add_mfa_form #captcha_solution").val("");
+    }
+
+    function verifySecurityInfoButton() {
+        let access_token_id = $("#mfa_form #access_token_id").val();
+        let security_info_type = $("#add_mfa_form #security_info_type").val();
+        let verification_context = $("#add_mfa_form #verification_context").val();
+        let verification_data = $("#add_mfa_form #user_input").val();
+        verifySecurityInfo(access_token_id, security_info_type, verification_context, verification_data);
+    }
+</script>
+<!-- Delete MFA Method Modal -->
+<div class="modal fade" id="delete_mfa_method_modal" tabindex="-1" aria-labelledby="delete_mfa_method_modal_label" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="delete_mfa_method_modal_label">Add MFA Method</h1>
+                <div style="float: right">
+                    <i class="fi fi-br-expand px-3" id="expand-icon" style="cursor: pointer; float: left; opacity: 0.5"></i>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <form id="delete_mfa_form">
+                    <div class="row g-3">
+                        <div class="col-auto">
+                            <label class="form-label">Select the MFA method to delete.</label>
+                            <input type="text" id="security_info_type" class="form-control" hidden>
+                            <div id="delete_mfa_options">
+                            </div>
+                            <button type="Button" class="btn btn-outline-danger" onclick="deleteSecurityInfoButton()">Delete</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    function deleteSecurityInfoButton() {
+        if (!$("#delete_mfa_form input[name='delete_radio_options']:checked").length) {
+            bootstrapToast("Delete MFA Method", "No MFA method selected.", "warning");
+            return false;
+        }
+        if (!confirm("Are you sure you want to delete this authentication method?")) {
+            return false;
+        }
+        let access_token_id = $("#mfa_form #access_token_id").val();
+        let security_info_type = $("#delete_mfa_form #security_info_type").val();
+        let method_to_delete = JSON.parse(($("#delete_mfa_form input[name='delete_radio_options']:checked").siblings("label").find("pre").text()), undefined, 4);
+        deleteSecurityInfo(access_token_id, security_info_type, method_to_delete);
+    }
+</script>
+{%endblock content%}
