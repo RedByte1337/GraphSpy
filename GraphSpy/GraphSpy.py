@@ -8,8 +8,7 @@ from datetime import datetime, timezone
 import time
 import os,sys,shutil,traceback,logging
 from threading import Thread
-import json
-import uuid
+import json, base64, uuid
 import re
 import pyotp
 
@@ -99,6 +98,14 @@ def update_db():
         current_schema_version = query_db("SELECT value FROM settings where setting = 'schema_version'",one=True)[0]
 
 # ========== Helper Functions ==========
+
+def create_response(status_code, message, data = None):
+    response_body = {
+        "message": message
+    }
+    if data != None:
+        response_body["data"] = data
+    return response_body, status_code
 
 def get_user_agent():
     user_agent = query_db("SELECT value FROM settings where setting = 'user_agent'",one=True)
@@ -391,7 +398,6 @@ def get_security_info_type(type_id):
     }
     return security_info_types_dict[type_id] if type_id in security_info_types_dict else security_info_types_dict[0]
 
-
 def get_verification_state(verification_state_id):
     verification_state_dict = {
         0: "unknown",
@@ -408,8 +414,7 @@ def get_verification_state(verification_state_id):
     }
     return verification_state_dict[verification_state_id] if verification_state_id in verification_state_dict else verification_state_dict[0]
 
-
-def get_add_security_info_error(error_id):
+def get_security_info_error(error_id):
     add_security_info_error_dict = {
         0: "none",
         1: "userIsBlockedBySAS",
@@ -449,7 +454,6 @@ def get_add_security_info_error(error_id):
         35: "HardwareTokenAssigned"
     }
     return add_security_info_error_dict[error_id] if error_id in add_security_info_error_dict else add_security_info_error_dict[0]
-
 
 def get_session_ctx(access_token_id):
     access_token = query_db("SELECT accesstoken FROM accesstokens WHERE id = ? AND resource LIKE '%0000000c-0000-0000-c000-000000000000%'",[access_token_id],one=True)
@@ -586,7 +590,7 @@ def delete_security_info(access_token_id, security_info_type, data):
         traceback.print_exc()
         return False
 
-def add_security_info(access_token_id, security_info_type, data):
+def add_security_info(access_token_id, security_info_type, data = None):
     access_token = query_db("SELECT accesstoken FROM accesstokens WHERE id = ? AND resource LIKE '%0000000c-0000-0000-c000-000000000000%'",[access_token_id],one=True)
     if not access_token:
         gspy_log.error(f"No access token with ID {access_token_id} and resource containing '0000000c-0000-0000-c000-000000000000'!")
@@ -596,11 +600,12 @@ def add_security_info(access_token_id, security_info_type, data):
         sessionCtx = get_session_ctx(access_token_id)
         headers = {"Authorization":f"Bearer {access_token}", "Sessionctx":sessionCtx, "User-Agent":get_user_agent()}
         uri = "https://account.activedirectory.windowsazure.com/securityinfo/AddSecurityInfo"
-        body_data = json.dumps(data) if type(data) == dict else data
         body = {
-            "Type": security_info_type,
-            "Data": body_data
+            "Type": security_info_type
         }
+        body_data = json.dumps(data) if type(data) == dict else data
+        if body_data:
+            body["Data"] = body_data
         response = requests.post(uri, headers=headers, json=body)
         if response.status_code != 200:
             gspy_log.error(f"AddSecurityInfo request failed. Received status code {response.status_code}")
@@ -745,6 +750,114 @@ def add_graphspy_otp(access_token_id, description = ""):
         traceback.print_exc()
         return False
 
+def add_security_key(access_token_id, key_description = "GraphSpy Key", client_type = "Windows", device_pin = None):
+    app.config["add_security_key_status"] = "INIT"
+    access_token = query_db("SELECT accesstoken FROM accesstokens WHERE id = ? AND resource LIKE '%0000000c-0000-0000-c000-000000000000%'",[access_token_id],one=True)
+    if not access_token:
+        gspy_log.error(f"No access token with ID {access_token_id} and resource containing '0000000c-0000-0000-c000-000000000000'!")
+        return create_response(400, f"No access token with ID {access_token_id} and resource containing '0000000c-0000-0000-c000-000000000000'!")
+    access_token = access_token[0]
+    from fido2.hid import CtapHidDevice
+    from fido2.client import Fido2Client, WindowsClient, UserInteraction
+    security_info_response = add_security_info(access_token_id, 12)
+    if not security_info_response or ("ErrorCode" in security_info_response and security_info_response["ErrorCode"] != 0):
+        error_message = get_security_info_error(security_info_response["ErrorCode"]) if security_info_response and "ErrorCode" in security_info_response else "Unknown"
+        gspy_log.error(f"Something went wrong trying to add the security key. Microsoft Error Message: {error_message}")
+        return create_response(400, f"Something went wrong trying to add the security key. Microsoft Error Message: {error_message}")
+    security_info_data = json.loads(security_info_response["Data"])
+    public_key_options = {
+        "challenge": security_info_data["requestData"]["serverChallenge"].encode("utf-8"),
+        "rp": {
+            "name": "Microsoft",
+            "id": "login.microsoft.com"
+        },
+        "user": {
+            "id": base64.urlsafe_b64decode(security_info_data["requestData"]["userId"] + "=="),
+            "name": security_info_data["requestData"]["memberName"],
+            "displayName": security_info_data["requestData"]["userDisplayName"],
+            "icon": ""
+        },
+        "pubKeyCredParams": [{
+                "type": "public-key",
+                "alg": -7
+            }, {
+                "type": "public-key",
+                "alg": -257
+            }
+        ],
+        "timeout": 600000,
+        "excludeCredentials": [],
+        "authenticatorSelection": {
+            "authenticatorAttachment": security_info_data["requestData"]["authenticator"],
+            "requireResidentKey": True,
+            "userVerification": "required"
+        },
+        "attestation": "direct",
+        "extensions": {
+            "hmacCreateSecret": True,
+            "credentialProtectionPolicy": "userVerificationOptional"
+        }
+    }
+    app.config["add_security_key_status"] = "CLIENT_SETUP"
+    if client_type == "Windows":
+        if not WindowsClient.is_available():
+            gspy_log.error(f"Windows client requested, but WindowsClient is not available! Are you sure the GraphSpy server is running on a compatible Windows device?")
+            return create_response(400, "Windows client requested, but WindowsClient is not available! Are you sure the GraphSpy server is running on a compatible Windows device?")
+        client = WindowsClient("https://login.microsoft.com")
+    else:
+        dev = next(CtapHidDevice.list_devices(), None)
+        if dev is None:
+            gspy_log.debug("No USB FIDO authenticator device found! Trying to use NFC instead.")
+            try:
+                from fido2.pcsc import CtapPcscDevice
+                dev = next(CtapPcscDevice.list_devices(), None)
+                gspy_log.debug("Using NFC channel.")
+            except Exception as e:
+                gspy_log.error("An error occurred when searching for an NFC channel")
+                traceback.print_exc()
+        if not dev:
+            gspy_log.error("No valid FIDO authenticator device found. Admin/root privileges might be required to discover your Authenticator device when not using the Windows WebAuthn API.")
+            return create_response(400, "No valid FIDO authenticator device found. Admin/root privileges might be required to discover your Authenticator device when not using the Windows WebAuthn API.")
+            
+        class CliInteraction(UserInteraction):
+            def prompt_up(self):
+                app.config["add_security_key_status"] = "TOUCH"
+                gspy_log.debug("Touch your authenticator device now.")
+
+            def request_pin(self, permissions, rd_id):
+                app.config["add_security_key_status"] = "PIN"
+                return device_pin
+
+            def request_uv(self, permissions, rd_id):
+                gspy_log.debug("User Verification required.")
+                return True
+        client = Fido2Client(dev, "https://login.microsoft.com", user_interaction=CliInteraction())
+    app.config["add_security_key_status"] = "CREDENTIAL_REGISTRATION"
+    credential = client.make_credential(public_key_options)
+    if not credential:
+        gspy_log.error("Credential registration with the authenticator device failed.")
+        return create_response(400, "Credential registration with the authenticator device failed.")
+    app.config["add_security_key_status"] = "VERIFY_DATA"
+    client_data_json = json.loads(credential.client_data)
+    client_data_json_base64 = base64.urlsafe_b64encode(json.dumps(client_data_json, separators=(',',':')).encode("utf-8")).decode()
+    credential_id_base64 = base64.urlsafe_b64encode(credential.attestation_object.auth_data.credential_data.credential_id).decode()
+    extension_results_json_base64 = base64.urlsafe_b64encode(json.dumps(credential.extension_results).encode("utf-8")).decode()
+    verification_data = {
+        "Name": key_description,
+        "Canary": security_info_data["requestData"]["canary"],
+        "AttestationObject": base64.urlsafe_b64encode(credential.attestation_object).decode(),
+        "ClientDataJson": client_data_json_base64,
+        "CredentialId": credential_id_base64,
+        "ClientExtensionResults": extension_results_json_base64,
+        "PostInfo": ""
+    }
+    response = verify_security_info(access_token_id, 12, None, json.dumps(verification_data, separators=(',',':')))
+    if response["ErrorCode"] != 0:
+        error_message = get_security_info_error(response["ErrorCode"])
+        gspy_log.error(f"Failed to add the security key. Microsoft error message: {error_message}")
+        return create_response(400, f"Failed to add the security key. Microsoft error message: {error_message}")
+    app.config["add_security_key_status"] = "SUCCESS"
+    return create_response(200, f"Successfully added new security key with description '{key_description}' to the account.")
 
 # ========== Teams Functions ==========
 
@@ -1007,6 +1120,31 @@ def init_routes():
         except Exception as e:
             traceback.print_exc()
             return "[Error] Failed to create OTP code from the provided secret key.", 400
+
+    @app.post("/api/add_security_key")
+    def api_add_security_key():
+        try:
+            if not "access_token_id" in request.form:
+                return f"[Error] No access_token_id specified.", 400
+            access_token_id = request.form['access_token_id']
+            if not "client_type" in request.form:
+                return f"[Error] No client_type specified.", 400
+            client_type = request.form['client_type']
+            description = request.form['description'] if "description" in request.form and request.form['description'] else "GraphSpy Key"
+            device_pin = request.form['device_pin'] if "device_pin" in request.form else ""
+        
+            add_security_key_response = add_security_key(access_token_id, description, client_type, device_pin)
+            if app.config["add_security_key_status"] != "SUCCESS":
+                app.config["add_security_key_status"] = "FAILED"
+            return add_security_key_response
+        except Exception as e:
+            app.config["add_security_key_status"] = "FAILED"
+            traceback.print_exc()
+            return create_response(400, "An unexpected error occurred when trying to add the security key.")
+
+    @app.get("/api/get_security_key_status")
+    def api_get_security_key_status():
+        return app.config["add_security_key_status"] if "add_security_key_status" in app.config else "UNKNOWN"
 
     @app.post("/api/verify_security_info")
     def api_verify_security_info():

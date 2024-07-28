@@ -147,9 +147,10 @@
             let tr = e.target.closest('tr');
             let row = authMethodsTable.row(tr);
             let method = row.data().MethodName;
-            // Hide all containers in the modal, and only show the relevant one
+            // Reset the modal to its default state
             $("#add_mfa_form .default-disabled").hide();
             $("#add_mfa_form input[type=text]").val("");
+            $("#add_mfa_form input[type=radio]").prop('checked', false);
             if (["MobilePhone", "AltMobilePhone", "OfficePhone"].includes(method)) {
                 if (row.data().Data) {
                     $("#add_mfa_form #add_phone_container #replace_phone_warning").show();
@@ -179,6 +180,11 @@
                     $("#add_mfa_form #add_email_container #replace_email_warning").hide();
                 }
                 $("#add_mfa_form #add_email_container").show();
+            } else if (method == "Fido") {
+                $("#add_mfa_form #add_security_key_container").show();
+            } else {
+                bootstrapToast("Add MFA Method", `Adding method '${method}' is not implemented in GraphSpy yet. Feel free to create a PR!`, "warning");
+                return;
             }
             $('#add_mfa_method_modal').modal('show');
         });
@@ -395,6 +401,44 @@
                                 <button type="Button" class="btn btn-outline-primary" onclick="addAuthenticatorAppButton()">Add</button>
                             </div>
                         </div>
+                        <div id="add_security_key_container" class="default-disabled" style="display: none;">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="securityKeyMethod" id="securityKeyMethod1" value="auto_windows">
+                                <label class="form-check-label" for="securityKeyMethod1">
+                                    Automatic Windows
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="securityKeyMethod" id="securityKeyMethod2" value="auto_other">
+                                <label class="form-check-label" for="securityKeyMethod2">
+                                    Automatic Other
+                                </label>
+                            </div>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="radio" name="securityKeyMethod" id="securityKeyMethod3" value="manual_browser" disabled>
+                                <label class="form-check-label" for="securityKeyMethod3">
+                                    Manual Browser
+                                </label>
+                            </div>
+                            <div class="form-floating mb-3">
+                                <input type="text" id="securityKeyDescription" class="form-control" placeholder="Description">
+                                <label for="securityKeyDescription">Description</label>
+                            </div>
+                            <div class="form-floating default-disabled mb-3" style="display: none;">
+                                <input type="text" id="securityKeyPIN" class="form-control" placeholder="1234">
+                                <label for="securityKeyPIN">Authenticator device PIN</label>
+                            </div>
+                            <div class="my-3">
+                                <button type="Button" class="btn btn-outline-primary" onclick="addSecurityKeyButton()">Add Security Key</button>
+                                <div role="status" id="securityKeyLoadingSpinner" class="spinner-border text-primary default-disabled" style="display: none; vertical-align: -0.7em;">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                            <div class="form-floating default-disabled" style="display: none;">
+                                <input type="text" id="securityKeyStatusText" class="form-control" placeholder="Status" disabled>
+                                <label for="securityKeyStatusText">Status</label>
+                            </div>
+                        </div>
                         <div class="w-100 m-0"></div>
                         <div id="qr_code_container" class="col-auto default-disabled" style="display: none;">
                             <div>Scan the following code with your authenticator app:</div>
@@ -437,11 +481,19 @@
     </div>
 </div>
 <script>
-    $('#add_authenticator_app_container input[type="radio"]').change(function (e) {
+    $('#add_mfa_form #add_authenticator_app_container input[type="radio"]').change(function (e) {
         if (e.target.value == "graphspy_otp") {
-            $("#add_mfa_form #graphspyOtpDescription").show();
+            $("#add_mfa_form #add_authenticator_app_container #graphspyOtpDescription").show();
         } else {
-            $("#add_mfa_form #graphspyOtpDescription").hide();
+            $("#add_mfa_form #add_authenticator_app_container #graphspyOtpDescription").hide();
+        }
+    });
+
+    $('#add_mfa_form #add_security_key_container input[type="radio"]').change(function (e) {
+        if (e.target.value == "auto_other") {
+            $("#add_mfa_form #add_security_key_container #securityKeyPIN").parent().show();
+        } else {
+            $("#add_mfa_form #add_security_key_container #securityKeyPIN").parent().hide();
         }
     });
 
@@ -484,7 +536,7 @@
         }
         if (phone_type == "OfficePhone" || phone_type == "AltMobilePhone" || phone_type == "MobilePhone_call") {
             bootstrapToast("Add Phone Number", "Approve the call using the '#' symbol.", "primary");
-            $("#add_mfa_form #verification_container #verification_description").text("Approve the call to your provided phone number using the '#' symbol.");
+            $("#add_mfa_form #verification_container #verification_description").text("Approve the call to your provided phone number using the '#' symbol. Then, click the Validate button below.");
             if (phone_type == "OfficePhone") {
                 $("#add_mfa_form #verification_container #security_info_type").val(7);
             } else if (phone_type == "AltMobilePhone") {
@@ -589,6 +641,91 @@
         let secret_key = (initialize_mobile_app_registration_json.RegistrationType == 2 ? initialize_mobile_app_registration_json.ActivationCode : initialize_mobile_app_registration_json.SecretKey);
         $("#add_mfa_form #qr_code_container #secret_key").val(secret_key);
         $("#add_mfa_form #qr_code_container").show();
+    }
+
+    async function addSecurityKeyButton() {
+        let access_token_id = $("#mfa_form #access_token_id").val();
+        let selectedMethod = $("#add_mfa_form #add_security_key_container input[name='securityKeyMethod']:checked").val();
+        if (!selectedMethod) {
+            bootstrapToast("Add Security Key", "No method selected.", "warning");
+            return false;
+        }
+        if (selectedMethod == "auto_windows" || selectedMethod == "auto_other") {
+            selectedMethod = selectedMethod == "auto_windows" ? "Windows" : "Other";
+            if (selectedMethod != "Windows") {
+                $("#add_mfa_form #add_security_key_container #securityKeyPIN").parent().show();
+            }
+            let securityKeyPIN = $("#add_mfa_form #add_security_key_container #securityKeyPIN").val();
+            let securityKeyDescription = $("#add_mfa_form #add_security_key_container #securityKeyDescription").val();
+            var responseReady = false;
+            let addSecurityKeyResponse = $.ajax({
+                type: "POST",
+                async: true,
+                url: "/api/add_security_key",
+                data: {
+                    "access_token_id": access_token_id,
+                    "client_type": selectedMethod,
+                    "description": securityKeyDescription,
+                    "device_pin": securityKeyPIN
+                },
+                success: function (response) {
+                    responseReady = true;
+                    bootstrapToast("Add Security Key", response.message, "success");
+                },
+                error: function (xhr, status, error) {
+                    responseReady = true;
+                    responseJSON = JSON.parse(xhr.responseText)
+                    bootstrapToast("Add Security Key", responseJSON.message, "danger");
+                }
+            });
+            $("#securityKeyLoadingSpinner").show();
+            while (!responseReady) {
+                await new Promise(r => setTimeout(r, 1000));
+                let statusResponse = $.ajax({
+                    type: "GET",
+                    async: false,
+                    url: "/api/get_security_key_status"
+                });
+                securityKeyStatus = statusResponse.responseText;
+                let statusMessage = "";
+                switch (securityKeyStatus) {
+                    case "INIT":
+                        statusMessage = "Retrieving publicKeyCredentialCreationOptions from Microsoft.";
+                        break;
+                    case "CLIENT_SETUP":
+                        statusMessage = "Initializing selected WebAuthn client type.";
+                        break;
+                    case "CREDENTIAL_REGISTRATION":
+                        statusMessage = "Registering credentials with FIDO authenticator device.";
+                        break;
+                    case "PIN":
+                        statusMessage = "Providing PIN.";
+                        break;
+                    case "TOUCH":
+                        statusMessage = "[ACTION REQUIRED] Please touch the authenticator device now to complete the registration!";
+                        break;
+                    case "VERIFY_DATA":
+                        statusMessage = "New credential created on authenticator device. Sending registration data to Microsoft.";
+                        break;
+                    case "SUCCESS":
+                        statusMessage = "The security key was successfully added!";
+                        break;
+                    case "FAILED":
+                        statusMessage = "Failed to add the security key.";
+                        break;
+                    default:
+                        continue;
+                }
+                $("#add_mfa_form #add_security_key_container #securityKeyStatusText").parent().show();
+                $("#add_mfa_form #add_security_key_container #securityKeyStatusText").val(statusMessage);
+                if (securityKeyStatus == "SUCCESS" || securityKeyStatus == "FAILED") {
+                    break;
+                }
+            }
+            $("#add_mfa_form #add_security_key_container #securityKeyLoadingSpinner").hide();
+            return;
+        }
+        bootstrapToast("Add Security Key", "Manual option not yet implemented.", "warning");
     }
 
     function scannedQrButton() {
