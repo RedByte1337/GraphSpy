@@ -111,12 +111,12 @@ function deleteRefreshToken(token_id) {
 
 // ========== Device Codes ==========
 
-function generateDeviceCode(resource, client_id) {
+function generateDeviceCode(resource, client_id, ngcmfa) {
     let response = $.ajax({
         type: "POST",
         async: false,
         url: "/api/generate_device_code",
-        data: { "resource": resource, "client_id": client_id }
+        data: { "resource": resource, "client_id": client_id, "ngcmfa": ngcmfa}
     });
     bootstrapToast("Device Code", `[Success] Generated Device Code with User Code '${response.responseText}'.`, "primary");
     reloadTables();

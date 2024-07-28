@@ -95,6 +95,21 @@ Easily create and poll multiple device codes at once. If a user used the device 
 
 ![Device Codes](images/device_codes.png)
 
+## MFA Methods
+
+View, modify and create MFA methods linked to the account of the user.
+
+![MFA Methods Overview](images/mfa_methods_overview.png)
+
+The following MFA methods can be added from GraphSpy to set up persistance:
+- Microsoft Authenticator App
+- Custom OTP App, or use GraphSpy as OTP app to generate TOTP codes on the fly!
+- FIDO Security Keys!
+- Alternative email address
+- Mobile/Office/Alternative Phones (SMS or call)
+
+![MFA Methods FIDO](images/mfa_methods_fido.png)
+
 ## Files and SharePoint
 
 Browse through files and folders in the user's OneDrive or any accessible SharePoint site through an intuitive file explorer interface.
@@ -164,7 +179,6 @@ Refer to the [Release Notes](https://github.com/RedByte1337/GraphSpy/wiki/Releas
   * Upload files and images
 * Entra ID
 	* List Users, Groups, Applications, Devices, Conditional Access Policies, ...
-	* Add MFA methods
 * Cleaner exception handling
 	* While this should not have any direct impact on the user, edge cases might currently throw exceptions to the GraphSpy output instead of handling them in a cleaner way.
 

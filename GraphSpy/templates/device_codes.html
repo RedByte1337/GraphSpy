@@ -4,7 +4,7 @@
 
 <div class="col-sm-5">
     <h1>Generate Device Code</h1>
-    <form class="row g-3">
+    <form class="row g-3" id="device_code_form">
         <div>
             <label for="resource" class="form-label">Resource *</label>
             <input list="resource_list" id="resource" class="form-control" required placeholder="https://graph.microsoft.com">
@@ -32,10 +32,17 @@
             </datalist>
         </div>
         <div>
-            <button type="button" class="btn btn-primary" onclick="generateDeviceCode(this.closest('form').resource.value,this.closest('form').client_id.value);">Submit</button>
+            <input type="checkbox" id="ngcmfa_checkbox" class="form-check-input">
+            <label for="ngcmfa_checkbox" class="form-check-label" id="ngcmfa_tooltip" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Access tokens with the ngcmfa claim can be used for 15 minutes to register FIDO security keys. Note: this will force the victim to authenticate with MFA during the device code authentication!">Request ngcmfa claim</label>
+        </div>
+        <div>
+            <button type="button" class="btn btn-primary" onclick="generateDeviceCode($('#device_code_form #resource').val(),$('#device_code_form #client_id').val(), $('#ngcmfa_checkbox').prop('checked'));">Submit</button>
         </div>
     </form>
 </div>
+<script>
+    new bootstrap.Tooltip(document.getElementById('ngcmfa_tooltip'));
+</script>
 <br>
 <div>
     <h1>Device Code List</h1>

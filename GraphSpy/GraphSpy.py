@@ -285,11 +285,13 @@ def refresh_to_access_token(refresh_token_id, client_id = "d3590ed6-52b3-4102-ae
 
 # ========== Device Code Functions ==========
 
-def generate_device_code(resource = "https://graph.microsoft.com", client_id = "d3590ed6-52b3-4102-aeff-aad2292ab01c"):
+def generate_device_code(resource = "https://graph.microsoft.com", client_id = "d3590ed6-52b3-4102-aeff-aad2292ab01c", ngcmfa = False):
     body =  {
         "resource": resource,
         "client_id": client_id
     }
+    if (ngcmfa):
+        body["amr_values"]= "ngcmfa"
     url = "https://login.microsoftonline.com/common/oauth2/devicecode?api-version=1.0"
     headers = {"User-Agent":get_user_agent()}
     response = requests.post(url, data=body,headers=headers)
@@ -363,8 +365,8 @@ def start_device_code_thread():
     app.config["device_code_thread"].start()
     return "[Success] Started device code polling thread."
 
-def device_code_flow(resource = "https://graph.microsoft.com", client_id = "d3590ed6-52b3-4102-aeff-aad2292ab01c"):
-    device_code = generate_device_code(resource, client_id)
+def device_code_flow(resource = "https://graph.microsoft.com", client_id = "d3590ed6-52b3-4102-aeff-aad2292ab01c", ngcmfa = False):
+    device_code = generate_device_code(resource, client_id, ngcmfa)
     row = query_db_json("SELECT * FROM devicecodes WHERE device_code = ?",[device_code],one=True)
     user_code = row["user_code"]
     start_device_code_thread()
@@ -1000,8 +1002,9 @@ def init_routes():
     def api_generate_device_code():
         resource = request.form['resource'] if "resource" in request.form and request.form['resource'] else "https://graph.microsoft.com"
         client_id = request.form['client_id'] if "client_id" in request.form and request.form['client_id'] else "d3590ed6-52b3-4102-aeff-aad2292ab01c"
+        ngcmfa = request.form['ngcmfa'] == "true" if "ngcmfa" in request.form else False
         if resource and client_id:
-            user_code = device_code_flow(resource, client_id)
+            user_code = device_code_flow(resource, client_id, ngcmfa)
         else:
             user_code = "000000000"
         return user_code
