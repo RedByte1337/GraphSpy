@@ -221,7 +221,7 @@
             for (const file of JSON.parse(messageJson.properties.files)) {
                 let fileContainer = $('<a class="link-underline link-underline-opacity-0" target="_blank"></a>');
                 fileContainer.attr("href", file.fileInfo.shareUrl);
-                let fileColor = file.permissionScope == "anonymous" ? "success" : "warning";
+                let fileColor = ["anonymous", "anyone"].includes(file.permissionScope) ? "success" : "warning";
                 let fileBody = $(`<div class="border border-${fileColor}-subtle rounded p-2 bg-${fileColor}-subtle text-${fileColor}-emphasis"></div>`);
                 fileBody.append($('<i class="fi fi-rr-document"></i>'));
                 fileBody.append($('<span></span>').text(" " + file.fileName));
