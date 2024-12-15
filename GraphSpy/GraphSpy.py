@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 import time
 import os,sys,shutil,traceback,logging
 from threading import Thread
-import json, base64, uuid
+import json, base64, uuid, urllib.parse
 import re
 import pyotp
 
@@ -155,24 +155,37 @@ def generic_request(uri, access_token_id, method, request_type, body, headers={}
     headers["Authorization"] = f"Bearer {access_token}"
     headers["User-Agent"] = get_user_agent()
 
-    # Empty body
-    if not body:
-        response = requests.request(method, uri, headers=headers)
-    # Text, XML or urlencoded request
-    elif request_type in ["text", "urlencoded", "xml"]:
-        if request_type == "urlencoded" and not "Content-Type" in headers:
-            headers["Content-Type"] = "application/x-www-form-urlencoded"
-        if request_type == "xml" and not "Content-Type" in headers:
-            headers["Content-Type"] = "application/xml"
-        response = requests.request(method, uri, headers=headers, data=body)
-    # Json request
-    elif request_type == "json":
-        try:
-            response = requests.request(method, uri, headers=headers, json=json.loads(body))
-        except ValueError as e:
-            return f"[Error] The body message does not contain valid JSON, but a body type of JSON was specified.", 400
-    else:
-        return f"[Error] Invalid request type.", 400
+    retry_count = 3
+    while retry_count > 0:
+        # Empty body
+        if not body:
+            response = requests.request(method, uri, headers=headers)
+        # Text, XML or urlencoded request
+        elif request_type in ["text", "urlencoded", "xml"]:
+            if request_type == "urlencoded" and not "Content-Type" in headers:
+                headers["Content-Type"] = "application/x-www-form-urlencoded"
+            if request_type == "xml" and not "Content-Type" in headers:
+                headers["Content-Type"] = "application/xml"
+            response = requests.request(method, uri, headers=headers, data=body)
+        # Json request
+        elif request_type == "json":
+            try:
+                if type(body) == str:
+                    body = json.loads(body)
+                response = requests.request(method, uri, headers=headers, json=body)
+            except ValueError as e:
+                return f"[Error] The body message does not contain valid JSON, but a body type of JSON was specified.", 400
+        else:
+            return f"[Error] Invalid request type.", 400
+
+        if response.status_code == 429 and "Retry-After" in response.headers:
+            # Request throttled
+            retry_count -= 1
+            retry_delay = int(response.headers["Retry-After"]) + 1 
+            gspy_log.debug(f"Request throttled. Received status code 429. Retrying after {retry_delay} seconds [{retry_count} attempts left]")
+            time.sleep(retry_delay)
+        else:
+            break
 
     # Format json if the Content-Type contains json
     response_type = "json" if ("Content-Type" in response.headers and "json" in response.headers["Content-Type"]) else "xml" if ("Content-Type" in response.headers and "xml" in response.headers["Content-Type"]) else "text"
@@ -981,6 +994,10 @@ def init_routes():
     def teams():
         return render_template('teams.html', title="Microsoft Teams")
 
+    @app.route("/entra_users")
+    def entra_users():
+        return render_template('entra_users.html', title="Entra ID Users")
+
     # ========== API ==========
 
         # ========== Device Codes ==========
@@ -1729,6 +1746,89 @@ def init_routes():
                 else:
                     gspy_log.error(f"Failed sending message to {conversation_id}. Received response status {response.status_code}.\n{response.content}")
         return created_conversations
+
+        # ========== Entra ID ==========
+
+    @app.get("/api/get_entra_users")
+    def api_get_entra_users():
+        if not "access_token_id" in request.args:
+            return f"[Error] No access_token_id specified.", 400
+        access_token_id = request.args['access_token_id']
+        uri = f"https://graph.microsoft.com/v1.0/users?$top=999"
+        if "customize_properties" in request.args and request.args["customize_properties"] != " ":
+            uri += f"&$select={urllib.parse.quote_plus(request.args['customize_properties'])}"
+        if "expand_memberships" in request.args and request.args["expand_memberships"]:
+            uri += "&$expand=transitiveMemberOf"
+        users_list = []
+        for x in range(5000):
+            response = generic_request(uri, access_token_id, "GET", "text", "")
+            if response['response_status_code'] == 200 and response['response_type'] == "json":
+                response_json = json.loads(response['response_text'])
+                users_list += response_json["value"]
+                gspy_log.debug(f"Retrieved {len(response_json['value'])} users. {len(users_list)} total users so far.")
+                if "@odata.nextLink" in response_json:
+                    uri = response_json["@odata.nextLink"]
+                else:
+                    gspy_log.debug(f"All users retrieved.")
+                    break
+            else:
+                gspy_log.error(response)
+                return f"[Error] Something went wrong trying to obtain Entra ID Users. Received response status {response['response_status_code']} and response type {response['response_type']}", 400
+        return users_list
+
+    @app.get("/api/get_entra_user_details/<user_id>")
+    def api_get_entra_user_details(user_id):
+        if not "access_token_id" in request.args:
+            return f"[Error] No access_token_id specified.", 400
+        access_token_id = request.args['access_token_id']
+        parsed_user_id = urllib.parse.quote_plus(user_id)
+        batch_body = {
+            "requests": [
+                {
+                    "id": "userDetails",
+                    "method": "GET",
+                    "url": f"/users/{parsed_user_id}?$expand=transitiveMemberOf&$select=displayName,givenName,surname,userPrincipalName,mail,otherMails,proxyAddresses,mobilePhone,businessPhones,faxNumber,createdDateTime,lastPasswordChangeDateTime,refreshTokensValidFromDateTime,userType,companyName,jobTitle,department,officeLocation,streetAddress,city,state,country,preferredLanguage,surname,userPrincipalName,id,accountEnabled,passwordPolicies,licenseAssignmentStates,creationType,customSecurityAttributes,onPremisesSyncEnabled,onPremisesDistinguishedName,onPremisesSamAccountName,onPremisesUserPrincipalName,onPremisesDomainName,onPremisesImmutableId,onPremisesLastSyncDateTime,onPremisesSecurityIdentifier,securityIdentifier"
+                },
+                {
+                    "id": "ownedObjects",
+                    "method": "GET",
+                    "url": f"/users/{parsed_user_id}/ownedObjects"
+                },
+                {
+                    "id": "ownedDevices",
+                    "method": "GET",
+                    "url": f"/users/{parsed_user_id}/ownedDevices"
+                },
+                {
+                    "id": "appRoleAssignments",
+                    "method": "GET",
+                    "url": f"/users/{parsed_user_id}/appRoleAssignments"
+                },
+                {
+                    "id": "oauth2PermissionGrants",
+                    "method": "GET",
+                    "url": f"/users/{parsed_user_id}/oauth2PermissionGrants"
+                }
+            ]
+        }
+        batch_uri = "https://graph.microsoft.com/v1.0/$batch"
+        batch_response = generic_request(batch_uri, access_token_id, "POST", "json", batch_body)
+        if not (batch_response['response_status_code'] == 200 and batch_response['response_type'] == "json"):
+            gspy_log.error(f"Something went wrong trying to obtain user details of '{user_id}'.")
+            gspy_log.error(batch_response)
+            return f"[Error] Something went wrong trying to obtain user details of '{user_id}'. Received response status {batch_response['response_status_code']} and response type {batch_response['response_type']}", 400
+        batch_response_list = json.loads(batch_response['response_text'])["responses"]
+        user_details = [response["body"] for response in batch_response_list if response["id"] == "userDetails" and response["status"] == 200]
+        if len(user_details) == 0:
+            gspy_log.error(f"Something went wrong trying to obtain user details of '{user_id}'.")
+            gspy_log.error(batch_response)
+            return f"[Error] Something went wrong trying to obtain user details of '{user_id}'.", 400
+        user_details = user_details[0]
+        for response in batch_response_list:
+            if response["id"] == "userDetails":
+                continue
+            user_details[response["id"]] = response["body"]["value"] if "value" in response["body"] else []
+        return user_details
 
         # ========== Database ==========
     

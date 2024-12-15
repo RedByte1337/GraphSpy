@@ -1,0 +1,267 @@
+{% extends 'layout.html'%}
+
+{%block content%}
+
+<br>
+<div class="row">
+    <h1>Entra ID Users</h1>
+    <form id="entra_users_form">
+        <div class="row align-items-center">
+            <div class="col-auto">
+                <div class="input-group">
+                    <label for="access_token_id" class="input-group-text">Access token id</label>
+                    <input type="text" id="access_token_id" name="access_token_id" class="form-control" required>
+                    <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#access_token_modal" onclick="$('#access_token_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
+                    <button type="Button" class="btn btn-outline-primary" onclick="generateEntraUsersTable()">Reload</button>
+                </div>
+            </div>
+            <div class="col-auto gy-3">
+                <div class="row g-3">
+                    <div class="col-auto mt-0">
+                        <div class="form-check form-switch">
+                            <input type="checkbox" id="membership_count" class="form-check-input" role="switch">
+                            <label for="membership_count" class="form-check-label" id="membership_count_tooltip" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Also request the group and role memberships for every user. Note: This will expand the transitiveMemberOf attribute for each user, reducing the maximum amount of users retruned per request from 1000 to 100, which will take significantly more time in larger environments!">Include membership count</label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input type="checkbox" id="customize_properties" class="form-check-input" role="switch">
+                            <label for="customize_properties" class="form-check-label" id="customize_properties_tooltip" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Customize which properties to request.">Customize Properties</label>
+                        </div>
+                    </div>
+                    <div class="col-auto mt-0" style="display:none">
+                        <div class="form-check form-switch">
+                            <input type="checkbox" id="show_all" class="form-check-input" role="switch">
+                            <label for="show_all" class="form-check-label" id="show_all_tooltip" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Placeholder Second Row.">Placeholder Second Row</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12">
+            </div>
+            <div class="col-lg-6 gy-2">
+                <div class="input-group" style="display: none;">
+                    <label for="entra_user_properties" class="input-group-text">Properties</label>
+                    <datalist id="entra_user_properties_list">
+                        <option value=" ">Default Microsoft</option>
+                        <option value="id,displayName,userPrincipalName,mail,mobilePhone,accountEnabled,userType,onPremisesSyncEnabled">GraphSpy Table Only</option>
+                        <option value="displayName,givenName,surname,userPrincipalName,mail,otherMails,proxyAddresses,mobilePhone,businessPhones,faxNumber,createdDateTime,lastPasswordChangeDateTime,refreshTokensValidFromDateTime,userType,companyName,jobTitle,department,officeLocation,streetAddress,city,state,country,preferredLanguage,surname,userPrincipalName,id,accountEnabled,passwordPolicies,licenseAssignmentStates,creationType,customSecurityAttributes,onPremisesSyncEnabled,onPremisesDistinguishedName,onPremisesSamAccountName,onPremisesUserPrincipalName,onPremisesDomainName,onPremisesImmutableId,onPremisesLastSyncDateTime,onPremisesSecurityIdentifier,securityIdentifier">Detailed</option>
+                    </datalist>
+                    <input list="entra_user_properties_list" id="entra_user_properties" class="form-control" placeholder="id,displayName,userPrincipalName,...">
+                </div>
+            </div>
+        </div>
+    </form>
+    <script>
+        $(document).ready(function () {
+            getActiveAccessToken(document.getElementById("entra_users_form").access_token_id);
+            new bootstrap.Tooltip(document.getElementById('membership_count_tooltip'));
+            new bootstrap.Tooltip(document.getElementById('customize_properties_tooltip'));
+            function toggleUserPropertiesInput() {
+                if ($('#customize_properties').is(':checked')) {
+                    $('#entra_user_properties').parent().show();
+                } else {
+                    $('#entra_user_properties').parent().hide();
+                }
+            }
+            toggleUserPropertiesInput();
+            $('#customize_properties').change(function () {
+                toggleUserPropertiesInput();
+            });
+        });
+    </script>
+</div>
+<br>
+<div>
+    <h2>Users Table</h2>
+    <table id="entra_id_users_table" class="table table-striped nowrap" style="width:100%">
+        <thead>
+            <tr>
+                <th></th>
+                <th></th>
+                <th>Display Name</th>
+                <th>User Principal Name</th>
+                <th>Mail</th>
+                <th>Mobile</th>
+                <th>Groups</th>
+                <th>Roles</th>
+                <th>Enabled</th>
+                <th>Type</th>
+                <th>Synced</th>
+            </tr>
+        </thead>
+    </table>
+</div>
+
+<script>
+    // Populate the entra_id_users_table table
+    function generateEntraUsersTable() {
+        if ($.fn.dataTable.isDataTable("#entra_id_users_table")) {
+            // If the DataTable already exists, just reload it
+            $('#entra_id_users_table').DataTable().ajax.reload(null, false);
+        } else {
+            // Initialize datatable
+            let entraUsersTable = new DataTable('#entra_id_users_table', {
+                ajax: {
+                    type: "GET",
+                    url: `/api/get_entra_users`,
+                    data: function (d) {
+                        d.access_token_id = $("#entra_users_form #access_token_id").val()
+                        if ($('#membership_count').is(':checked')) {
+                            d.expand_memberships = true;
+                        }
+                        if ($('#customize_properties').is(':checked')) {
+                            d.customize_properties = $('#entra_user_properties').val();
+                        } else {
+                            d.customize_properties = "id,displayName,userPrincipalName,mail,mobilePhone,accountEnabled,userType,onPremisesSyncEnabled";
+                        }
+                    },
+                    dataSrc: "",
+                    error: function (xhr, status, error) {
+                        bootstrapToast("Entra ID Users Table", xhr.responseText, "danger");
+                        entraUsersTable.clear().draw();
+                    }
+                },
+                columns: [
+                    {
+                        className: 'dt-control',
+                        orderable: false,
+                        data: null,
+                        defaultContent: '',
+                        'width': '40px'
+                    },
+                    {
+                        className: 'groups-control',
+                        orderable: false,
+                        data: null,
+                        defaultContent: '<i class="fi fi-rr-users" style="cursor: pointer"></i>',
+                        'width': '40px'
+                    },
+                    {
+                        data: 'displayName'
+                    },
+                    {
+                        data: 'userPrincipalName'
+                    },
+                    {
+                        data: 'mail'
+                    },
+                    {
+                        data: 'mobilePhone'
+                    },
+                    {
+                        name: "groups",
+                        data: null,
+                        render: function (d, t, r) {
+                            if (!$('#membership_count').is(':checked')) {
+                                return "/";
+                            }
+                            if (r.transitiveMemberOf && r.transitiveMemberOf instanceof Array) {
+                                groups = r.transitiveMemberOf.filter(object => object["@odata.type"] == "#microsoft.graph.group");
+                                return groups.length;
+                            }
+                            return 0;
+                        },
+                        width: '100px'
+                    },
+                    {
+                        name: "roles",
+                        data: null,
+                        render: function (d, t, r) {
+                            if (!$('#membership_count').is(':checked')) {
+                                return "/";
+                            }
+                            if (r.transitiveMemberOf && r.transitiveMemberOf instanceof Array) {
+                                directoryRoles = r.transitiveMemberOf.filter(object => object["@odata.type"] == "#microsoft.graph.directoryRole");
+                                return directoryRoles.length;
+                            }
+                            return 0;
+                        },
+                        width: '80px'
+                    },
+                    {
+                        data: 'accountEnabled',
+                        width: '100px'
+                    },
+                    {
+                        data: 'userType',
+                        width: '80px'
+                    },
+                    {
+                        data: null,
+                        render: function (d, t, r) { return r.onPremisesSyncEnabled ? "true" : "false"; },
+                        width: '100px'
+                    }
+                ],
+                order: [[2, 'asc']],
+                buttons: [
+                    {
+                        extend: 'colvis',
+                        text: 'Columns',
+                        columns: 'th:nth-child(n+3)'
+                    },
+                    {
+                        extend: 'collection',
+                        text: 'Export',
+                        autoClose: true,
+                        buttons: [
+                            {
+                                extend: 'copy',
+                                exportOptions: {
+                                    columns: ':visible'
+                                }
+                            },
+                            {
+                                extend: 'csv',
+                                exportOptions: {
+                                    columns: ':visible'
+                                }
+                            },
+                            {
+                                extend: 'excel',
+                                exportOptions: {
+                                    columns: ':visible'
+                                }
+                            }
+                        ]
+
+                    }
+                ],
+                layout: {
+                    top2Start: 'buttons'
+                },
+                colReorder: true,
+                scrollX: true,
+                fixedColumns: {
+                    start: 3
+                },
+                processing: true
+            })
+
+            entraUsersTable.on('click', 'td.dt-control', function (e) {
+                let tr = e.target.closest('tr');
+                let row = entraUsersTable.row(tr);
+
+                if (row.child.isShown()) {
+                    // This row is already open - close it
+                    row.child.hide();
+                }
+                else {
+                    // Open this row
+                    row.child(formatJsonCode(row.data())).show();
+                    Prism.highlightAll();
+                }
+            });
+
+            entraUsersTable.on('click', 'td.groups-control', function (e) {
+                let tr = e.target.closest('tr');
+                let row = entraUsersTable.row(tr);
+                openUserDetailsModal($("#entra_users_form #access_token_id").val(),row.data().id);
+            });
+        }
+        // If "Include membership count" is checked, show the Groups and Roles columns.
+        $('#entra_id_users_table').DataTable().column("groups:name").visible($('#membership_count').is(':checked'))
+        $('#entra_id_users_table').DataTable().column("roles:name").visible($('#membership_count').is(':checked'))
+        return false;
+    }
+
+</script>
+{%endblock content%}

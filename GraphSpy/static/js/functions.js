@@ -455,6 +455,409 @@ function createTeamsConversation(access_token_id, members, type = "group_chat", 
     return response.responseJSON;
 }
 
+// ========== Entra ID ==========
+
+function getEntraUserDetails(access_token_id, user_id) {
+    let response = $.ajax({
+        type: "GET",
+        async: false,
+        url: `/api/get_entra_user_details/${encodeURIComponent(user_id)}?access_token_id=${access_token_id}`
+    });
+    if (response.status >= 400) {
+        bootstrapToast("Get Entra ID User Details", response.responseText, "danger");
+        return;
+    }
+    return response.responseJSON;
+}
+
+function openUserDetailsModal(access_token_id, user_id) {
+    let entraUserDetails = getEntraUserDetails(access_token_id, user_id);
+    let modalBody = `
+        <div class="row ms-0" id="user_details_header_overview">
+            <h5>Overview</h5>
+            <ul id="user_details_overview" class="list-group">
+            </ul>
+        </div>
+        <div class="accordion" id="userDetailsAccordion">
+          <div class="accordion-item">
+            <h2 class="accordion-header">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-controls="collapseOne">
+                <b>Full details</b>
+              </button>
+            </h2>
+            <div id="collapseOne" class="accordion-collapse collapse" data-bs-parent="#userDetailsAccordion">
+              <div class="accordion-body" id="user_details_full">
+              </div>
+            </div>
+          </div>
+        </div>
+        <hr>
+        <div class="row" id="user_details_header_groups">
+            <h5>Group Membership</h5>
+            <table id="user_details_group_membership_table" class="table table-striped" style="width:100%">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th></th>
+                        <th>Display Name</th>
+                        <th>Description</th>
+                        <th>Security Enabled</th>
+                        <th>Dynamic</th>
+                        <th>Synced</th>
+                    </tr>
+                </thead>
+            </table>
+        </div>
+        <hr>
+        <div class="row" id="user_details_header_roles">
+            <h5>Directory Role Membership</h5>
+            <table id="user_details_role_membership_table" class="table table-striped" style="width:100%">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th></th>
+                        <th>Display Name</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+            </table>
+        </div>
+        <hr>
+        <div class="row" id="user_details_header_devices">
+            <h5>Owned Devices</h5>
+            <table id="user_details_owned_devices_table" class="table table-striped" style="width:100%">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th></th>
+                        <th>Display Name</th>
+                        <th>OS</th>
+                        <th>Type</th>
+                        <th>Last Signin</th>
+                    </tr>
+                </thead>
+            </table>
+        </div>
+        <hr>
+        <div class="row" id="user_details_header_app_roles">
+            <h5>App Role Assignments</h5>
+            <table id="user_details_app_role_assignment_table" class="table table-striped" style="width:100%">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th></th>
+                        <th>Resource ID</th>
+                        <th>Resource Name</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+            </table>
+        </div>
+        <hr>
+        <div class="row" id="user_details_header_api_perms">
+            <h5>API Permissions</h5>
+            <table id="user_details_api_permissions_table" class="table table-striped" style="width:100%">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th></th>
+                        <th>Client ID</th>
+                        <th>Resource ID</th>
+                        <th>Scope</th>
+                    </tr>
+                </thead>
+            </table>
+        </div>
+        `;
+    let modalNav = `
+        <nav id="entra_user_details_modal_navbar" class="navbar">
+          <ul class="nav nav-pills">
+            <li class="nav-item">
+              <a class="nav-link" href="#user_details_header_overview">Overview</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#user_details_header_groups">Groups</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#user_details_header_roles">Roles</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#user_details_header_devices">Devices</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#user_details_header_app_roles">App Roles</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#user_details_header_api_perms">API Perms</a>
+            </li>
+          </ul>
+        </nav>
+        `;
+    let userGroupsModal = createModal("entra_user_details_modal", `User details '${entraUserDetails.displayName}'`, modalBody, "modal-xl");
+    userGroupsModal.find(".modal-title").addClass("d-inline-block text-truncate").css("max-width", "350px");
+    userGroupsModal.find(".modal-title").after(modalNav);
+    userGroupsModal.find(".modal-body").attr("data-bs-spy", "scroll").attr("data-bs-target", "#entra_user_details_modal_navbar").attr("tabindex", "0");;
+    userGroupsModal.on('shown.bs.modal', function () {
+        bootstrap.ScrollSpy.getOrCreateInstance(this.querySelector('.modal-body')).refresh();
+    });
+    userGroupsModal.modal('show');
+    function createDetailItem(key, value) {
+        let item = $('<li class="list-group-item"></li>');
+        item.append($('<b class="text-body-secondary"></b>').text(`${key}: `));
+        item.append($('<span class="text-light-emphasis"></span>').text(value));
+        return item;
+    }
+    let userDetailsOverview = $('#user_details_overview');
+    userDetailsOverview.append(createDetailItem("ID", entraUserDetails.id));
+    userDetailsOverview.append(createDetailItem("Security ID", entraUserDetails.securityIdentifier));
+    userDetailsOverview.append(createDetailItem("Name", entraUserDetails.displayName));
+    userDetailsOverview.append(createDetailItem("User Principal Name", entraUserDetails.userPrincipalName));
+    userDetailsOverview.append(createDetailItem("Enabled", entraUserDetails.accountEnabled));
+    userDetailsOverview.append(createDetailItem("Type", entraUserDetails.userType));
+    if (entraUserDetails.mail) { userDetailsOverview.append(createDetailItem("Mail", entraUserDetails.mail))};
+    if (entraUserDetails.mobilePhone) { userDetailsOverview.append(createDetailItem("Mobile", entraUserDetails.mobilePhone))};
+    if (entraUserDetails.businessPhones.length) { userDetailsOverview.append(createDetailItem("Business Phones", entraUserDetails.businessPhones))};
+    if (entraUserDetails.companyName) { userDetailsOverview.append(createDetailItem("Company", entraUserDetails.companyName))};
+    if (entraUserDetails.department) { userDetailsOverview.append(createDetailItem("Department", entraUserDetails.department))};
+    if (entraUserDetails.jobTitle) { userDetailsOverview.append(createDetailItem("Job Title", entraUserDetails.jobTitle))};
+    if (entraUserDetails.country) { userDetailsOverview.append(createDetailItem("Country", entraUserDetails.country))};
+    if (entraUserDetails.city) { userDetailsOverview.append(createDetailItem("City", entraUserDetails.city))};
+    if (entraUserDetails.streetAddress) { userDetailsOverview.append(createDetailItem("Street Address", entraUserDetails.streetAddress))};
+    userDetailsOverview.append(createDetailItem("Password Changed", entraUserDetails.lastPasswordChangeDateTime));
+    userDetailsOverview.append(createDetailItem("Created", entraUserDetails.createdDateTime));
+    userDetailsOverview.append(createDetailItem("Refresh Tokens Valid From", entraUserDetails.refreshTokensValidFromDateTime));
+    if (entraUserDetails.onPremisesSyncEnabled) {
+        userDetailsOverview.append(createDetailItem("On-Prem Synced", entraUserDetails.onPremisesSyncEnabled));
+        userDetailsOverview.append(createDetailItem("On-Prem UPN", entraUserDetails.onPremisesUserPrincipalName));
+        userDetailsOverview.append(createDetailItem("On-Prem SamAccountName", entraUserDetails.onPremisesSamAccountName));
+        userDetailsOverview.append(createDetailItem("On-Prem DN", entraUserDetails.onPremisesDistinguishedName));
+        userDetailsOverview.append(createDetailItem("On-Prem Last Sync", entraUserDetails.onPremisesLastSyncDateTime));
+        userDetailsOverview.append(createDetailItem("On-Prem SID", entraUserDetails.onPremisesSecurityIdentifier));
+        userDetailsOverview.append(createDetailItem("On-Prem Immutable ID", entraUserDetails.onPremisesImmutableId));
+    } else {
+        userDetailsOverview.append(createDetailItem("Synced", "false"));
+    }
+    $('#user_details_full').append(formatJsonCode(entraUserDetails));
+    Prism.highlightAll();
+
+    if ($.fn.dataTable.isDataTable('#user_details_group_membership_table')) {
+        $('#user_details_group_membership_table').DataTable().destroy();
+        $('#user_details_group_membership_table').empty();
+    }
+    let userDetailsGroupMembershipTable = new DataTable('#user_details_group_membership_table', {
+        data: entraUserDetails.transitiveMemberOf.filter(object => object["@odata.type"] == "#microsoft.graph.group"),
+        columns: [
+            {
+                className: 'dt-control',
+                orderable: false,
+                data: null,
+                defaultContent: '',
+                'width': '20px'
+            },
+            {
+                className: 'placeholder-control',
+                orderable: false,
+                data: null,
+                defaultContent: '',
+                'width': '20px'
+            },
+            { data: 'displayName', title: "Display Name" },
+            { data: 'description', title: "Description" },
+            { data: 'securityEnabled', title: "Security Enabled", width: "10px" },
+            {
+                data: null,
+                render: function (d, t, r) { return r.membershipRule ? "true" : "false"; },
+                title: "Dynamic",
+                width: '10px'
+            },
+            {
+                data: null,
+                render: function (d, t, r) { return r.onPremisesSyncEnabled ? "true" : "false"; },
+                title: "Synced",
+                width: '10px'
+            }
+        ],
+        autoWidth: false,
+        order: [[2, 'asc']]
+    });
+    userDetailsGroupMembershipTable.on('click', 'td.dt-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = userDetailsGroupMembershipTable.row(tr);
+        if (row.child.isShown()) {
+            // This row is already open - close it
+            row.child.hide();
+        }
+        else {
+            // Open this row
+            row.child(formatJsonCode(row.data())).show();
+            Prism.highlightAll();
+        }
+    });
+    if ($.fn.dataTable.isDataTable('#user_details_role_membership_table')) {
+        $('#user_details_role_membership_table').DataTable().destroy();
+        $('#user_details_role_membership_table').empty();
+    }
+    let userDetailsRoleMembershipTable = new DataTable('#user_details_role_membership_table', {
+        data: entraUserDetails.transitiveMemberOf.filter(object => object["@odata.type"] == "#microsoft.graph.directoryRole"),
+        columns: [
+            {
+                className: 'dt-control',
+                orderable: false,
+                data: null,
+                defaultContent: '',
+                'width': '20px'
+            },
+            {
+                className: 'placeholder-control',
+                orderable: false,
+                data: null,
+                defaultContent: '',
+                'width': '20px'
+            },
+            { data: 'displayName', title: "Display Name" },
+            { data: 'description', title: "Description" }
+        ],
+        autoWidth: false,
+        order: [[2, 'asc']]
+    });
+    userDetailsRoleMembershipTable.on('click', 'td.dt-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = userDetailsRoleMembershipTable.row(tr);
+        if (row.child.isShown()) {
+            // This row is already open - close it
+            row.child.hide();
+        }
+        else {
+            // Open this row
+            row.child(formatJsonCode(row.data())).show();
+            Prism.highlightAll();
+        }
+    });
+    if ($.fn.dataTable.isDataTable('#user_details_owned_devices_table')) {
+        $('#user_details_owned_devices_table').DataTable().destroy();
+        $('#user_details_owned_devices_table').empty();
+    }
+    let userDetailsOwnedDeviceTable = new DataTable('#user_details_owned_devices_table', {
+        data: entraUserDetails.ownedDevices,
+        columns: [
+            {
+                className: 'dt-control',
+                orderable: false,
+                data: null,
+                defaultContent: '',
+                'width': '20px'
+            },
+            {
+                className: 'placeholder-control',
+                orderable: false,
+                data: null,
+                defaultContent: '',
+                'width': '20px'
+            },
+            { data: 'displayName', title: "Display Name" },
+            { data: 'operatingSystem', title: "OS" },
+            { data: 'profileType', title: "Type" },
+            { data: 'approximateLastSignInDateTime', title: "Last Signin" }
+        ],
+        autoWidth: false,
+        order: [[5, 'desc']]
+    });
+    userDetailsOwnedDeviceTable.on('click', 'td.dt-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = userDetailsOwnedDeviceTable.row(tr);
+        if (row.child.isShown()) {
+            // This row is already open - close it
+            row.child.hide();
+        }
+        else {
+            // Open this row
+            row.child(formatJsonCode(row.data())).show();
+            Prism.highlightAll();
+        }
+    });
+    if ($.fn.dataTable.isDataTable('#user_details_app_role_assignment_table')) {
+        $('#user_details_app_role_assignment_table').DataTable().destroy();
+        $('#user_details_app_role_assignment_table').empty();
+    }
+    let userDetailsAppRoleAssignmentTable = new DataTable('#user_details_app_role_assignment_table', {
+        data: entraUserDetails.appRoleAssignments,
+        columns: [
+            {
+                className: 'dt-control',
+                orderable: false,
+                data: null,
+                defaultContent: '',
+                'width': '20px'
+            },
+            {
+                className: 'placeholder-control',
+                orderable: false,
+                data: null,
+                defaultContent: '',
+                'width': '20px'
+            },
+            { data: 'resourceId', title: "Resource ID", width: "320px" },
+            { data: 'resourceDisplayName', title: "Resource Name" },
+            { data: 'createdDateTime', title: "Created" }
+        ],
+        autoWidth: false,
+        order: [[2, 'asc']]
+    });
+    userDetailsAppRoleAssignmentTable.on('click', 'td.dt-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = userDetailsAppRoleAssignmentTable.row(tr);
+        if (row.child.isShown()) {
+            // This row is already open - close it
+            row.child.hide();
+        }
+        else {
+            // Open this row
+            row.child(formatJsonCode(row.data())).show();
+            Prism.highlightAll();
+        }
+    });
+    if ($.fn.dataTable.isDataTable('#user_details_api_permissions_table')) {
+        $('#user_details_api_permissions_table').DataTable().destroy();
+        $('#user_details_api_permissions_table').empty();
+    }
+    let userDetailsApiPermissionsTable = new DataTable('#user_details_api_permissions_table', {
+        data: entraUserDetails.oauth2PermissionGrants,
+        columns: [
+            {
+                className: 'dt-control',
+                orderable: false,
+                data: null,
+                defaultContent: '',
+                'width': '20px'
+            },
+            {
+                className: 'placeholder-control',
+                orderable: false,
+                data: null,
+                defaultContent: '',
+                'width': '20px'
+            },
+            { data: 'clientId', title: "Client ID", width: "320px"},
+            { data: 'resourceId', title: "App Object ID", width: "320px" },
+            { data: 'scope', title: "Scope" }
+        ],
+        autoWidth: false,
+        order: [[2, 'asc']]
+    });
+    userDetailsApiPermissionsTable.on('click', 'td.dt-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = userDetailsApiPermissionsTable.row(tr);
+        if (row.child.isShown()) {
+            // This row is already open - close it
+            row.child.hide();
+        }
+        else {
+            // Open this row
+            row.child(formatJsonCode(row.data())).show();
+            Prism.highlightAll();
+        }
+    });
+}
 
 // ========== Settings ==========
 
@@ -559,6 +962,17 @@ function prettifyXml(sourceXml) {
     return resultXml;
 };
 
+function formatJsonCode(jsonInput) {
+    let formatWrapper = ($('<div></div>'));
+    let copyIcon = $('<i class="fi fi-rr-copy-alt float-end p-2 ms-n2" style="cursor: pointer"></i>')
+    copyIcon.on('click', function () {
+        copyToClipboard(JSON.stringify(jsonInput, undefined, 4));
+    });
+    formatWrapper.append(copyIcon);
+    formatWrapper.append($('<pre></pre>').append($('<code class="language-json" style="white-space: pre-wrap; word-break: break-all"></code>').text(JSON.stringify(jsonInput, undefined, 4))));
+    return formatWrapper;
+}
+
 // ========== Messages ==========
 
 function bootstrapAlert(message, type) {
@@ -604,4 +1018,42 @@ function bootstrapToast(title, message, type = null, alternative = false) {
     // Activate the last Toast Message
     const toastList = [...$(".toast")].map(toastEl => new bootstrap.Toast(toastEl, "show"))
     toastList[toastList.length - 1].show()
+}
+
+// ========== Modals ==========
+
+function createModal(modalID, modalTitle, modalBody, modalSize = "modal-xl") {
+    // If a modal with the same ID already exists, delete it first
+    $('div#modal_container').children(`div.modal#${modalID}`).remove();
+    let modalWrapper = $(`
+    <div class="modal fade" id="" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h1 class="modal-title fs-5">Temp Modal Title</h1>
+                    <div class="d-flex justify-content-end align-items-center">
+                        <i class="fi fi-br-expand me-2" id="expand-icon" style="cursor: pointer; opacity: 0.5"></i>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                </div>
+                <div class="modal-body m-2">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    `);
+    modalWrapper.attr('id', modalID);
+    modalWrapper.find('h1.modal-title').text(modalTitle);
+    modalSize = ['modal-sm', 'modal-md', 'modal-lg', 'modal-xl'].includes(modalSize) ? modalSize : "modal-xl";
+    modalWrapper.find('div.modal-dialog').addClass(modalSize);
+    modalWrapper.find('div.modal-body').append(modalBody);
+    modalWrapper.on('click', 'i#expand-icon', function (e) {
+        $(e.target).closest(".modal-dialog").toggleClass('modal-xl').toggleClass('modal-fullscreen');
+        $(e.target).toggleClass('fi-br-expand').toggleClass('fi-br-compress');
+    });
+    $('div#modal_container').append(modalWrapper);
+    return modalWrapper;
 }

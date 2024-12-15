@@ -10,6 +10,10 @@ td:has(i.fi), td.dt-control {
 .icon-hover-change:hover {
     color: var(--bs-primary-border-subtle);
 }
+/* Better background for datatables copy notifications */
+div.dt-button-info#datatables_buttons_info {
+    background: var(--bs-secondary-bg);
+}
 /* Teams CSS */
 #teams_message_container pre {
     background: var(--bs-secondary-bg);
@@ -29,3 +33,58 @@ blockquote {
     border: var(--bs-border-width) var(--bs-border-style) var(--bs-border-color);
     padding: .5rem;
 }
+
+/* JSON Styling */
+:not(pre) > code[class*=language-], pre[class*=language-] {
+    background: transparent !important;
+}
+
+.token.operator, .token.punctuation {
+    color: var(--bs-body-color);
+}
+
+.token {
+    text-shadow: none !important;
+}
+
+/* Bootstrap negative margins */
+
+.m-n1 { margin: -0.25rem; }
+.mt-n1 { margin-top: -0.25rem; }
+.mb-n1 { margin-bottom: -0.25rem; }
+.ms-n1 { margin-left: -0.25rem; }
+.me-n1 { margin-right: -0.25rem; }
+.mx-n1 { margin-left: -0.25rem; margin-right: -0.25rem; }
+.my-n1 { margin-top: -0.25rem; margin-bottom: -0.25rem; }
+
+.m-n2 { margin: -0.5rem; }
+.mt-n2 { margin-top: -0.5rem; }
+.mb-n2 { margin-bottom: -0.5rem; }
+.ms-n2 { margin-left: -0.5rem; }
+.me-n2 { margin-right: -0.5rem; }
+.mx-n2 { margin-left: -0.5rem; margin-right: -0.5rem; }
+.my-n2 { margin-top: -0.5rem; margin-bottom: -0.5rem; }
+
+.m-n3 { margin: -1rem; }
+.mt-n3 { margin-top: -1rem; }
+.mb-n3 { margin-bottom: -1rem; }
+.ms-n3 { margin-left: -1rem; }
+.me-n3 { margin-right: -1rem; }
+.mx-n3 { margin-left: -1rem; margin-right: -1rem; }
+.my-n3 { margin-top: -1rem; margin-bottom: -1rem; }
+
+.m-n4 { margin: -1.5rem; }
+.mt-n4 { margin-top: -1.5rem; }
+.mb-n4 { margin-bottom: -1.5rem; }
+.ms-n4 { margin-left: -1.5rem; }
+.me-n4 { margin-right: -1.5rem; }
+.mx-n4 { margin-left: -1.5rem; margin-right: -1.5rem; }
+.my-n4 { margin-top: -1.5rem; margin-bottom: -1.5rem; }
+
+.m-n5 { margin: -3rem; }
+.mt-n5 { margin-top: -3rem; }
+.mb-n5 { margin-bottom: -3rem; }
+.ms-n5 { margin-left: -3rem; }
+.me-n5 { margin-right: -3rem; }
+.mx-n5 { margin-left: -3rem; margin-right: -3rem; }
+.my-n5 { margin-top: -3rem; margin-bottom: -3rem; }
