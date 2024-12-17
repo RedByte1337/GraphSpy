@@ -19,6 +19,7 @@ with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),"version.txt")
 
 def init_db():
     con = sqlite3.connect(app.config['graph_spy_db_path'])
+    con.execute('CREATE TABLE requests (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, user TEXT, uri TEXT, method TEXT, body TEXT)')
     con.execute('CREATE TABLE accesstokens (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at TEXT, issued_at TEXT, expires_at TEXT, description TEXT, user TEXT, resource TEXT, accesstoken TEXT)')
     con.execute('CREATE TABLE refreshtokens (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at TEXT, description TEXT, user TEXT, tenant_id TEXT, resource TEXT, foci INTEGER, refreshtoken TEXT)')
     con.execute('CREATE TABLE devicecodes (id INTEGER PRIMARY KEY AUTOINCREMENT, generated_at INTEGER, expires_at INTEGER, user_code TEXT, device_code TEXT, interval INTEGER, client_id TEXT, status TEXT, last_poll INTEGER)')
@@ -99,6 +100,9 @@ def update_db():
 
 # ========== Helper Functions ==========
 
+def save_request(timestamp, uri, method, body = "", user = ""):
+    execute_db("INSERT INTO requests (timestamp, user, uri, method, body) VALUES (?,?,?,?,?)", (timestamp, user, uri, method, body))
+
 def create_response(status_code, message, data = None):
     response_body = {
         "message": message
@@ -125,6 +129,7 @@ def graph_request(graph_uri, access_token_id):
     access_token = query_db("SELECT accesstoken FROM accesstokens where id = ?",[access_token_id],one=True)[0]
     headers = {"Authorization":f"Bearer {access_token}", "User-Agent":get_user_agent()}
     response = requests.get(graph_uri, headers=headers)
+    save_request(time.time(), graph_uri, "GET", user=jwt.decode(access_token, options={"verify_signature": False})["unique_name"])
     resp_json = response.json()
     return json.dumps(resp_json)
 
@@ -132,6 +137,7 @@ def graph_request_post(graph_uri, access_token_id, body):
     access_token = query_db("SELECT accesstoken FROM accesstokens where id = ?",[access_token_id],one=True)[0]
     headers = {"Authorization":f"Bearer {access_token}", "User-Agent":get_user_agent()}
     response = requests.post(graph_uri, headers=headers, json=body)
+    save_request(time.time(), graph_uri, "POST", str(body), user=jwt.decode(access_token, options={"verify_signature": False})["unique_name"])
     resp_json = response.json()
     return json.dumps(resp_json)
 
@@ -144,6 +150,7 @@ def graph_upload_request(upload_uri, access_token_id, file):
     headers = {"Authorization": f"Bearer {access_token}", "Content-Type": file.content_type, "User-Agent":get_user_agent()}
 
     response = requests.put(upload_uri, headers=headers, data=file.read())
+    save_request(time.time(), upload_uri, "PUT", str(file.read()))
 
     if response.status_code in [200, 201]:
         return json.dumps({"message": "File uploaded successfully."}), response.status_code
@@ -158,6 +165,7 @@ def generic_request(uri, access_token_id, method, request_type, body, headers={}
     # Empty body
     if not body:
         response = requests.request(method, uri, headers=headers)
+        save_request(time.time(), uri, "GET")
     # Text, XML or urlencoded request
     elif request_type in ["text", "urlencoded", "xml"]:
         if request_type == "urlencoded" and not "Content-Type" in headers:
@@ -165,10 +173,12 @@ def generic_request(uri, access_token_id, method, request_type, body, headers={}
         if request_type == "xml" and not "Content-Type" in headers:
             headers["Content-Type"] = "application/xml"
         response = requests.request(method, uri, headers=headers, data=body)
+        save_request(time.time(), uri, method.upper(), str(body))
     # Json request
     elif request_type == "json":
         try:
             response = requests.request(method, uri, headers=headers, json=json.loads(body))
+            save_request(time.time(), uri, method.upper(), str(json.loads(body)))
         except ValueError as e:
             return f"[Error] The body message does not contain valid JSON, but a body type of JSON was specified.", 400
     else:
@@ -235,6 +245,7 @@ def is_valid_uuid(val):
 def get_tenant_id(tenant_domain):
     headers = {"User-Agent":get_user_agent()}
     response = requests.get(f"https://login.microsoftonline.com/{tenant_domain}/.well-known/openid-configuration", headers=headers)
+    save_request(time.time(), f"https://login.microsoftonline.com/{tenant_domain}/.well-known/openid-configuration", "GET")
     resp_json = response.json()
     tenant_id = resp_json["authorization_endpoint"].split("/")[3]
     return tenant_id
@@ -258,6 +269,7 @@ def refresh_to_access_token(refresh_token_id, client_id = "d3590ed6-52b3-4102-ae
 
     headers = {"User-Agent":get_user_agent()}
     response = requests.post(url, data=body, headers=headers)
+    save_request(time.time(), url, "POST", str(body))
     if "error" in response.json():
         error_msg = f"[{response.json()['error']}] {response.json()['error_description']}"
         return error_msg
@@ -294,7 +306,8 @@ def generate_device_code(resource = "https://graph.microsoft.com", client_id = "
         body["amr_values"]= "ngcmfa"
     url = "https://login.microsoftonline.com/common/oauth2/devicecode?api-version=1.0"
     headers = {"User-Agent":get_user_agent()}
-    response = requests.post(url, data=body,headers=headers)
+    response = requests.post(url, data=body, headers=headers)
+    save_request(time.time(), url, "POST", str(body))
 
     execute_db("INSERT INTO devicecodes (generated_at, expires_at, user_code, device_code, interval, client_id, status, last_poll) VALUES (?,?,?,?,?,?,?,?)",(
             int(datetime.now().timestamp()),
@@ -335,6 +348,7 @@ def poll_device_codes():
                 url = "https://login.microsoftonline.com/Common/oauth2/token?api-version=1.0"
                 headers = {"User-Agent":get_user_agent()}
                 response = requests.post(url, data=body, headers=headers)
+                save_request(time.time(), url, "POST", str(body))
                 execute_db("UPDATE devicecodes SET last_poll = ? WHERE device_code = ?",(int(datetime.now().timestamp()),row["device_code"]))
                 if response.status_code == 200 and "access_token" in response.json():
                     access_token = response.json()["access_token"]
@@ -467,6 +481,7 @@ def get_session_ctx(access_token_id):
         headers = {"Authorization":f"Bearer {access_token}", "User-Agent":get_user_agent()}
         uri = "https://account.activedirectory.windowsazure.com/securityinfo/Authorize"
         response = requests.post(uri, headers=headers, json={})
+        save_request(time.time(), uri, "POST", str({}))
         if response.status_code != 200:
             gspy_log.error(f"Failed to obtain SessionCtx value. Received status code {response.status_code}")
             return False
@@ -490,6 +505,7 @@ def get_available_authentication_info(access_token_id):
         headers = {"Authorization":f"Bearer {access_token}", "Sessionctx":sessionCtx, "User-Agent":get_user_agent()}
         uri = "https://account.activedirectory.windowsazure.com/securityinfo/AvailableAuthenticationInfo"
         response = requests.get(uri, headers=headers)
+        save_request(time.time(), uri, "GET")
         if response.status_code != 200:
             gspy_log.error(f"Failed to obtain AvailableAuthenticationInfo. Received status code {response.status_code}")
             return False
@@ -520,6 +536,7 @@ def validate_captcha(access_token_id, challenge_id, captcha_solution, azure_regi
             "AzureRegion": azure_region
         }
         response = requests.post(uri, headers=headers, json=body)
+        save_request(time.time(), uri, "POST", str(body))
         if response.status_code != 200:
             gspy_log.error(f"Failed to validate captcha. Received status code {response.status_code}")
             return False
@@ -546,6 +563,7 @@ def initialize_mobile_app_registration(access_token_id, security_info_type):
             "securityInfoType": security_info_type
         }
         response = requests.post(uri, headers=headers, json=body)
+        save_request(time.time(), uri, "POST", str(body))
         if response.status_code != 200:
             gspy_log.error(f"InitializeMobileAppRegistration request failed. Received status code {response.status_code}")
             return False
@@ -577,6 +595,7 @@ def delete_security_info(access_token_id, security_info_type, data):
             "Data": body_data
         }
         response = requests.post(uri, headers=headers, json=body)
+        save_request(time.time(), uri, "POST", str(body))
         if response.status_code != 200:
             gspy_log.error(f"DeleteSecurityInfo request failed. Received status code {response.status_code}")
             return False
@@ -609,6 +628,7 @@ def add_security_info(access_token_id, security_info_type, data = None):
         if body_data:
             body["Data"] = body_data
         response = requests.post(uri, headers=headers, json=body)
+        save_request(time.time(), uri, "POST", str(body))
         if response.status_code != 200:
             gspy_log.error(f"AddSecurityInfo request failed. Received status code {response.status_code}")
             return False
@@ -623,6 +643,7 @@ def add_security_info(access_token_id, security_info_type, data = None):
             gspy_log.debug(f"We need to solve a captcha...")
             captcha_uri = "https://account.activedirectory.windowsazure.com/securityinfo/Captcha?challengeType=Visual"
             captcha_response = requests.get(captcha_uri, headers=headers)
+            save_request(time.time(), captcha_uri, "GET")
             gspy_log.debug(f"Captcha Raw Response:\n{captcha_response.text}")
             captcha_response_json = json.loads(captcha_response.text[6:])
             security_info_response["captcha"] = captcha_response_json
@@ -656,6 +677,7 @@ def verify_security_info(access_token_id, security_info_type, verification_conte
             "VerificationContext": verification_context
         }
         response = requests.post(uri, headers=headers, json=body)
+        save_request(time.time(), uri, "POST", str(body))
         if response.status_code != 200:
             gspy_log.error(f"VerifySecurityInfo request failed. Received status code {response.status_code}")
             return False
@@ -738,7 +760,7 @@ def add_graphspy_otp(access_token_id, description = ""):
         otp_code = pyotp.TOTP(secret_key).now()
         verify_security_info_response = verify_security_info(access_token_id, 3, security_info_response["VerificationContext"], otp_code)
         if ("ErrorCode" in verify_security_info_response and verify_security_info_response["ErrorCode"]):
-            gspy_log.error(f"An error occurred when trying to validate the provided info. Received Error Code {response.ErrorCode}")
+            gspy_log.error(f"An error occurred when trying to validate the provided info. Received Error Code {verify_security_info_response.ErrorCode}")
             return False
         execute_db("INSERT INTO mfa_otp (stored_at, secret_key, account_name, description) VALUES (?,?,?,?)",(
             f"{datetime.now()}".split(".")[0],
@@ -879,6 +901,7 @@ def getTeamsSettings(access_token_id):
     headers = {"Authorization":f"Bearer {access_token}", "User-Agent":get_user_agent()}
     uri = "https://teams.microsoft.com/api/authsvc/v1.0/authz"
     response = requests.post(uri, headers=headers)
+    save_request(time.time(), uri, "POST", "")
     if response.status_code != 200:
         gspy_log.error(f"Failed obtaining teams settings. Received status code {response.status_code}")
         return False
@@ -1539,6 +1562,7 @@ def init_routes():
             "content": message_content
         }
         response = requests.post(conversation_link, headers=headers, json=body)
+        save_request(time.time(), conversation_link, "POST", str(body))
         if response.status_code >= 200 and response.status_code < 300:
             message_id = response.json()["OriginalArrivalTime"] if "OriginalArrivalTime" in response.json() else "Unknown"
             return f"{message_id}"
@@ -1582,6 +1606,7 @@ def init_routes():
         cookies = {"skypetoken_asm":teams_settings['skypeToken']}
         headers = {"User-Agent":get_user_agent()}
         response = requests.get(image_uri, cookies=cookies, headers=headers)
+        save_request(time.time(), image_uri, "GET")
         if response.status_code == 200:
             return Response(response.content, mimetype=response.headers['Content-Type'])
         return f"[Error] Something went wrong trying to obtain teams image. Received response status {response.status_code} and response type {response.headers['Content-Type'] if 'Content-Type' in response.headers else 'empty'}", 400
@@ -1682,6 +1707,7 @@ def init_routes():
                     "role": "Admin"
                 })
                 response = requests.post(uri, headers=headers, json=body)
+                save_request(time.time(), uri, "POST", body)
                 if response.status_code >= 200 and response.status_code < 300 and "Location" in response.headers:
                     conversation_id_regex = re.search('https:\/\/emea\.ng\.msg\.teams\.microsoft\.com\/v1\/threads\/(.*)$', response.headers["Location"])
                     if conversation_id_regex:
@@ -1701,6 +1727,7 @@ def init_routes():
                 "properties": conversation_properties
             }
             response = requests.post(uri, headers=headers, json=body)
+            save_request(time.time(), uri, "POST", body)
             if response.status_code >= 200 and response.status_code < 300 and "Location" in response.headers:
                 conversation_id_regex = re.search('https:\/\/emea\.ng\.msg\.teams\.microsoft\.com\/v1\/threads\/(.*)$', response.headers["Location"])
                 if conversation_id_regex:
@@ -1723,6 +1750,7 @@ def init_routes():
             for conversation_id in created_conversations:
                 conversation_link = f"{chat_service_uri}/v1/users/ME/conversations/{conversation_id}/messages"
                 response = requests.post(conversation_link, headers=headers, json=body)
+                save_request(time.time(), conversation_link, "POST", body)
                 if response.status_code >= 200 and response.status_code < 300:
                     message_id = response.json()["OriginalArrivalTime"] if "OriginalArrivalTime" in response.json() else "Unknown"
                     gspy_log.debug(f"Sent message to conversation {conversation_id}. Message ID: {message_id}")
