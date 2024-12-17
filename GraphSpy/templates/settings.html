@@ -45,6 +45,12 @@
                     <button class="btn btn-outline-primary" type="button" onclick="update_user_agent_button()">Set User Agent</button>
                 </div>
             </div>
+            <div class="col-12">
+                <div class="input-group">
+                    <input type="text" id="proxy_field" placeholder="Proxy" class="form-control">
+                    <button class="btn btn-outline-primary" type="button" onclick="update_proxy_button()">Set Proxy</button>
+                </div>
+            </div>
         </div>
     </div>
     <div class="col-auto ms-auto" style="max-width: 33%;">
@@ -175,6 +181,11 @@
     function update_user_agent_button() {
         setUserAgent($("#user_agent_field").val());
         $("#user_agent_field").val(getUserAgent());
+    }
+    $("#proxy_field").val(getProxy());
+    function update_proxy_button() {
+        setProxy($("#proxy_field").val());
+        $("#proxy_field").val(getProxy());
     }
 
 </script>
