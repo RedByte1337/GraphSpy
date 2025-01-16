@@ -60,7 +60,8 @@
                             url: "/api/get_settings"
                         });
                         let responseJSON = JSON.parse(response.responseText);
-                        $("#settings_json").text(JSON.stringify(responseJSON, undefined, 4));
+                        $("#settings_json").html(formatJsonCode(responseJSON));
+                        Prism.highlightAll();
                     }
                     obtainPersistentSettings();
                 </script>

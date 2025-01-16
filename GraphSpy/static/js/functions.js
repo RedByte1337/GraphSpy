@@ -353,18 +353,20 @@ function duplicateDatabase(database_name) {
 
 // ========== Teams ==========
 
-function getTeamsConversations(access_token_id) {
-    let response = $.ajax({
+async function getTeamsConversations(access_token_id) {
+    let response = await $.ajax({
         type: "POST",
-        async: false,
+        async: true,
         url: "/api/get_teams_conversations",
-        data: { "access_token_id": access_token_id }
+        data: { "access_token_id": access_token_id },
+        error: function (jqXHR, textStatus, errorThrown) {
+            if (jqXHR.status >= 400) {
+                bootstrapToast("Teams Conversations", jqXHR.responseText, "danger");
+                return;
+            }
+        }
     });
-    if (response.status >= 400) {
-        bootstrapToast("Teams Conversations", response.responseText, "danger");
-        return;
-    }
-    return response.responseJSON;
+    return response;
 }
 
 function getTeamsConversationMessages(access_token_id, conversation_link) {
@@ -971,6 +973,18 @@ function formatJsonCode(jsonInput) {
     formatWrapper.append(copyIcon);
     formatWrapper.append($('<pre></pre>').append($('<code class="language-json" style="white-space: pre-wrap; word-break: break-all"></code>').text(JSON.stringify(jsonInput, undefined, 4))));
     return formatWrapper;
+}
+
+function setButtonLoadingState(button, loadingText = "Loading...") {
+    button.prop('disabled', true);
+    button.find('span.spinner-border').show();
+    button.find('span#button_text').text(loadingText);
+}
+
+function resetButtonState(button, originalText = "Submit") {
+    button.prop('disabled', false);
+    button.find('span.spinner-border').hide();
+    button.find('span#button_text').text(originalText);
 }
 
 // ========== Messages ==========

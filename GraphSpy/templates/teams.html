@@ -13,7 +13,10 @@
                 <div class="input-group">
                     <input type="text" id="access_token_id" name="access_token_id" class="form-control" required readonly>
                     <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#access_token_modal" onclick="$('#access_token_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
-                    <button type="Button" class="btn btn-outline-primary" onclick="loadTeamsConversations()">Reload</button>
+                    <button type="Button" id="reload_button" class="btn btn-outline-primary" onclick="loadTeamsConversations()">
+                        <span class="spinner-border spinner-border-sm" aria-hidden="true" style="display: none"></span>
+                        <span id="button_text">Reload</span>
+                    </button>
                 </div>
             </div>
             <div class="col-lg-3 gy-3">
@@ -139,61 +142,69 @@
         $("#teams_message_container").css("max-height", `calc(100vh - ${document.getElementById("teams_message_container").getBoundingClientRect().top}px - ${document.getElementById("message_form_container").getBoundingClientRect().height}px - 25px)`)
     }
 
-    function loadTeamsConversations() {
-        teams_access_token_id = $("#ms_teams_form #access_token_id").val()
-        conversations = getTeamsConversations(teams_access_token_id).conversations;
-        conversationsNonEmpty = conversations.filter(function (conversation) { return (conversation.properties.isemptyconversation == "False" || $("#ms_teams_form #show_all").prop('checked')) })
-        conversations_sorted = conversationsNonEmpty.sort(function (a, b) {
-            let timeToCheckA = a.lastMessage.originalarrivaltime || a.threadProperties.createdat;
-            let timeToCheckB = b.lastMessage.originalarrivaltime || b.threadProperties.createdat;
-            return (timeToCheckB > timeToCheckA ? 1 : -1);
-        });
-        $("#conversation_list_group").empty();
-        for (const conversation of conversations_sorted) {
-            // Skip streamofnotifications
-            if (conversation.threadProperties.threadType == "streamofnotifications") {
-                continue;
+    async function loadTeamsConversations() {
+        setButtonLoadingState($("#ms_teams_form #reload_button"));
+        try {
+            teams_access_token_id = $("#ms_teams_form #access_token_id").val()
+            conversations = (await getTeamsConversations(teams_access_token_id)).conversations;
+            conversationsNonEmpty = conversations.filter(function (conversation) { return (conversation.properties.isemptyconversation == "False" || $("#ms_teams_form #show_all").prop('checked')) });
+            conversations_sorted = conversationsNonEmpty.sort(function (a, b) {
+                let timeToCheckA = a.lastMessage.originalarrivaltime || a.threadProperties.createdat;
+                let timeToCheckB = b.lastMessage.originalarrivaltime || b.threadProperties.createdat;
+                return (timeToCheckB > timeToCheckA ? 1 : -1);
+            });
+            if (conversations_sorted.length == 0) {
+                bootstrapToast("Teams Conversations", "No Microsoft Teams conversations found for this user.", "warning");
             }
-            // Get a useful name for the conversation
-            let conversationName = conversation.threadProperties.topic || conversation.threadProperties.spaceThreadTopic || "";
-            console.log(conversation)
-            try {
-                if (!conversationName && !conversationName && $("#ms_teams_form #resolve_conversation_names").prop('checked')) {
-                    let conversationMembers = getTeamsConversationMembers(teams_access_token_id, conversation.id);
-                    //console.log(conversationMembers);
-                    let otherMembers = conversationMembers.filter(member => !member.isCurrentUser);
-                    for (const otherMember of otherMembers) {
-                        conversationName += `${otherMember.displayName}, `;
-                    }
-                    if (conversationName) {
-                        conversationName = conversationName.slice(0, -2)
-                    }
+            $("#conversation_list_group").empty();
+            for (const conversation of conversations_sorted) {
+                // Skip streamofnotifications
+                if (conversation.threadProperties.threadType == "streamofnotifications") {
+                    continue;
                 }
-            } catch (error) {
-                console.error(error);
-            }
-            if (!conversationName) {
-                conversationName = "Unknown";
-            }
-            // To do: get the name of the last message sender if it is empty and if resolve_conversation_names is set
+                // Get a useful name for the conversation
+                let conversationName = conversation.threadProperties.topic || conversation.threadProperties.spaceThreadTopic || "";
+                console.log(conversation)
+                try {
+                    if (!conversationName && !conversationName && $("#ms_teams_form #resolve_conversation_names").prop('checked')) {
+                        let conversationMembers = getTeamsConversationMembers(teams_access_token_id, conversation.id);
+                        //console.log(conversationMembers);
+                        let otherMembers = conversationMembers.filter(member => !member.isCurrentUser);
+                        for (const otherMember of otherMembers) {
+                            conversationName += `${otherMember.displayName}, `;
+                        }
+                        if (conversationName) {
+                            conversationName = conversationName.slice(0, -2)
+                        }
+                    }
+                } catch (error) {
+                    console.error(error);
+                }
+                if (!conversationName) {
+                    conversationName = "Unknown";
+                }
+                // To do: get the name of the last message sender if it is empty and if resolve_conversation_names is set
 
-            let conversationItemWrapper = $('<a href="#" class="list-group-item list-group-item-action"></a>');
-            let conversationItemHeader = $('<div class="d-flex justify-content-between"></div>');
-            let conversationItemName = $('<b class="mb-1 text-truncate"></b>').text(`[${conversation.threadProperties.threadType}] ${conversationName}`);
-            // Show the time if the last message was sent today, otherwise show the date
-            lastMessageDate = new Date((conversation.lastMessage.originalarrivaltime || conversation.threadProperties.createdat));
-            lastMessageDate = (new Date().toLocaleDateString() == lastMessageDate.toLocaleDateString()) ? lastMessageDate.toLocaleTimeString() : lastMessageDate.toLocaleDateString();
-            let conversationItemDate = $('<small class="text-body-secondary"></small>').text(lastMessageDate);
-            let conversationItemPreview = $('<div class="d-flex justify-content-between"></div>')
-            let previewContent = ((["RichText/Html", "Text"].includes(conversation.lastMessage.messagetype)) ? `${conversation.lastMessage.imdisplayname}: ${new DOMParser().parseFromString(DOMPurify.sanitize(conversation.lastMessage.content), 'text/html').body.textContent.trim() || "[Unrenderable_Content]"}` : "[Unrenderable_Content]");
-            conversationItemPreview.append($('<small class="text-body-secondary text-truncate"></small>').text(previewContent));
-            conversationItemPreview.append($('<div class="d-flex"><i id="members-icon" class="fi fi-rr-user icon-hover-change mx-1"></i> <i id="info-icon" class="fi fi-rr-info icon-hover-change"></i></div>'));
-            let conversationRawHidden = $('<div class="raw-conversation" hidden></div>').text(JSON.stringify(conversation));
-            conversationItemHeader.append(conversationItemName).append(conversationItemDate);
-            conversationItemWrapper.append(conversationItemHeader);
-            conversationItemWrapper.append(conversationItemPreview);
-            conversationItemWrapper.append(conversationRawHidden);
-            $("#conversation_list_group").append(conversationItemWrapper);
+                let conversationItemWrapper = $('<a href="#" class="list-group-item list-group-item-action"></a>');
+                let conversationItemHeader = $('<div class="d-flex justify-content-between"></div>');
+                let conversationItemName = $('<b class="mb-1 text-truncate"></b>').text(`[${conversation.threadProperties.threadType}] ${conversationName}`);
+                // Show the time if the last message was sent today, otherwise show the date
+                lastMessageDate = new Date((conversation.lastMessage.originalarrivaltime || conversation.threadProperties.createdat));
+                lastMessageDate = (new Date().toLocaleDateString() == lastMessageDate.toLocaleDateString()) ? lastMessageDate.toLocaleTimeString() : lastMessageDate.toLocaleDateString();
+                let conversationItemDate = $('<small class="text-body-secondary"></small>').text(lastMessageDate);
+                let conversationItemPreview = $('<div class="d-flex justify-content-between"></div>')
+                let previewContent = ((["RichText/Html", "Text"].includes(conversation.lastMessage.messagetype)) ? `${conversation.lastMessage.imdisplayname}: ${new DOMParser().parseFromString(DOMPurify.sanitize(conversation.lastMessage.content), 'text/html').body.textContent.trim() || "[Unrenderable_Content]"}` : "[Unrenderable_Content]");
+                conversationItemPreview.append($('<small class="text-body-secondary text-truncate"></small>').text(previewContent));
+                conversationItemPreview.append($('<div class="d-flex"><i id="members-icon" class="fi fi-rr-user icon-hover-change mx-1"></i> <i id="info-icon" class="fi fi-rr-info icon-hover-change"></i></div>'));
+                let conversationRawHidden = $('<div class="raw-conversation" hidden></div>').text(JSON.stringify(conversation));
+                conversationItemHeader.append(conversationItemName).append(conversationItemDate);
+                conversationItemWrapper.append(conversationItemHeader);
+                conversationItemWrapper.append(conversationItemPreview);
+                conversationItemWrapper.append(conversationRawHidden);
+                $("#conversation_list_group").append(conversationItemWrapper);
+            }
+        } finally {
+            resetButtonState($("#ms_teams_form #reload_button"), "Reload")
         }
     }
 
@@ -427,7 +438,8 @@
     // Show conversation info
     $("#conversation_list_group").on('click', 'i#info-icon', function (e) {
         let conversation_info = e.target.closest(".list-group-item").getElementsByClassName("raw-conversation")[0].textContent
-        $("#conversation_info_details").text(JSON.stringify(JSON.parse(conversation_info), undefined, 4));
+        $("#conversation_info_details").html(formatJsonCode(JSON.parse(conversation_info)));
+        Prism.highlightAll();
         $('#conversation_info_modal').modal('show');
         e.stopPropagation();
     });
@@ -436,7 +448,8 @@
         let conversation_info = JSON.parse(e.target.closest(".list-group-item").getElementsByClassName("raw-conversation")[0].textContent, undefined, 4);
         let teams_access_token_id = $("#ms_teams_form #access_token_id").val();
         let conversation_members = getTeamsConversationMembers(teams_access_token_id, conversation_info.id)
-        $("#conversation_members_details").text(JSON.stringify(conversation_members, undefined, 4));
+        $("#conversation_members_details").html(formatJsonCode(conversation_members));
+        Prism.highlightAll();
         $('#conversation_members_modal').modal('show');
         e.stopPropagation();
     });
@@ -453,7 +466,8 @@
     // Show teams message info
     $("#teams_message_container").on('click', 'i#info-icon', function (e) {
         let message_info = JSON.parse(e.target.closest("div.card").getElementsByClassName("raw-message")[0].textContent, undefined, 4);
-        $("#teams_message_info_details").text(JSON.stringify(message_info, undefined, 4));
+        $("#teams_message_info_details").html(formatJsonCode(message_info));
+        Prism.highlightAll();
         $('#teams_message_info_modal').modal('show');
     });
     // Show new conversation modal
@@ -552,6 +566,7 @@
         else {
             // Open this row
             row.child(formatTeamsUserDetails(row.data().mri)).show();
+            Prism.highlightAll();
         }
     });
     function addUserToConversation(userPrincipalName, mri) {
@@ -585,7 +600,8 @@
             bootstrapToast("Search External User", `No external user with email '${email}' found`, "danger");
             return false;
         }
-        $("#external_user_details_card pre").text(JSON.stringify(external_user_details, undefined, 4));
+        $("#external_user_details_card pre").html(formatJsonCode(external_user_details));
+        Prism.highlightAll();
         $("#external_user_details_card").show();
         return external_user_details;
     }
@@ -613,7 +629,7 @@
         let userDetailsPre = $('<pre style="white-space: pre-wrap;"></pre>');
         let teams_access_token_id = $("#ms_teams_form #access_token_id").val();
         let userDetails = getTeamsUserDetails(teams_access_token_id, user_mri, false)
-        userDetailsPre.text(JSON.stringify(userDetails, undefined, 4));
+        userDetailsPre.html(formatJsonCode(userDetails));
         formatWrapper.append($("<dd></dd>").append(userDetailsPre));
         return formatWrapper;
     }

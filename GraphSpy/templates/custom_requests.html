@@ -76,7 +76,10 @@
             <label for="body">Body</label>
         </div>
         <div>
-            <button type="Button" class="btn btn-primary" onclick="sendGenerateRequest()">Request</button>
+            <button id="request_button" type="Button" class="btn btn-primary" onclick="sendGenerateRequest()">
+                <span class="spinner-border spinner-border-sm" aria-hidden="true" style="display: none"></span>
+                <span id="button_text">Request</span>
+            </button>
         </div>
     </form>
     <script>
@@ -94,7 +97,7 @@
                         <button type="button" id="response_card_headers_button" class="btn btn-outline-primary" onclick="toggleResponseCardContent()">Headers</button>
                     </div>
                     <b>Response [<span id="response_status_code"></span>]</b>
-                    <i class="fi fi-rr-copy-alt" id="copy-icon" style="cursor: pointer"></i>
+                    <div></div>
                 </div>
             </div>
             <div class="card-body">
@@ -142,46 +145,55 @@
         return variables;
     }
 
-    function sendGenerateRequest() {
-        let request_form = document.getElementById("custom_request_form");
-        let response;
-        response = $.ajax({
-            type: "POST",
-            async: false,
-            url: "/api/custom_api_request",
-            dataType: "json",
-            contentType: "application/json; charset=utf-8",
-            data: JSON.stringify({
-                "uri": request_form.request_uri.value,
-                "access_token_id": request_form.access_token_id.value,
-                "method": request_form.method.value,
-                "request_type": request_form.request_type.value,
-                "body": request_form.body.value,
-                "headers": getInputHeaders(),
-                "variables": getInputVariables()
-            }),
-            success: null
-        });
-        if (response.status >= 400) {
-            bootstrapAlert(response.responseText, "danger");
-            return;
-        }
-        let responseJSON = JSON.parse(response.responseText);
+    async function sendGenerateRequest() {
+        setButtonLoadingState($("#request_button"));
+        // Send request
         try {
-            if (responseJSON.response_type == "json") {
-                $("#response_body").text(JSON.stringify(JSON.parse(responseJSON.response_text), undefined, 4));
-            } else if (responseJSON.response_type == "xml") {
-                $("#response_body").text(prettifyXml(responseJSON.response_text));
-            } else {
+            let request_form = document.getElementById("custom_request_form");
+            let response = await $.ajax({
+                type: "POST",
+                async: true,
+                url: "/api/custom_api_request",
+                dataType: "json",
+                contentType: "application/json; charset=utf-8",
+                data: JSON.stringify({
+                    "uri": request_form.request_uri.value,
+                    "access_token_id": request_form.access_token_id.value,
+                    "method": request_form.method.value,
+                    "request_type": request_form.request_type.value,
+                    "body": request_form.body.value,
+                    "headers": getInputHeaders(),
+                    "variables": getInputVariables()
+                }),
+                success: null,
+                error: function (jqXHR, textStatus, errorThrown) {
+                    if (jqXHR.status >= 400) {
+                        bootstrapAlert(jqXHR.responseText, "danger");
+                        return;
+                    }
+                }
+            });
+            //let responseJSON = JSON.parse(response.responseText);
+            let responseJSON = response;
+            try {
+                if (responseJSON.response_type == "json") {
+                    $("#response_body").html(formatJsonCode(JSON.parse(responseJSON.response_text)));
+                    Prism.highlightAll();
+                } else if (responseJSON.response_type == "xml") {
+                    $("#response_body").text(prettifyXml(responseJSON.response_text));
+                } else {
+                    $("#response_body").text(responseJSON.response_text);
+                }
+            } catch (e) {
                 $("#response_body").text(responseJSON.response_text);
             }
-        } catch (e) {
-            $("#response_body").text(responseJSON.response_text);
-        }
-        $("#response_status_code").text(responseJSON.response_status_code);
-        $("#response-card").show();
+            $("#response_status_code").text(responseJSON.response_status_code);
+            $("#response-card").show();
 
-        generateRespHeadersTable(responseJSON.response_headers);
+            generateRespHeadersTable(responseJSON.response_headers);
+        } finally {
+            resetButtonState($("#request_button"), "Request")
+        }
     }
 
     function generateRespHeadersTable(respHeaders) {

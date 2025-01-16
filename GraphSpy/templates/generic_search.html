@@ -22,7 +22,7 @@
         </div>
         <div class="col-sm-4">
             <label for="search_limit" class="form-label">Limit *</label>
-            <input type="text" id="search_limit" name="search_limit" class="form-control" value="25" required>
+            <input type="text" id="search_limit" name="search_limit" class="form-control" value="500" required>
             <i class="form-text">Max 500</i>
         </div>
         <div class="col-sm-4">
@@ -76,9 +76,10 @@
                     dataSrc: function (json) {
                         if (json.hasOwnProperty("error")){
                             bootstrapAlert(`[${json.error.code}] ${json.error.message}`, "danger");
+                            myTable.clear().draw();
                             return [];
                         }
-                        return json.value[0].hitsContainers[0].hits
+                        return "hits" in json.value[0].hitsContainers[0] ? json.value[0].hitsContainers[0].hits : [];
                     },
                     data: function (d) {
                         d.graph_uri = "https://graph.microsoft.com/v1.0/search/query",
@@ -117,11 +118,17 @@
                     {
                         data: 'summary',
                         render: function (d, t, r) {
-                            return d.replaceAll("<c0>", "<b>").replaceAll("</c0>", "</b>")
+                            if (document.getElementById("search_form").search_query.value == "*") {
+                                return d;
+                             }
+                            else {
+                                return d.replaceAll("<c0>", '<b class="text-danger-emphasis">').replaceAll("</c0>", "</b>");
+                            }
                         }
                     },
                     { data: 'resource.webUrl' }
-                ]
+                ],
+                processing: true
             })
 
             myTable.on('click', 'td.dt-control', function (e) {
@@ -134,7 +141,8 @@
                 }
                 else {
                     // Open this row
-                    row.child(format(row.data())).show();
+                    row.child(formatJsonCode(JSON.parse(DOMPurify.sanitize(JSON.stringify(row.data()))))).show();
+                    Prism.highlightAll();
                 }
             });
 

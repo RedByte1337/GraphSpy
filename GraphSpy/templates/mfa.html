@@ -138,7 +138,8 @@
             }
             else {
                 // Open this row
-                row.child(format(row.data())).show();
+                row.child(formatJsonCode(row.data())).show();
+                Prism.highlightAll();
             }
 
         });
@@ -193,7 +194,7 @@
             let number = $("#delete_mfa_form #delete_mfa_options").children().length + 1;
             let methodRadio = $('<div class="form-check"></div>');
             methodRadio.append($(`<input class="form-check-input" type="radio" name="delete_radio_options" id="delete_method_${number}">`));
-            methodRadio.append($(`<label class="form-check-label" for="delete_method_${number}"></label>`).append($('<pre style="white-space: pre-wrap;"></pre>').text(JSON.stringify(method, undefined, 4))));
+            methodRadio.append($(`<label class="form-check-label" for="delete_method_${number}"></label>`).append(formatJsonCode(method)));
             $("#delete_mfa_form #delete_mfa_options").append(methodRadio);
         }
 
@@ -214,24 +215,11 @@
             } else {
                 addDeleteMfaOption(registeredMethods);
             }
+            Prism.highlightAll();
             $("#delete_mfa_form #security_info_type").val(row.data().Type);
             $('#delete_mfa_method_modal').modal('show');
         });
         return;
-    }
-
-    function format(d) {
-        // `d` is the original data object for the row
-
-        let formatWrapper = $(
-            '<dl>' +
-            '<dt>Raw Info:</dt>' +
-            '</dl>'
-        );
-        let detailsPre = $('<pre style="white-space: pre-wrap;"></pre>');
-        detailsPre.text(JSON.stringify(d, undefined, 4));
-        formatWrapper.append($("<dd></dd>").append(detailsPre));
-        return formatWrapper;
     }
 </script>
 <br>
@@ -807,7 +795,7 @@
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h1 class="modal-title fs-5" id="delete_mfa_method_modal_label">Add MFA Method</h1>
+                <h1 class="modal-title fs-5" id="delete_mfa_method_modal_label">Delete MFA Method</h1>
                 <div style="float: right">
                     <i class="fi fi-br-expand px-3" id="expand-icon" style="cursor: pointer; float: left; opacity: 0.5"></i>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -846,5 +834,9 @@
         let method_to_delete = JSON.parse(($("#delete_mfa_form input[name='delete_radio_options']:checked").siblings("label").find("pre").text()), undefined, 4);
         deleteSecurityInfo(access_token_id, security_info_type, method_to_delete);
     }
+    $(".modal").on('click', 'i#expand-icon', function (e) {
+        $(e.target).closest(".modal-dialog").toggleClass('modal-xl').toggleClass('modal-fullscreen');
+        $(e.target).toggleClass('fi-br-expand').toggleClass('fi-br-compress');
+    })
 </script>
 {%endblock content%}

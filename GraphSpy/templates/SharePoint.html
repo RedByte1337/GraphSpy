@@ -148,7 +148,8 @@
                         width: '120px'
                     },
                     { data: 'webUrl' }
-                ]
+                ],
+                processing: true
             })
 
 
@@ -162,7 +163,8 @@
                 }
                 else {
                     // Open this row
-                    row.child(format(row.data())).show();
+                    row.child(formatJsonCode(row.data())).show();
+                    Prism.highlightAll();
                 }
 
             });
@@ -201,18 +203,6 @@
         }
 
         return false;
-    }
-
-    function format(d) {
-        // `d` is the original data object for the row
-        return (
-            '<dl>' +
-            '<dt>Raw File Info:</dt>' +
-            '<dd><pre style="white-space: pre-wrap;">' +
-            JSON.stringify(d, undefined, 4) +
-            '</pre></dd>' +
-            '</dl>'
-        );
     }
 
     function openFolder(folder_name) {

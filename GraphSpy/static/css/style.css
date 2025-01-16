@@ -3,7 +3,7 @@ table.dataTable tbody tr td {
     vertical-align: middle;
 }
 /* Center action icons used in datatables */
-td:has(i.fi), td.dt-control {
+td:has(> i.fi), td.dt-control {
     text-align: center;
 }
 /* Change the color of the icons on hover */

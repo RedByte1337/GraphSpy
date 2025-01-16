@@ -208,6 +208,7 @@
         else {
             // Open this row
             row.child(format(row.data())).show();
+            Prism.highlightAll();
         }
     });
 
@@ -247,7 +248,7 @@
         var formatCode = $('<code></code>').text(d.accesstoken);
         formatWrapper.append($('<dd></dd>').append(formatCode));
         formatWrapper.append($('<dt>Decoded Token:</dt>'));
-        var formatPre = $('<pre></pre>').text(JSON.stringify(JSON.parse(response.responseText), undefined, 4));
+        var formatPre = formatJsonCode(JSON.parse(response.responseText));
         formatWrapper.append($('<dd></dd>').append(formatPre));
         return formatWrapper;
     }

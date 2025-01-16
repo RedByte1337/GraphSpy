@@ -42,6 +42,12 @@
     generateTable();
     // Populate the response_table table
     function generateTable() {
+        if ($.fn.dataTable.isDataTable("#response_table")) {
+            // If the DataTable already exists, destroy it first and remove all event handlers
+            $('#response_table').off();
+            $('#response_table').DataTable().clear().destroy();
+            $('#response_table').empty();
+        }
         let myTable = new DataTable('#response_table', {
             "destroy": true,
             ajax: {
@@ -82,21 +88,31 @@
                     'width': '40px'
                 },
                 {
+                    title: 'Created',
                     data: 'createdDateTime',
                     width: '175px'
                 },
                 {
+                    title: 'Last Modified',
                     data: 'lastModifiedDateTime',
                     width: '175px'
                 },
-                { data: 'name' },
                 {
+                    title: 'File Name',
+                    data: 'name'
+                },
+                {
+                    title: 'File Size',
                     data: 'size',
                     width: '120px'
                 },
-                { data: 'webUrl' }
+                {
+                    title: 'URL',
+                    data: 'webUrl'
+                }
             ],
-            order: [[2, 'desc']]
+            order: [[2, 'desc']],
+            processing: true
         })
 
         myTable.on('click', 'td.dt-control', function (e) {
@@ -109,7 +125,8 @@
             }
             else {
                 // Open this row
-                row.child(format(row.data())).show();
+                row.child(formatJsonCode(row.data())).show();
+                Prism.highlightAll();
             }
 
         });
@@ -123,18 +140,6 @@
             graphDownload(drive_id, item_id, access_token_id);
         });
         return false;
-    }
-
-    function format(d) {
-        // `d` is the original data object for the row
-        return (
-            '<dl>' +
-            '<dt>Raw File Info:</dt>' +
-            '<dd><pre style="white-space: pre-wrap;">' +
-            JSON.stringify(d, undefined, 4) +
-            '</pre></dd>' +
-            '</dl>'
-        );
     }
 </script>
 {%endblock content%}

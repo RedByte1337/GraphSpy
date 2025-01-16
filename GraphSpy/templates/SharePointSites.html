@@ -12,8 +12,8 @@
         </div>
         <div class="col-sm-4">
             <label for="search_limit" class="form-label">Limit *</label>
-            <input type="text" id="search_limit" name="search_limit" class="form-control" value="100" required>
-            <i class="form-text">Max 1000</i>
+            <input type="text" id="search_limit" name="search_limit" class="form-control" value="500" required>
+            <i class="form-text">Max 500</i>
         </div>
         <div class="col-sm-4">
             <label for="access_token_id" class="form-label">Access token id *</label>
@@ -106,7 +106,8 @@
                     { data: 'resource.name' },
                     { data: 'resource.displayName' },
                     { data: 'resource.webUrl' }
-                ]
+                ],
+                processing: true
             })
 
             myTable.on('click', 'td.dt-control', function (e) {
@@ -119,7 +120,8 @@
                 }
                 else {
                     // Open this row
-                    row.child(format(row.data())).show();
+                    row.child(formatJsonCode(JSON.parse(DOMPurify.sanitize(JSON.stringify(row.data()))))).show();
+                    Prism.highlightAll();
                 }
             });
 
@@ -136,18 +138,6 @@
             });
         }
         return false;
-    }
-
-    function format(d) {
-        // `d` is the original data object for the row
-        return (
-            '<dl>' +
-            '<dt>Raw File Info:</dt>' +
-            '<dd><pre style="white-space: pre-wrap;">' +
-            JSON.stringify(d, undefined, 4) +
-            '</pre></dd>' +
-            '</dl>'
-        );
     }
 </script>
 {%endblock content%}
