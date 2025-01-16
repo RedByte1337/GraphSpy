@@ -158,11 +158,11 @@ Custom request templates with variables can be stored in the database to allow e
 
 List all Entra ID users and their properties using the Microsoft Graph API.
 
-![Custom Request](images/entra_users_overview.png)
+![Entra Users Overview](images/entra_users_overview.png)
 
 View additional details for a user, such as its group memberships, role assignments, devices, app roles and API permissions.
 
-![Custom Request](images/entra_users_details_1.png)
+![Entra Users Details](images/entra_users_details_1.png)
 
 ## Multiple Databases
 
