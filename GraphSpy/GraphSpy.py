@@ -12,6 +12,8 @@ import json, base64, uuid
 import re
 import pyotp
 
+VERIFY=True
+
 with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),"version.txt")) as f:
     __version__ = f.read()
 
@@ -125,10 +127,28 @@ def set_user_agent(user_agent):
     else:
         return False
 
+def get_proxy():
+    proxy = query_db("SELECT value FROM settings where setting = 'proxy'",one=True)
+    if proxy:
+        return proxy[0]
+    else:
+        return ""
+
+def set_proxy(proxy):
+    ## check if proxy is valid
+    if proxy == "":
+        execute_db("INSERT OR REPLACE INTO settings (setting, value) VALUES ('proxy',?)",(proxy,))
+        return True
+    elif (proxy.startswith("http://") or proxy.startswith("https://") or proxy.startswith("socks4://") or proxy.startswith("socks5://")):
+        execute_db("INSERT OR REPLACE INTO settings (setting, value) VALUES ('proxy',?)",(proxy,))
+        return True
+    else:
+        return False
+
 def graph_request(graph_uri, access_token_id):
     access_token = query_db("SELECT accesstoken FROM accesstokens where id = ?",[access_token_id],one=True)[0]
     headers = {"Authorization":f"Bearer {access_token}", "User-Agent":get_user_agent()}
-    response = requests.get(graph_uri, headers=headers)
+    response = requests.get(graph_uri, proxies={"http":get_proxy(),"https":get_proxy()}, verify=VERIFY, headers=headers)
     save_request(time.time(), graph_uri, "GET", user=jwt.decode(access_token, options={"verify_signature": False})["unique_name"])
     resp_json = response.json()
     return json.dumps(resp_json)
@@ -136,7 +156,7 @@ def graph_request(graph_uri, access_token_id):
 def graph_request_post(graph_uri, access_token_id, body):
     access_token = query_db("SELECT accesstoken FROM accesstokens where id = ?",[access_token_id],one=True)[0]
     headers = {"Authorization":f"Bearer {access_token}", "User-Agent":get_user_agent()}
-    response = requests.post(graph_uri, headers=headers, json=body)
+    response = requests.post(graph_uri, proxies={"http":get_proxy(),"https":get_proxy()}, verify=VERIFY, headers=headers, json=body)
     save_request(time.time(), graph_uri, "POST", str(body), user=jwt.decode(access_token, options={"verify_signature": False})["unique_name"])
     resp_json = response.json()
     return json.dumps(resp_json)
@@ -149,7 +169,7 @@ def graph_upload_request(upload_uri, access_token_id, file):
     access_token = access_token_entry[0]
     headers = {"Authorization": f"Bearer {access_token}", "Content-Type": file.content_type, "User-Agent":get_user_agent()}
 
-    response = requests.put(upload_uri, headers=headers, data=file.read())
+    response = requests.put(upload_uri, proxies={"http":get_proxy(),"https":get_proxy()}, verify=VERIFY, headers=headers, data=file.read())
     save_request(time.time(), upload_uri, "PUT", str(file.read()))
 
     if response.status_code in [200, 201]:
@@ -164,7 +184,7 @@ def generic_request(uri, access_token_id, method, request_type, body, headers={}
 
     # Empty body
     if not body:
-        response = requests.request(method, uri, headers=headers)
+        response = requests.request(method, uri, proxies={"http":get_proxy(),"https":get_proxy()}, verify=VERIFY, headers=headers)
         save_request(time.time(), uri, "GET")
     # Text, XML or urlencoded request
     elif request_type in ["text", "urlencoded", "xml"]:
@@ -172,12 +192,12 @@ def generic_request(uri, access_token_id, method, request_type, body, headers={}
             headers["Content-Type"] = "application/x-www-form-urlencoded"
         if request_type == "xml" and not "Content-Type" in headers:
             headers["Content-Type"] = "application/xml"
-        response = requests.request(method, uri, headers=headers, data=body)
+        response = requests.request(method, uri, proxies={"http":get_proxy(),"https":get_proxy()}, verify=VERIFY, headers=headers, data=body)
         save_request(time.time(), uri, method.upper(), str(body))
     # Json request
     elif request_type == "json":
         try:
-            response = requests.request(method, uri, headers=headers, json=json.loads(body))
+            response = requests.request(method, uri, proxies={"http":get_proxy(),"https":get_proxy()}, verify=VERIFY, headers=headers, json=json.loads(body))
             save_request(time.time(), uri, method.upper(), str(json.loads(body)))
         except ValueError as e:
             return f"[Error] The body message does not contain valid JSON, but a body type of JSON was specified.", 400
@@ -244,7 +264,7 @@ def is_valid_uuid(val):
 
 def get_tenant_id(tenant_domain):
     headers = {"User-Agent":get_user_agent()}
-    response = requests.get(f"https://login.microsoftonline.com/{tenant_domain}/.well-known/openid-configuration", headers=headers)
+    response = requests.get(f"https://login.microsoftonline.com/{tenant_domain}/.well-known/openid-configuration", proxies={"http":get_proxy(),"https":get_proxy()}, verify=VERIFY, headers=headers)
     save_request(time.time(), f"https://login.microsoftonline.com/{tenant_domain}/.well-known/openid-configuration", "GET")
     resp_json = response.json()
     tenant_id = resp_json["authorization_endpoint"].split("/")[3]
@@ -268,7 +288,7 @@ def refresh_to_access_token(refresh_token_id, client_id = "d3590ed6-52b3-4102-ae
         url += "/oauth2/v2.0/token"
 
     headers = {"User-Agent":get_user_agent()}
-    response = requests.post(url, data=body, headers=headers)
+    response = requests.post(url, data=body, proxies={"http":get_proxy(),"https":get_proxy()}, verify=VERIFY, headers=headers)
     save_request(time.time(), url, "POST", str(body))
     if "error" in response.json():
         error_msg = f"[{response.json()['error']}] {response.json()['error_description']}"
@@ -306,7 +326,7 @@ def generate_device_code(resource = "https://graph.microsoft.com", client_id = "
         body["amr_values"]= "ngcmfa"
     url = "https://login.microsoftonline.com/common/oauth2/devicecode?api-version=1.0"
     headers = {"User-Agent":get_user_agent()}
-    response = requests.post(url, data=body, headers=headers)
+    response = requests.post(url, data=body, proxies={"http":get_proxy(),"https":get_proxy()}, verify=VERIFY, headers=headers)
     save_request(time.time(), url, "POST", str(body))
 
     execute_db("INSERT INTO devicecodes (generated_at, expires_at, user_code, device_code, interval, client_id, status, last_poll) VALUES (?,?,?,?,?,?,?,?)",(
@@ -347,7 +367,7 @@ def poll_device_codes():
                 }
                 url = "https://login.microsoftonline.com/Common/oauth2/token?api-version=1.0"
                 headers = {"User-Agent":get_user_agent()}
-                response = requests.post(url, data=body, headers=headers)
+                response = requests.post(url, data=body, proxies={"http":get_proxy(),"https":get_proxy()}, verify=VERIFY, headers=headers)
                 save_request(time.time(), url, "POST", str(body))
                 execute_db("UPDATE devicecodes SET last_poll = ? WHERE device_code = ?",(int(datetime.now().timestamp()),row["device_code"]))
                 if response.status_code == 200 and "access_token" in response.json():
@@ -480,7 +500,7 @@ def get_session_ctx(access_token_id):
     try:
         headers = {"Authorization":f"Bearer {access_token}", "User-Agent":get_user_agent()}
         uri = "https://account.activedirectory.windowsazure.com/securityinfo/Authorize"
-        response = requests.post(uri, headers=headers, json={})
+        response = requests.post(uri, proxies={"http":get_proxy(),"https":get_proxy()}, verify=VERIFY, headers=headers, json={})
         save_request(time.time(), uri, "POST", str({}))
         if response.status_code != 200:
             gspy_log.error(f"Failed to obtain SessionCtx value. Received status code {response.status_code}")
@@ -504,7 +524,7 @@ def get_available_authentication_info(access_token_id):
         sessionCtx = get_session_ctx(access_token_id)
         headers = {"Authorization":f"Bearer {access_token}", "Sessionctx":sessionCtx, "User-Agent":get_user_agent()}
         uri = "https://account.activedirectory.windowsazure.com/securityinfo/AvailableAuthenticationInfo"
-        response = requests.get(uri, headers=headers)
+        response = requests.get(uri, proxies={"http":get_proxy(),"https":get_proxy()}, verify=VERIFY, headers=headers)
         save_request(time.time(), uri, "GET")
         if response.status_code != 200:
             gspy_log.error(f"Failed to obtain AvailableAuthenticationInfo. Received status code {response.status_code}")
@@ -535,7 +555,7 @@ def validate_captcha(access_token_id, challenge_id, captcha_solution, azure_regi
             "InputSolution": captcha_solution,
             "AzureRegion": azure_region
         }
-        response = requests.post(uri, headers=headers, json=body)
+        response = requests.post(uri, proxies={"http":get_proxy(),"https":get_proxy()}, verify=VERIFY, headers=headers, json=body)
         save_request(time.time(), uri, "POST", str(body))
         if response.status_code != 200:
             gspy_log.error(f"Failed to validate captcha. Received status code {response.status_code}")
@@ -562,7 +582,7 @@ def initialize_mobile_app_registration(access_token_id, security_info_type):
         body = {
             "securityInfoType": security_info_type
         }
-        response = requests.post(uri, headers=headers, json=body)
+        response = requests.post(uri, proxies={"http":get_proxy(),"https":get_proxy()}, verify=VERIFY, headers=headers, json=body)
         save_request(time.time(), uri, "POST", str(body))
         if response.status_code != 200:
             gspy_log.error(f"InitializeMobileAppRegistration request failed. Received status code {response.status_code}")
@@ -594,7 +614,7 @@ def delete_security_info(access_token_id, security_info_type, data):
             "Type": security_info_type,
             "Data": body_data
         }
-        response = requests.post(uri, headers=headers, json=body)
+        response = requests.post(uri, proxies={"http":get_proxy(),"https":get_proxy()}, verify=VERIFY, headers=headers, json=body)
         save_request(time.time(), uri, "POST", str(body))
         if response.status_code != 200:
             gspy_log.error(f"DeleteSecurityInfo request failed. Received status code {response.status_code}")
@@ -627,7 +647,7 @@ def add_security_info(access_token_id, security_info_type, data = None):
         body_data = json.dumps(data) if type(data) == dict else data
         if body_data:
             body["Data"] = body_data
-        response = requests.post(uri, headers=headers, json=body)
+        response = requests.post(uri, proxies={"http":get_proxy(),"https":get_proxy()}, verify=VERIFY, headers=headers, json=body)
         save_request(time.time(), uri, "POST", str(body))
         if response.status_code != 200:
             gspy_log.error(f"AddSecurityInfo request failed. Received status code {response.status_code}")
@@ -642,7 +662,7 @@ def add_security_info(access_token_id, security_info_type, data = None):
             # ErrorCode 28 indicates that a Captcha needs to be solved (happens after a couple of failed attempts in a short timeframe)
             gspy_log.debug(f"We need to solve a captcha...")
             captcha_uri = "https://account.activedirectory.windowsazure.com/securityinfo/Captcha?challengeType=Visual"
-            captcha_response = requests.get(captcha_uri, headers=headers)
+            captcha_response = requests.get(captcha_uri, proxies={"http":get_proxy(),"https":get_proxy()}, verify=VERIFY, headers=headers)
             save_request(time.time(), captcha_uri, "GET")
             gspy_log.debug(f"Captcha Raw Response:\n{captcha_response.text}")
             captcha_response_json = json.loads(captcha_response.text[6:])
@@ -676,7 +696,7 @@ def verify_security_info(access_token_id, security_info_type, verification_conte
             "VerificationData": verification_data,
             "VerificationContext": verification_context
         }
-        response = requests.post(uri, headers=headers, json=body)
+        response = requests.post(uri, proxies={"http":get_proxy(),"https":get_proxy()}, verify=VERIFY, headers=headers, json=body)
         save_request(time.time(), uri, "POST", str(body))
         if response.status_code != 200:
             gspy_log.error(f"VerifySecurityInfo request failed. Received status code {response.status_code}")
@@ -900,7 +920,7 @@ def getTeamsSettings(access_token_id):
     access_token = access_token[0]
     headers = {"Authorization":f"Bearer {access_token}", "User-Agent":get_user_agent()}
     uri = "https://teams.microsoft.com/api/authsvc/v1.0/authz"
-    response = requests.post(uri, headers=headers)
+    response = requests.post(uri, proxies={"http":get_proxy(),"https":get_proxy()}, verify=VERIFY, headers=headers)
     save_request(time.time(), uri, "POST", "")
     if response.status_code != 200:
         gspy_log.error(f"Failed obtaining teams settings. Received status code {response.status_code}")
@@ -1561,7 +1581,7 @@ def init_routes():
             "messagetype": "RichText/Html",
             "content": message_content
         }
-        response = requests.post(conversation_link, headers=headers, json=body)
+        response = requests.post(conversation_link, proxies={"http":get_proxy(),"https":get_proxy()}, verify=VERIFY, headers=headers, json=body)
         save_request(time.time(), conversation_link, "POST", str(body))
         if response.status_code >= 200 and response.status_code < 300:
             message_id = response.json()["OriginalArrivalTime"] if "OriginalArrivalTime" in response.json() else "Unknown"
@@ -1605,7 +1625,7 @@ def init_routes():
             return f"[Error] Unable to obtain teams settings with access token {access_token_id}.", 400
         cookies = {"skypetoken_asm":teams_settings['skypeToken']}
         headers = {"User-Agent":get_user_agent()}
-        response = requests.get(image_uri, cookies=cookies, headers=headers)
+        response = requests.get(image_uri, cookies=cookies, proxies={"http":get_proxy(),"https":get_proxy()}, verify=VERIFY, headers=headers)
         save_request(time.time(), image_uri, "GET")
         if response.status_code == 200:
             return Response(response.content, mimetype=response.headers['Content-Type'])
@@ -1706,7 +1726,7 @@ def init_routes():
                     "id": member,
                     "role": "Admin"
                 })
-                response = requests.post(uri, headers=headers, json=body)
+                response = requests.post(uri, proxies={"http":get_proxy(),"https":get_proxy()}, verify=VERIFY, headers=headers, json=body)
                 save_request(time.time(), uri, "POST", body)
                 if response.status_code >= 200 and response.status_code < 300 and "Location" in response.headers:
                     conversation_id_regex = re.search('https:\/\/emea\.ng\.msg\.teams\.microsoft\.com\/v1\/threads\/(.*)$', response.headers["Location"])
@@ -1726,7 +1746,7 @@ def init_routes():
                 "members": conversation_members,
                 "properties": conversation_properties
             }
-            response = requests.post(uri, headers=headers, json=body)
+            response = requests.post(uri, proxies={"http":get_proxy(),"https":get_proxy()}, verify=VERIFY, headers=headers, json=body)
             save_request(time.time(), uri, "POST", body)
             if response.status_code >= 200 and response.status_code < 300 and "Location" in response.headers:
                 conversation_id_regex = re.search('https:\/\/emea\.ng\.msg\.teams\.microsoft\.com\/v1\/threads\/(.*)$', response.headers["Location"])
@@ -1749,7 +1769,7 @@ def init_routes():
             }
             for conversation_id in created_conversations:
                 conversation_link = f"{chat_service_uri}/v1/users/ME/conversations/{conversation_id}/messages"
-                response = requests.post(conversation_link, headers=headers, json=body)
+                response = requests.post(conversation_link, proxies={"http":get_proxy(),"https":get_proxy()}, verify=VERIFY, headers=headers, json=body)
                 save_request(time.time(), conversation_link, "POST", body)
                 if response.status_code >= 200 and response.status_code < 300:
                     message_id = response.json()["OriginalArrivalTime"] if "OriginalArrivalTime" in response.json() else "Unknown"
@@ -1846,7 +1866,18 @@ def init_routes():
             return "[Error] User agent not specified!", 400 
         if not set_user_agent(user_agent):
             return f"[Error] Unable to set user agent to '{user_agent}'!", 400 
-        return f"[Success] User agent set to '{user_agent}'!" 
+        return f"[Success] User agent set to '{user_agent}'!"
+    
+    @app.get("/api/get_proxy")
+    def api_get_proxy():
+        return get_proxy()
+
+    @app.post("/api/set_proxy")
+    def api_set_proxy():
+        proxy = request.form['proxy'] if "proxy" in request.form else ""
+        if not set_proxy(proxy):
+            return f"[Error] Unable to set proxy to '{proxy}'!", 400 
+        return f"[Success] Proxy set to '{proxy}'!" 
 
     # ========== Other ==========
 
@@ -1873,7 +1904,14 @@ def main():
     parser.add_argument("-p", "--port", type=int, help="The port to bind to. (Default = 5000)")
     parser.add_argument("-d","--database", type=str, default="database.db", help="Database file to utilize. (Default = database.db)")
     parser.add_argument("--debug", action="store_true", help="Enable flask debug mode. Will show detailed stack traces when an error occurs.")
+    parser.add_argument("--certignore", action="store_true", help="Disable certificate verification. May be usefull for proxies.")    
     args = parser.parse_args()
+
+    # Configure certificate verification
+    if args.certignore :
+        global VERIFY
+        VERIFY=False
+        from urllib3.exceptions import InsecureRequestWarning
 
     # Configure logging
     global gspy_log

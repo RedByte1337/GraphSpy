@@ -494,6 +494,30 @@ function setUserAgent(userAgent) {
     bootstrapToast("Set User Agent", response.responseText)
 }
 
+// ========== Proxy ==========
+
+function getProxy() {
+    let response = $.ajax({
+        type: "GET",
+        async: false,
+        url: "/api/get_proxy"
+    });
+    if (response.status == 200) {
+        return response.responseText
+    }
+    return "Unable to obtain proxy."
+}
+
+function setProxy(proxy) {
+    let response = $.ajax({
+        type: "POST",
+        async: false,
+        url: "/api/set_proxy",
+        data: { "proxy": proxy }
+    });
+    bootstrapToast("Set Proxy", response.responseText)
+}
+
 // ========== Cookies ==========
 
 function getCookie(name) {
