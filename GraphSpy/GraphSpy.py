@@ -367,7 +367,8 @@ def poll_device_codes():
                         user, 
                         decoded_accesstoken["tid"] if "tid" in decoded_accesstoken else "unknown", 
                         response.json()["resource"]if "resource" in response.json() else "unknown", 
-                        int(response.json()["foci"])) if "foci" in response.json() else 0
+                        int(response.json()["foci"]) if "foci" in response.json() else 0
+                    )
                     execute_db("UPDATE devicecodes SET status = ? WHERE device_code = ?",("SUCCESS",row["device_code"]))
 
 def start_device_code_thread():
