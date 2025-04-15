@@ -99,10 +99,10 @@ def update_db():
 
 # ========== Helper Functions ==========
 
-def create_response(status_code, message, data = None):
-    response_body = {
-        "message": message
-    }
+def create_response(status_code, message = None, data = None):
+    response_body = {}
+    if message != None:
+        response_body["message"] = message
     if data != None:
         response_body["data"] = data
     return response_body, status_code
@@ -746,7 +746,7 @@ def add_graphspy_otp(access_token_id, description = ""):
         otp_code = pyotp.TOTP(secret_key).now()
         verify_security_info_response = verify_security_info(access_token_id, 3, security_info_response["VerificationContext"], otp_code)
         if ("ErrorCode" in verify_security_info_response and verify_security_info_response["ErrorCode"]):
-            gspy_log.error(f"An error occurred when trying to validate the provided info. Received Error Code {response.ErrorCode}")
+            gspy_log.error(f"An error occurred when trying to validate the provided info. Received Error Code {verify_security_info_response.ErrorCode}")
             return False
         execute_db("INSERT INTO mfa_otp (stored_at, secret_key, account_name, description) VALUES (?,?,?,?)",(
             f"{datetime.now()}".split(".")[0],
