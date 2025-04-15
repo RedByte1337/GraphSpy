@@ -81,11 +81,11 @@
                     orderable: false,
                     data: null,
                     render: function (d, t, r) {
-                        if (!r.CanAdd) {
-                            // Only allow to add if CanAdd is true
+                        if (!r.canAdd) {
+                            // Only allow to add if canAdd is true
                             return '<i class="fi fi-rr-add text-secondary"></i>'
                         }
-                        if (["MobilePhone", "AltMobilePhone", "OfficePhone", "Email"].includes(r.MethodName) && r.Data) {
+                        if (["mobilePhone", "altMobilePhone", "officePhone", "email"].includes(r.MethodName) && r.Data) {
                             // You can only have one value for these methods. So adding a new one will replace the existing one.
                             return '<i class="fi fi-rr-replace" style="cursor: pointer"></i>'
                         }
@@ -99,8 +99,8 @@
                     orderable: false,
                     data: null,
                     render: function (d, t, r) {
-                        if (r.CanDelete && r.Data) {
-                            // Only allow delete if CanDelete is true and the method is configured
+                        if (r.canDelete && r.data) {
+                            // Only allow delete if canDelete is true and the method is configured
                             return '<i class="fi fi-rr-trash" style="cursor: pointer"></i>'
                         }
                         return '<i class="fi fi-rr-trash text-secondary"></i>'
@@ -111,18 +111,18 @@
                     data: 'MethodName'
                 },
                 {
-                    data: 'IsRegistered'
+                    data: 'isRegistered'
                 },
                 {
                     data: null,
                     render: function (d, t, r) {
-                        registeredMethods = r.Data;
+                        registeredMethods = r.data;
                         registeredMethodsCount = registeredMethods ? (registeredMethods instanceof Array ? registeredMethods.length : 1) : 0;
                         return registeredMethodsCount;
                     }
                 },
                 {
-                    data: 'CanAdd'
+                    data: 'canAdd'
                 }
             ],
             order: [[3, 'desc']]
@@ -152,36 +152,36 @@
             $("#add_mfa_form .default-disabled").hide();
             $("#add_mfa_form input[type=text]").val("");
             $("#add_mfa_form input[type=radio]").prop('checked', false);
-            if (["MobilePhone", "AltMobilePhone", "OfficePhone"].includes(method)) {
-                if (row.data().Data) {
+            if (["mobilePhone", "altMobilePhone", "officePhone"].includes(method)) {
+                if (row.data().data) {
                     $("#add_mfa_form #add_phone_container #replace_phone_warning").show();
                 } else {
                     $("#add_mfa_form #add_phone_container #replace_phone_warning").hide();
                 }
                 $("#add_mfa_form #add_phone_container #phone_verify_option_call").prop("checked", true)
-                if (method == "MobilePhone") {
+                if (method == "mobilePhone") {
                     $("#add_mfa_form #add_phone_container #phone_verify_option_sms").removeAttr("disabled")
                 } else {
                     $("#add_mfa_form #add_phone_container #phone_verify_option_sms").attr("disabled", "")
                 }
                 $("#add_mfa_form #add_phone_container #phone_type").val(method);
                 $("#add_mfa_form #add_phone_container").show();
-            } else if (method == "AuthenticatorApp") {
-                registeredMethods = row.data().Data;
+            } else if (method == "authenticatorApp") {
+                registeredMethods = row.data().data;
                 registeredMethodsCount = registeredMethods ? (registeredMethods instanceof Array ? registeredMethods.length : 1) : 0;
                 if (registeredMethodsCount >= 5) {
                     bootstrapToast("Add MFA Method", "Microsoft only allows 5 authenticator apps of any type to be enrolled on a single account. If you want to add an additional one, you'll first have to remove some!", "danger");
                     return false;
                 }
                 $("#add_mfa_form #add_authenticator_app_container").show();
-            } else if (method == "Email") {
-                if (row.data().Data) {
+            } else if (method == "email") {
+                if (row.data().data) {
                     $("#add_mfa_form #add_email_container #replace_email_warning").show();
                 } else {
                     $("#add_mfa_form #add_email_container #replace_email_warning").hide();
                 }
                 $("#add_mfa_form #add_email_container").show();
-            } else if (method == "Fido") {
+            } else if (method == "fido") {
                 $("#add_mfa_form #add_security_key_container").show();
             } else {
                 bootstrapToast("Add MFA Method", `Adding method '${method}' is not implemented in GraphSpy yet. Feel free to create a PR!`, "warning");
@@ -201,11 +201,11 @@
         authMethodsTable.on('click', 'td.delete-control', function (e) {
             let tr = e.target.closest('tr');
             let row = authMethodsTable.row(tr);
-            if (!row.data().CanDelete || !row.data().Data) {
+            if (!row.data().canDelete || !row.data().data) {
                 // Only allow delete if CanDelete is true and the method is configured
                 return;
             }
-            let registeredMethods = row.data().Data;
+            let registeredMethods = row.data().data;
             $("#delete_mfa_form #delete_mfa_options").empty();
             if (registeredMethods instanceof Array) {
                 ;
@@ -216,7 +216,7 @@
                 addDeleteMfaOption(registeredMethods);
             }
             Prism.highlightAll();
-            $("#delete_mfa_form #security_info_type").val(row.data().Type);
+            $("#delete_mfa_form #security_info_type").val(row.data().type);
             $('#delete_mfa_method_modal').modal('show');
         });
         return;
@@ -430,7 +430,7 @@
                         <div class="w-100 m-0"></div>
                         <div id="qr_code_container" class="col-auto default-disabled" style="display: none;">
                             <div>Scan the following code with your authenticator app:</div>
-                            <img id="qr_code_image">
+                            <img id="qr_code_image" class="w-25">
                             <div class="pt-3">
                                 <input type="text" id="registration_type" class="form-control" hidden>
                                 <input type="text" id="secret_key" class="form-control" hidden>
@@ -490,9 +490,9 @@
         let country_code = $("#add_mfa_form #country_code").val();
         let phone_number = $("#add_mfa_form #phone_number").val();
         let phone_type = $("#add_mfa_form #phone_type").val();
-        if (phone_type == "MobilePhone") {
+        if (phone_type == "mobilePhone") {
             let selectedVerifyMethod = $("#add_mfa_form input[name='phone_verify_options']:checked").val();
-            phone_type = `MobilePhone_${selectedVerifyMethod}`;
+            phone_type = `mobilePhone_${selectedVerifyMethod}`;
         }
         let response = $.ajax({
             type: "POST",
@@ -522,12 +522,12 @@
             $("#add_mfa_form #captcha_container").show();
             return false;
         }
-        if (phone_type == "OfficePhone" || phone_type == "AltMobilePhone" || phone_type == "MobilePhone_call") {
+        if (phone_type == "officePhone" || phone_type == "altMobilePhone" || phone_type == "mobilePhone_call") {
             bootstrapToast("Add Phone Number", "Approve the call using the '#' symbol.", "primary");
             $("#add_mfa_form #verification_container #verification_description").text("Approve the call to your provided phone number using the '#' symbol. Then, click the Validate button below.");
-            if (phone_type == "OfficePhone") {
+            if (phone_type == "officePhone") {
                 $("#add_mfa_form #verification_container #security_info_type").val(7);
-            } else if (phone_type == "AltMobilePhone") {
+            } else if (phone_type == "altMobilePhone") {
                 $("#add_mfa_form #verification_container #security_info_type").val(11);
             } else {
                 $("#add_mfa_form #verification_container #security_info_type").val(5);
