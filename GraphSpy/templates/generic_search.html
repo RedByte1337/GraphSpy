@@ -72,7 +72,7 @@
             let myTable = new DataTable('#response_table', {
                 ajax: {
                     type: "POST",
-                    url: '/api/generic_graph_post',
+                    url: '/api/generic_graph',
                     dataSrc: function (json) {
                         if (json.hasOwnProperty("error")){
                             bootstrapAlert(`[${json.error.code}] ${json.error.message}`, "danger");
@@ -84,6 +84,7 @@
                     data: function (d) {
                         d.graph_uri = "https://graph.microsoft.com/v1.0/search/query",
                             d.access_token_id = document.getElementById("search_form").access_token_id.value,
+                            d.method = "POST",
                             d.body = '{"requests": [{"entityTypes": ["' + document.getElementById("search_form").search_type.value + '"], "query": {"queryString": "' + document.getElementById("search_form").search_query.value + '"}, "from": 0, "size": ' + document.getElementById("search_form").search_limit.value + '}]}'
                     }
                 },

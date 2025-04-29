@@ -1038,7 +1038,7 @@ function bootstrapToast(title, message, type = null, alternative = false) {
 
 function createModal(modalID, modalTitle, modalBody, modalSize = "modal-xl") {
     // If a modal with the same ID already exists, delete it first
-    $('div#modal_container').children(`div.modal#${modalID}`).remove();
+    $(`div.modal#${modalID}`).remove();
     let modalWrapper = $(`
     <div class="modal fade" id="" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-scrollable">

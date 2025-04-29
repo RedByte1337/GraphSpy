@@ -59,7 +59,7 @@
             let myTable = new DataTable('#response_table', {
                 ajax: {
                     type: "POST",
-                    url: '/api/generic_graph_post',
+                    url: '/api/generic_graph',
                     dataSrc: function (json) {
                         if (json.hasOwnProperty("error")) {
                             bootstrapAlert(`[${json.error.code}] ${json.error.message}`, "danger");
@@ -69,6 +69,7 @@
                     },
                     data: function (d) {
                         d.graph_uri = "https://graph.microsoft.com/v1.0/search/query";
+                        d.method = "POST";
                         d.access_token_id = document.getElementById("sharepoint_form").access_token_id.value;
                         d.body = '{"requests": [{"entityTypes": ["site"], "query": {"queryString": "' + document.getElementById("sharepoint_form").search_query.value + '"}, "from": 0, "size": ' + document.getElementById("sharepoint_form").search_limit.value + '}]}';
                     }

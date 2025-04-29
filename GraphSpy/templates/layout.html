@@ -46,7 +46,7 @@
 </head>
 <body>
     <!-- Navbar -->
-    <nav class="navbar sticky-top navbar-expand-lg bg-body-tertiary">
+    <nav class="navbar sticky-top navbar-expand-xl bg-body-tertiary">
         <div class="container-fluid">
             <a class="navbar-brand" href="/">GraphSpy</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavDropdown" aria-controls="navbarNavDropdown" aria-expanded="false" aria-label="Toggle navigation">
@@ -104,8 +104,14 @@
                             <li><a class="dropdown-item" href="{{url_for('sharepoint')}}">SharePoint Files</a></li>
                         </ul>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{url_for('outlook')}}">Outlook</a>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Outlook
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{url_for('outlook')}}">Outlook Web</a></li>
+                            <li><a class="dropdown-item" href="{{url_for('outlook_graph')}}">Outlook Graph</a></li>
+                        </ul>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{{url_for('teams')}}">Teams</a>
@@ -125,8 +131,13 @@
                     </li>
                 </ul>
             </div>
-            <div>
-                <ul class="navbar-nav justify-content-end">
+            <div class="d-flex align-items-center order-lg-last">
+                <ul class="navbar-nav flex-row">
+                    <li class="nav-item">
+                        <a class="nav-link p-1 px-3" href="https://github.com/sponsors/RedByte1337" target="_blank" id="support-graphspy-icon" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Support GraphSpy" onmouseover="this.style.color='#ff6b81'" onmouseout="this.style.color=''">
+                            <i class="fi fi-rr-heart" style="vertical-align: -0.30em; font-size: 1.25em;" ></i>
+                        </a>
+                    </li>
                     <li class="nav-item">
                         <a class="nav-link" data-bs-toggle="offcanvas" href="#offcanvas-side-menu" role="button">Token Options</a>
                     </li>
@@ -136,6 +147,7 @@
     </nav>
     <script>
         const azurePopover = new bootstrap.Popover(document.getElementById('nav-azure-disabled'))
+        const supportGraphSpyTooltip = new bootstrap.Tooltip(document.getElementById('support-graphspy-icon'))
     </script>
     <!-- Placeholders -->
     <div id="alert_placeholder"></div>

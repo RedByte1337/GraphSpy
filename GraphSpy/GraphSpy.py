@@ -99,10 +99,10 @@ def update_db():
 
 # ========== Helper Functions ==========
 
-def create_response(status_code, message, data = None):
-    response_body = {
-        "message": message
-    }
+def create_response(status_code, message = None, data = None):
+    response_body = {}
+    if message != None:
+        response_body["message"] = message
     if data != None:
         response_body["data"] = data
     return response_body, status_code
@@ -121,19 +121,24 @@ def set_user_agent(user_agent):
     else:
         return False
 
-def graph_request(graph_uri, access_token_id):
+def graph_request(graph_uri, access_token_id, method = "GET", body = {}):
     access_token = query_db("SELECT accesstoken FROM accesstokens where id = ?",[access_token_id],one=True)[0]
     headers = {"Authorization":f"Bearer {access_token}", "User-Agent":get_user_agent()}
-    response = requests.get(graph_uri, headers=headers)
-    resp_json = response.json()
-    return json.dumps(resp_json)
-
-def graph_request_post(graph_uri, access_token_id, body):
-    access_token = query_db("SELECT accesstoken FROM accesstokens where id = ?",[access_token_id],one=True)[0]
-    headers = {"Authorization":f"Bearer {access_token}", "User-Agent":get_user_agent()}
-    response = requests.post(graph_uri, headers=headers, json=body)
-    resp_json = response.json()
-    return json.dumps(resp_json)
+    if method == "GET":
+        response = requests.get(graph_uri, headers=headers)
+    elif method == "POST":
+        response = requests.post(graph_uri, headers=headers, json=body)
+    elif method == "DELETE":
+        response = requests.delete(graph_uri, headers=headers, json=body)
+    elif method == "PATCH":
+        response = requests.patch(graph_uri, headers=headers, json=body)
+    elif method == "PUT":
+        response = requests.put(graph_uri, headers=headers, json=body)
+    try:
+        resp_json = response.json()
+        return json.dumps(resp_json)
+    except ValueError:
+        return response.text if response.text else ""
 
 def graph_upload_request(upload_uri, access_token_id, file):
     access_token_entry = query_db("SELECT accesstoken FROM accesstokens WHERE id = ?", [access_token_id], one=True)
@@ -145,7 +150,7 @@ def graph_upload_request(upload_uri, access_token_id, file):
 
     response = requests.put(upload_uri, headers=headers, data=file.read())
 
-    if response.status_code in [200, 201]:
+    if response.status_code in [200, 201, 202]:
         return json.dumps({"message": "File uploaded successfully."}), response.status_code
     else:
         return json.dumps({"error": "Failed to upload file.", "details": response.text}), response.status_code
@@ -752,7 +757,7 @@ def add_graphspy_otp(access_token_id, description = ""):
         otp_code = pyotp.TOTP(secret_key).now()
         verify_security_info_response = verify_security_info(access_token_id, 3, security_info_response["VerificationContext"], otp_code)
         if ("ErrorCode" in verify_security_info_response and verify_security_info_response["ErrorCode"]):
-            gspy_log.error(f"An error occurred when trying to validate the provided info. Received Error Code {response.ErrorCode}")
+            gspy_log.error(f"An error occurred when trying to validate the provided info. Received Error Code {verify_security_info_response.ErrorCode}")
             return False
         execute_db("INSERT INTO mfa_otp (stored_at, secret_key, account_name, description) VALUES (?,?,?,?)",(
             f"{datetime.now()}".split(".")[0],
@@ -991,6 +996,10 @@ def init_routes():
     def outlook():
         return render_template('outlook.html', title="Outlook")
 
+    @app.route("/outlook_graph")
+    def outlook_graph():
+        return render_template('outlook_graph.html', title="Outlook Graph")
+        
     @app.route("/teams")
     def teams():
         return render_template('teams.html', title="Microsoft Teams")
@@ -1362,15 +1371,9 @@ def init_routes():
     def api_generic_graph():
         graph_uri = request.form['graph_uri']
         access_token_id = request.form['access_token_id']
-        graph_response = graph_request(graph_uri, access_token_id)
-        return graph_response
-    
-    @app.post("/api/generic_graph_post")
-    def api_generic_graph_post():
-        graph_uri = request.form['graph_uri']
-        access_token_id = request.form['access_token_id']
-        body = json.loads(request.form['body'])
-        graph_response = graph_request_post(graph_uri, access_token_id, body)
+        method = request.form.get('method', 'GET')
+        body = json.loads(request.form.get('body', '{}'))
+        graph_response = graph_request(graph_uri, access_token_id, method, body)
         return graph_response
     
     @app.route('/api/generic_graph_upload', methods=['POST'])

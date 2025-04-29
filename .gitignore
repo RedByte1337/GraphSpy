@@ -1,3 +1,7 @@
 __pycache__/
 .vs/
 dist/
+.vscode/
+.cursor/
+location.txt
+*.code-workspace
