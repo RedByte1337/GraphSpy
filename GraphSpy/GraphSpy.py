@@ -809,8 +809,7 @@ def add_security_key(access_token_id, key_description = "GraphSpy Key", client_t
         },
         "attestation": "direct",
         "extensions": {
-            "hmacCreateSecret": True,
-            "credentialProtectionPolicy": "userVerificationOptional"
+            "hmacCreateSecret": True
         }
     }
     app.config["add_security_key_status"] = "CLIENT_SETUP"
@@ -856,7 +855,7 @@ def add_security_key(access_token_id, key_description = "GraphSpy Key", client_t
     client_data_json = json.loads(credential.client_data)
     client_data_json_base64 = base64.urlsafe_b64encode(json.dumps(client_data_json, separators=(',',':')).encode("utf-8")).decode()
     credential_id_base64 = base64.urlsafe_b64encode(credential.attestation_object.auth_data.credential_data.credential_id).decode()
-    extension_results_json_base64 = base64.urlsafe_b64encode(json.dumps(credential.extension_results).encode("utf-8")).decode()
+    extension_results_json_base64 = base64.urlsafe_b64encode(str(credential.extension_results).encode("utf-8")).decode()
     verification_data = {
         "Name": key_description,
         "Canary": security_info_data["requestData"]["canary"],
@@ -864,7 +863,9 @@ def add_security_key(access_token_id, key_description = "GraphSpy Key", client_t
         "ClientDataJson": client_data_json_base64,
         "CredentialId": credential_id_base64,
         "ClientExtensionResults": extension_results_json_base64,
-        "PostInfo": ""
+        "PostInfo": "",
+        "AAGuid": str(uuid.uuid4()),
+        "CredentialDeviceType": "singleDevice"
     }
     response = verify_security_info(access_token_id, 12, None, json.dumps(verification_data, separators=(',',':')))
     if response["ErrorCode"] != 0:
