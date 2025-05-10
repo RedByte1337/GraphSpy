@@ -1,6 +1,8 @@
 [![PyPi Version](https://img.shields.io/pypi/v/GraphSpy.svg)](https://pypi.org/project/GraphSpy/)
 ![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)
+[![GitHub Sponsors](https://img.shields.io/github/sponsors/RedByte1337?style=flat&logo=githubsponsors)](https://github.com/sponsors/RedByte1337)
 [![Twitter](https://img.shields.io/twitter/follow/RedByte1337?label=RedByte1337&style=social)](https://twitter.com/intent/follow?screen_name=RedByte1337)
+[![LinkedIn](https://img.shields.io/badge/in-Keanu_Nys-white?style=flat&logoColor=blue&labelColor=blue)](https://www.linkedin.com/in/keanunys/)
 
 # GraphSpy
 
@@ -25,6 +27,7 @@
 - [Features](#features)
 - [Release Notes](#release-notes)
 - [Upcoming Features](#upcoming-features)
+- [Sponsors](#sponsors)
 - [Credits](#credits)
 
 # Quick Start
@@ -124,11 +127,19 @@ Additionally, list the user's recently accessed files or files shared with the u
 
 ## Outlook
 
-Open the user's Outlook with a single click using just an Outlook access token (FOCI)!
+Open the user's Outlook web mail with a single click using just an Outlook access token (FOCI)!
 
 ![Outlook GraphSpy](images/outlook_1.png)
 
 ![Outlook](images/outlook_2.png)
+
+Or use the Outlook Graph module to list, read, search, delete, reply or send emails with just an access token for the MS Graph API!
+
+![Outlook Graph Overview](images/outlook_graph_overview.png)
+
+Craft completely HTML formated emails directly in GraphSpy and include images and attachments.
+
+![Outlook Graph Overview](images/outlook_graph_send_email.png)
 
 ## MS Teams
 
@@ -191,6 +202,14 @@ Refer to the [Release Notes](https://github.com/RedByte1337/GraphSpy/wiki/Releas
 	* List Users, Groups, Applications, Devices, Conditional Access Policies, ...
 * Cleaner exception handling
 	* While this should not have any direct impact on the user, edge cases might currently throw exceptions to the GraphSpy output instead of handling them in a cleaner way.
+
+# Sponsors
+
+Do you or your organization want to be featured as a key sponsor of this project here, or even mentioned within GraphSpy itself? Or do you just like GraphSpy and want to support my work? 
+
+Please check out my [Sponsor page](https://github.com/sponsors/RedByte1337).
+
+_If you do not have the means to sponsor, but you still want to show your gratitude, feel free to add a star instead._ ⭐
 
 # Credits
 
