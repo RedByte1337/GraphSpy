@@ -6,7 +6,7 @@ import jwt
 import sqlite3
 from datetime import datetime, timezone
 import time
-import os,sys,shutil,traceback,logging
+import os,sys,shutil,traceback,logging,inspect
 from threading import Thread
 import json, base64, uuid, urllib.parse
 import re
@@ -98,6 +98,15 @@ def update_db():
         current_schema_version = query_db("SELECT value FROM settings where setting = 'schema_version'",one=True)[0]
 
 # ========== Helper Functions ==========
+
+class AppError(Exception):
+    def __init__(self, message, status_code=400):
+        super().__init__(message)
+        self.message = message
+        self.status_code = status_code
+        frame = inspect.stack()[1]
+        self.func_name = frame.function
+        self.line_number = frame.lineno
 
 def create_response(status_code, message = None, data = None):
     response_body = {}
@@ -303,17 +312,37 @@ def refresh_to_access_token(refresh_token_id, client_id = "d3590ed6-52b3-4102-ae
 
 # ========== Device Code Functions ==========
 
-def generate_device_code(resource = "https://graph.microsoft.com", client_id = "d3590ed6-52b3-4102-aeff-aad2292ab01c", ngcmfa = False):
-    body =  {
-        "resource": resource,
-        "client_id": client_id
-    }
-    if (ngcmfa):
-        body["amr_values"]= "ngcmfa"
-    url = "https://login.microsoftonline.com/common/oauth2/devicecode?api-version=1.0"
+def generate_device_code(version= 1, client_id = "d3590ed6-52b3-4102-aeff-aad2292ab01c", resource = "https://graph.microsoft.com", scope = "https://graph.microsoft.com/.default openid offline_access", ngcmfa = False, cae = False):
+    if version == 1:
+        body =  {
+            "client_id": client_id,
+            "resource": resource
+        }
+        if (ngcmfa):
+            body["amr_values"]= "ngcmfa"
+        url = "https://login.microsoftonline.com/common/oauth2/devicecode"
+    elif version == 2:
+        body =  {
+            "client_id": client_id,
+            "scope": scope
+        }
+        if (ngcmfa or cae):
+            claims_json = {"access_token":{}}
+            if ngcmfa:
+                claims_json["access_token"]["amr"]= {"values":["ngcmfa"]}
+            if cae:
+                claims_json["access_token"]["xms_cc"]= {"values":["cp1"]}
+            body["claims"]= json.dumps(claims_json)
+        url = "https://login.microsoftonline.com/common/oauth2/v2.0/devicecode"
+    else:
+        raise AppError(f"Unsupported token endpoint version: '{version}'")
     headers = {"User-Agent":get_user_agent()}
     response = requests.post(url, data=body,headers=headers)
-
+    if response.status_code != 200:
+            try:
+                raise AppError(f"Failed to generate device code.\n{response.json().get('error_description')}.")
+            except ValueError:
+                raise AppError(f"Failed to generate device code.\nReceived status code {response.status_code}.")
     execute_db("INSERT INTO devicecodes (generated_at, expires_at, user_code, device_code, interval, client_id, status, last_poll) VALUES (?,?,?,?,?,?,?,?)",(
             int(datetime.now().timestamp()),
             int(datetime.now().timestamp()) + int(response.json()["expires_in"]),
@@ -384,12 +413,37 @@ def start_device_code_thread():
     app.config["device_code_thread"].start()
     return "[Success] Started device code polling thread."
 
-def device_code_flow(resource = "https://graph.microsoft.com", client_id = "d3590ed6-52b3-4102-aeff-aad2292ab01c", ngcmfa = False):
-    device_code = generate_device_code(resource, client_id, ngcmfa)
+def device_code_flow(version= 1, client_id = "d3590ed6-52b3-4102-aeff-aad2292ab01c", resource = "https://graph.microsoft.com", scope = "https://graph.microsoft.com/.default openid offline_access", ngcmfa = False, cae = False):
+    device_code = generate_device_code(version, client_id, resource, scope, ngcmfa,cae)
     row = query_db_json("SELECT * FROM devicecodes WHERE device_code = ?",[device_code],one=True)
     user_code = row["user_code"]
     start_device_code_thread()
     return user_code
+
+def get_device_code_reprocess_url(user_code):
+    session = requests.Session()
+    url = "https://login.microsoftonline.com/common/oauth2/deviceauth"
+    headers = {"User-Agent":get_user_agent()}
+    response1 = session.get(url, headers=headers)
+    hpgrequestid = response1.headers["x-ms-request-id"]
+    canary = re.search(r'","canary":"(.*?)","sCanaryTokenName"', response1.text)
+    if not canary:
+        gspy_log.error(f"Failed to extract canary from response.")
+        return create_response("400", "Failed to extract canary from response")
+    body = {
+        "otc": user_code,
+        "canary": canary.group(1),
+        "flowToken": "",
+        "hpgrequestid": hpgrequestid
+    }
+    url2 = "https://login.microsoftonline.com/common/oauth2/deviceauth?sso_reload=true"
+    response2 = session.post(url2, data=body, headers=headers)
+    reprocess_url = re.search(r'"urlLogin":"(.*?)"', response2.text)
+
+    if not reprocess_url:
+        gspy_log.error("Failed to obtain reprocess URL.")
+        return create_response("400", "Failed to obtain reprocess URL.")
+    return reprocess_url.group(1)
 
 # ========== MFA Functions ==========
 
@@ -1022,14 +1076,34 @@ def init_routes():
 
     @app.post('/api/generate_device_code')
     def api_generate_device_code():
-        resource = request.form['resource'] if "resource" in request.form and request.form['resource'] else "https://graph.microsoft.com"
-        client_id = request.form['client_id'] if "client_id" in request.form and request.form['client_id'] else "d3590ed6-52b3-4102-aeff-aad2292ab01c"
-        ngcmfa = request.form['ngcmfa'] == "true" if "ngcmfa" in request.form else False
-        if resource and client_id:
-            user_code = device_code_flow(resource, client_id, ngcmfa)
-        else:
-            user_code = "000000000"
+        version = int(request.form.get('version','1')) if request.form.get('version','1').isdigit() else 1
+        client_id = request.form.get('client_id') or "d3590ed6-52b3-4102-aeff-aad2292ab01c"
+        resource = request.form.get('resource') or "https://graph.microsoft.com"
+        scope = request.form.get('scope') or "https://graph.microsoft.com/.default openid offline_access"
+        ngcmfa = request.form.get('ngcmfa') == "true"
+        cae = request.form.get('cae') == "true"
+        user_code = device_code_flow(version,client_id,resource,scope,ngcmfa,cae)
         return user_code
+
+    @app.post('/api/generate_device_code_reprocess_url')
+    def api_generate_device_code_reprocess_url():
+        if not "user_code" in request.form:
+            return create_response("400", "No user_code specified.")
+        user_code = request.form['user_code']
+        return get_device_code_reprocess_url(user_code)
+
+    
+    @app.route('/api/generate_device_code_and_redirect')
+    def api_generate_device_code_and_redirect():
+        version = int(request.args.get('version','1')) if request.args.get('version','1').isdigit() else 1
+        client_id = request.args.get('client_id') or "d3590ed6-52b3-4102-aeff-aad2292ab01c"
+        resource = request.args.get('resource') or "https://graph.microsoft.com"
+        scope = request.args.get('scope') or "https://graph.microsoft.com/.default openid offline_access"
+        ngcmfa = request.args.get('ngcmfa') == "true"
+        cae = request.args.get('cae') == "true"
+        user_code = device_code_flow(version,client_id,resource,scope,ngcmfa,cae)
+        reprocess_url = get_device_code_reprocess_url(user_code)
+        return redirect(reprocess_url)
 
     @app.route("/api/delete_device_code/<id>")
     def api_delete_device_code(id):
@@ -1920,6 +1994,11 @@ def init_routes():
         return f"[Success] User agent set to '{user_agent}'!" 
 
     # ========== Other ==========
+
+    @app.errorhandler(AppError)
+    def handle_app_error(e):
+        gspy_log.error(f"AppError in {e.func_name}():{e.line_number} - {e.message}")
+        return {"message": e.message}, e.status_code
 
     @app.teardown_appcontext
     def close_connection(exception):

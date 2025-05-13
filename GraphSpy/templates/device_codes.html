@@ -5,21 +5,43 @@
 <div class="col-sm-5">
     <h1>Generate Device Code</h1>
     <form class="row g-3" id="device_code_form">
-        <div>
-            <label for="resource" class="form-label">Resource *</label>
-            <input list="resource_list" id="resource" class="form-control" required placeholder="https://graph.microsoft.com">
+        <div class="col-auto" id="api_version">
+            <div class="btn-group" role="group">
+                <span class="input-group-text">API Version</span>
+                <input type="radio" class="btn-check" name="btnradio" id="api_version_1" autocomplete="off" value="1" checked>
+                <label class="btn btn-outline-primary" for="api_version_1">v1</label>
+                <input type="radio" class="btn-check" name="btnradio" id="api_version_2" autocomplete="off" value="2">
+                <label class="btn btn-outline-primary" for="api_version_2">v2</label>
+            </div>
+        </div>
+        <div id="resource_container" class="col-12">
+            <label for="resource_list" class="form-label">Resource</label>
+            <input list="resource_list" id="resource_input" class="form-control" placeholder="https://graph.microsoft.com">
             <datalist id="resource_list">
                 <option value="https://graph.microsoft.com">MSGraph</option>
                 <option value="https://graph.windows.net/">AAD Graph</option>
                 <option value="https://outlook.office365.com">Outlook</option>
                 <option value="https://api.spaces.skype.com/">MSTeams</option>
                 <option value="https://management.core.windows.net/">AzureCoreManagement</option>
-                <option value="https://outlook.office365.com">AzureManagement</option>
+                <option value="https://management.azure.com">AzureManagement</option>
             </datalist>
         </div>
-        <div>
-            <label for="client_id" class="form-label">Client ID *</label>
-            <input list="client_id_list" id="client_id" class="form-control" required placeholder="d3590ed6-52b3-4102-aeff-aad2292ab01c">
+        <div id="scope_container" class="col-12" style="display: none;">
+            <label for="scope_list" class="form-label">Scope</label>
+            <input list="scope_list" id="scope_input" class="form-control" placeholder="https://graph.microsoft.com/.default openid offline_access">
+            <datalist id="scope_list">
+                <option value="https://graph.microsoft.com/.default openid offline_access">MSGraph</option>
+                <option value="https://graph.windows.net/.default openid offline_access">AAD Graph</option>
+                <option value="https://outlook.office365.com/.default openid offline_access">Outlook</option>
+                <option value="https://api.spaces.skype.com/.default openid offline_access">MSTeams</option>
+                <option value="https://management.core.windows.net/.default openid offline_access">AzureCoreManagement</option>
+                <option value="https://management.azure.com/.default openid offline_access">AzureManagement</option>
+                <option value="19db86c3-b2b9-44cc-b339-36da233a3be2/.default openid offline_access">My Signins</option>
+            </datalist>
+        </div>
+        <div class="col-12">
+            <label for="client_id_list" class="form-label">Client ID</label>
+            <input list="client_id_list" id="client_id_input" class="form-control" placeholder="d3590ed6-52b3-4102-aeff-aad2292ab01c">
             <datalist id="client_id_list">
                 <option value="d3590ed6-52b3-4102-aeff-aad2292ab01c">Microsoft Office</option>
                 <option value="1fec8e78-bce4-4aaf-ab1b-5451cc387264">Microsoft Teams</option>
@@ -32,16 +54,34 @@
             </datalist>
         </div>
         <div>
-            <input type="checkbox" id="ngcmfa_checkbox" class="form-check-input">
-            <label for="ngcmfa_checkbox" class="form-check-label" id="ngcmfa_tooltip" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Access tokens with the ngcmfa claim can be used for 15 minutes to register FIDO security keys. Note: this will force the victim to authenticate with MFA during the device code authentication!">Request ngcmfa claim</label>
+            <div>
+                <input type="checkbox" id="ngcmfa_checkbox" class="form-check-input">
+                <label for="ngcmfa_checkbox" class="form-check-label" id="ngcmfa_tooltip" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Access tokens with the ngcmfa claim can be used for 15 minutes to register FIDO security keys. Note: this will force the victim to authenticate with MFA during the device code authentication!">Request ngcmfa claim</label>
+            </div>
+            <div id="cae_container" style="display: none;">
+                <input type="checkbox" id="cae_checkbox" class="form-check-input">
+                <label for="cae_checkbox" class="form-check-label" id="cae_tooltip" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Request an access token with Continuous Access Evaluation (CAE) claims. Note: Access tokens with CAE will be valid for longer, however, they can instantly be revoked based on user risk or location changes!">Request CAE claim</label>
+            </div>
         </div>
         <div>
-            <button type="button" class="btn btn-primary" onclick="generateDeviceCode($('#device_code_form #resource').val(),$('#device_code_form #client_id').val(), $('#ngcmfa_checkbox').prop('checked'));">Submit</button>
+            <button type="button" class="btn btn-primary" onclick="generateDeviceCodeButton();">Generate Device Code</button>
         </div>
     </form>
 </div>
 <script>
     new bootstrap.Tooltip(document.getElementById('ngcmfa_tooltip'));
+    new bootstrap.Tooltip(document.getElementById('cae_tooltip'));
+    $("#device_code_form #api_version").on('click', 'input', function (e) {
+        if ($(e.target).val() == "1") {
+            $("#resource_container").show();
+            $("#scope_container").hide();
+            $("#cae_container").hide();
+        } else if ($(e.target).val() == "2") {
+            $("#resource_container").hide();
+            $("#scope_container").show();
+            $("#cae_container").show();
+        }
+    });
 </script>
 <br>
 <div>
@@ -50,6 +90,7 @@
     <table id="device_codes" class="table" style="table-layout:fixed; width:100%">
         <thead>
             <tr>
+                <th></th>
                 <th></th>
                 <th></th>
                 <th></th>
@@ -83,6 +124,13 @@
                 orderable: false,
                 data: null,
                 defaultContent: '<i class="fi fi-rr-copy-alt" style="cursor: pointer"></i>',
+                'width': '40px'
+            },
+            {
+                className: 'link-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-br-link-alt" style="cursor: pointer"></i>',
                 'width': '40px'
             },
             {
@@ -135,6 +183,12 @@
         copyToClipboard(row.data().user_code);
     });
 
+    myTable.on('click', 'td.link-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+        generateDeviceCodeReprocessUrl(row.data().user_code);
+    });
+
     myTable.on('click', 'td.delete-control', function (e) {
         let tr = e.target.closest('tr');
         let row = myTable.row(tr);
@@ -160,6 +214,34 @@
             url: "/api/delete_device_code/" + id
         });
         $('#device_codes').DataTable().ajax.reload(null, false);
+    }
+
+    function generateDeviceCodeButton(){
+        generateDeviceCode(
+            parseInt($('#api_version input:radio:checked').val()), 
+            client_id_input.value, 
+            resource_input.value,
+            scope_input.value,
+            ngcmfa_checkbox.checked,
+            cae_checkbox.checked
+        )
+        //generateDeviceCode(version, client_id, resource, scope, ngcmfa, cae)
+    };
+
+    function generateDeviceCodeReprocessUrl(userCode) {
+        let response = $.ajax({
+            type: "POST",
+            url: "/api/generate_device_code_reprocess_url",
+            data: {
+                user_code: userCode
+            },
+            success: function(reprocessUrl){
+                copyToClipboard(reprocessUrl);
+            },
+            error: function(xhr, status, error){
+                bootstrapToast("Device Code Reprocess URL", xhr.responseJSON["message"], "danger");
+            }
+        });
     }
     // Auto refresh the table every 5 seconds
     setInterval(function () {

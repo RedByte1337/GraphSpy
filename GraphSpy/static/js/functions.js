@@ -111,15 +111,27 @@ function deleteRefreshToken(token_id) {
 
 // ========== Device Codes ==========
 
-function generateDeviceCode(resource, client_id, ngcmfa) {
+function generateDeviceCode(version, client_id, resource, scope, ngcmfa, cae) {
     let response = $.ajax({
         type: "POST",
         async: false,
         url: "/api/generate_device_code",
-        data: { "resource": resource, "client_id": client_id, "ngcmfa": ngcmfa}
+        data: { 
+            "version": version,
+            "client_id": client_id,
+            "resource": resource,
+            "scope": scope,
+            "ngcmfa": ngcmfa,
+            "cae": cae
+        }, 
+        success: function(response){
+            bootstrapToast("Device Code", `[Success] Generated Device Code with User Code '${response}'.`, "primary");
+            reloadTables();
+        },
+        error: function (xhr, status, error) {
+            bootstrapToast("Device Code", xhr.responseJSON.message, "danger");
+        }
     });
-    bootstrapToast("Device Code", `[Success] Generated Device Code with User Code '${response.responseText}'.`, "primary");
-    reloadTables();
 }
 
 function restartDeviceCodePolling() {
