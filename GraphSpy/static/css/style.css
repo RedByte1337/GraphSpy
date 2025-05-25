@@ -14,6 +14,11 @@ td:has(> i.fi), td.dt-control {
 div.dt-button-info#datatables_buttons_info {
     background: var(--bs-secondary-bg);
 }
+/* Set the max width of the table control icons to 40px */
+.table-control {
+    max-width: 40px !important;
+}
+
 /* Teams CSS */
 #teams_message_container pre {
     background: var(--bs-secondary-bg);

@@ -11,22 +11,7 @@
             </div>
             <div class="modal-body">
                 <div id="dTable" class="box-body table-responsive" style="padding:10px;">
-                    <table id="refresh_token_modal_table" class="table table-striped" style="width:100%">
-                        <thead>
-                            <tr>
-                                <th></th>
-                                <th></th>
-                                <th></th>
-                                <th></th>
-                                <th>ID</th>
-                                <th>Stored At</th>
-                                <th>User</th>
-                                <th>Tenant ID</th>
-                                <th>Resource</th>
-                                <th>Foci</th>
-                                <th>Description</th>
-                            </tr>
-                        </thead>
+                    <table id="refresh_token_modal_table" class="table table-striped nowrap" style="width:100%">
                     </table>
                 </div>
             </div>
@@ -71,16 +56,16 @@
                 defaultContent: '<i class="fi fi-rr-trash" style="cursor: pointer"></i>',
                 'width': '40px'
             },
-            { data: 'id', 'width': '60px' },
-            { data: 'stored_at', 'width': '170px' },
-            { data: 'user', 'width': '320px' },
-            { data: 'tenant_id', 'width': '320px' },
-            { data: 'resource', 'width': '320px' },
-            { data: 'foci', 'width': '50px' },
-            { data: 'description' }
+            { data: 'id', title: 'ID', 'width': '60px' },
+            { data: 'stored_at', title: 'Stored At', 'width': '170px' },
+            { data: 'user', title: 'User', 'width': '320px' },
+            { data: 'tenant_id', title: 'Tenant ID', 'width': '320px' },
+            { data: 'client_id', title: 'Client ID', 'width': '320px' },
+            { data: 'resource', title: 'Resource', 'width': '320px' },
+            { data: 'foci', title: 'Foci', 'width': '50px' },
+            { data: 'description', title: 'Description', 'width': 'auto' }
         ],
-        order: [[4, 'desc']],
-        autoWidth: false
+        order: [[4, 'desc']]
     })
 
     refreshTokenModalTable.on('click', 'td.dt-control', function (e) {
@@ -121,7 +106,7 @@
     function formatRefreshToken(d) {
         // `d` is the original data object for the row
         var formatWrapper = $(
-            '<dl style="word-wrap: break-word; word-break: break-all; max-width:100%">' +
+            '<dl style="word-break: break-all; white-space: pre-wrap">' +
             '<dt>Raw Token:</dt>' +
             '</dl>'
         );

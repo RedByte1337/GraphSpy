@@ -15,12 +15,12 @@
             <input type="text" id="user" name="user" class="form-control" placeholder="john.doe@example.com">
         </div>
         <div class="col-md-6">
-            <label for="tenant_domain" class="form-label"><b>Tenant Domain/ID *</b></label>
-            <input type="text" id="tenant_domain" name="tenant_domain" class="form-control" required placeholder="example.com">
+            <label for="tenant_domain" class="form-label">Tenant Domain/ID</label>
+            <input type="text" id="tenant_domain" name="tenant_domain" class="form-control" placeholder="example.com">
         </div>
         <div class="col-md-6">
-            <label for="resource" class="form-label"><b>Resource *</b></label>
-            <input list="resource" name="resource" class="form-control" required placeholder="https://graph.microsoft.com">
+            <label for="resource" class="form-label">Resource</label>
+            <input list="resource" name="resource" class="form-control" placeholder="https://graph.microsoft.com">
             <datalist name="resource" id="resource">
                 <option value="https://graph.microsoft.com">MSGraph</option>
                 <option value="https://graph.windows.net/">AAD Graph</option>
@@ -31,6 +31,20 @@
             </datalist>
         </div>
         <div class="col-md-6">
+            <label for="client_id" class="form-label">Client ID</label>
+            <input list="client_id" name="client_id" class="form-control" placeholder="d3590ed6-52b3-4102-aeff-aad2292ab01c">
+            <datalist name="client_id" id="client_id">
+                <option value="d3590ed6-52b3-4102-aeff-aad2292ab01c">Microsoft Office</option>
+                <option value="1fec8e78-bce4-4aaf-ab1b-5451cc387264">Microsoft Teams</option>
+                <option value="27922004-5251-4030-b22d-91ecd9a37ea4">Outlook Mobile</option>
+                <option value="b26aadf8-566f-4478-926f-589f601d9c74">OneDrive</option>
+                <option value="d326c1ce-6cc6-4de2-bebc-4591e5e13ef0">SharePoint</option>
+                <option value="00b41c95-dab0-4487-9791-b9d2c32c80f2">Office 365 Management</option>
+                <option value="04b07795-8ddb-461a-bbee-02f9e1bf7b46">Microsoft Azure CLI</option>
+                <option value="1950a258-227b-4e31-a9cf-717495945fc2">Microsoft Azure PowerShell</option>
+            </datalist>
+        </div>
+        <div class="col-md-12">
             <label for="description" class="form-label">Description</label>
             <input type="text" id="description" name="description" class="form-control" placeholder="My First Token">
         </div>
@@ -64,22 +78,7 @@
 <br>
 <div>
     <h1>Refresh Tokens</h1>
-    <table id="refresh_tokens" class="table table-striped" style="table-layout:fixed; width:100%">
-        <thead>
-            <tr>
-                <th></th>
-                <th></th>
-                <th></th>
-                <th></th>
-                <th>ID</th>
-                <th>Stored At</th>
-                <th>User</th>
-                <th>Tenant ID</th>
-                <th>Resource</th>
-                <th>Foci</th>
-                <th>Description</th>
-            </tr>
-        </thead>
+    <table id="refresh_tokens" class="table table-striped nowrap" style="table-layout: fixed; width:100%">
     </table>
 </div>
 <script type="text/javascript" class="init">
@@ -90,42 +89,51 @@
         },
         columns: [
             {
-                className: 'dt-control',
+                className: 'dt-control table-control',
                 orderable: false,
                 data: null,
                 defaultContent: '',
                 'width': '40px'
             },
             {
-                className: 'active-control',
+                className: 'active-control table-control',
                 orderable: false,
                 data: null,
                 defaultContent: '<i class="fi fi-br-check" style="cursor: pointer"></i>',
                 'width': '40px'
             },
             {
-                className: 'copy-control',
+                className: 'copy-control table-control',
                 orderable: false,
                 data: null,
                 defaultContent: '<i class="fi fi-rr-copy-alt" style="cursor: pointer"></i>',
                 'width': '40px'
             },
             {
-                className: 'delete-control',
+                className: 'delete-control table-control',
                 orderable: false,
                 data: null,
                 defaultContent: '<i class="fi fi-rr-trash" style="cursor: pointer"></i>',
                 'width': '40px'
             },
-            { data: 'id', 'width': '60px' },
-            { data: 'stored_at', 'width': '170px' },
-            { data: 'user', 'width': '320px' },
-            { data: 'tenant_id', 'width': '320px' },
-            { data: 'resource', 'width': '320px' },
-            { data: 'foci', 'width': '50px' },
-            { data: 'description' }
+            { data: 'id', title: 'ID', 'width': '60px' },
+            { data: 'stored_at', title: 'Stored At', 'width': '170px' },
+            { data: 'user', title: 'User', 'width': '320px' },
+            { data: 'tenant_id', title: 'Tenant ID', 'width': '320px' },
+            { data: 'client_id', title: 'Client ID', 'width': '320px' },
+            { data: 'resource', title: 'Resource', 'width': '320px' },
+            { data: 'foci', title: 'Foci', 'width': '50px' },
+            { data: 'description', title: 'Description', 'width': 'auto' }
         ],
-        order: [[4, 'desc']]
+        order: [[4, 'desc']],
+        colReorder: {
+            columns: ':gt(3)'
+        },
+        scrollX: true,
+        fixedColumns: {
+            start: 4
+        },
+        processing: true
     })
 
     myTable.on('click', 'td.dt-control', function (e) {
@@ -163,14 +171,14 @@
     });
 
     function format(d) {
-        return (
-            '<dl>' +
+        var formatWrapper = $(
+            '<dl style="word-break: break-all; white-space: pre-wrap">' +
             '<dt>Raw Token:</dt>' +
-            '<dd><code>' +
-            d.refreshtoken +
-            '</code></dd>' +
             '</dl>'
         );
+        var formatCode = $('<code></code>').text(d.refreshtoken);
+        formatWrapper.append($('<dd></dd>').append(formatCode));
+        return formatWrapper;
     }
 </script>
 {%endblock content%}
