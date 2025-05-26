@@ -1,0 +1,221 @@
+{% extends 'layout.html'%}
+
+{%block content%}
+
+<br>
+<div class="col-md-8">
+    <h1>Request Primary Refresh Token</h1>
+    <form id="prt_form" class="row g-3">
+        <div class="col-lg-6">
+            <div class="input-group">
+                <label for="refresh_token_id" class="input-group-text">Refresh token id</label>
+                <input type="text" id="refresh_token_id" name="refresh_token_id" class="form-control" required>
+                <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#refresh_token_modal" onclick="$('#refresh_token_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="input-group">
+                <label for="device_id" class="input-group-text">Device ID</label>
+                <input type="text" id="device_id" name="device_id" class="form-control" required>
+                <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#device_modal" onclick="$('#device_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="input-group">
+                <label for="os_version" class="input-group-text">OS Version</label>
+                <input type="text" id="os_version" name="os_version" class="form-control" placeholder="10.0.26100">
+            </div>
+        </div>
+        <div class="col-12">
+            <button type="button" class="btn btn-primary" onclick="requestPRT()">Request PRT</button>
+        </div>
+    </form>
+</div>
+<script>
+    getActiveRefreshToken(document.getElementById("refresh_token_id"));
+
+    // Create device selection modal
+    let deviceModal = createModal("device_modal", "Select Device", `
+        <div id="dTable" class="box-body table-responsive" style="padding:10px;">
+            <table id="device_modal_table" class="table table-striped nowrap" style="width:100%">
+            </table>
+        </div>
+    `, "modal-xl");
+
+    // Initialize device selection table
+    let deviceTable = new DataTable('#device_modal_table', {
+        ajax: {
+            url: '/api/list_device_certificates', dataSrc: "data"
+        },
+        columns: [
+            {
+                className: 'select-control table-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-rr-check" title="Select Device" style="cursor: pointer"></i>',
+                'width': '40px'
+            },
+            { data: 'id', title: 'ID', 'width': '60px' },
+            { data: 'device_id', title: 'Device ID', 'width': '320px' },
+            { data: 'device_name', title: 'Device Name', 'width': '250px' },
+            { data: 'join_type', title: 'Join Type', 'width': '150px' },
+            { data: 'device_type', title: 'Device Type', 'width': '150px' }
+        ],
+        order: [[1, 'desc']]
+    });
+
+    deviceTable.on('click', 'td.select-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = deviceTable.row(tr);
+        $('#device_id').val(row.data().device_id);
+        $('#device_modal').modal('hide');
+    });
+
+    function requestPRT() {
+        let formData = {
+            device_id: $('#device_id').val(),
+            refresh_token_id: $('#refresh_token_id').val(),
+            os_version: $('#os_version').val() || "10.0.26100"
+        };
+
+        $.ajax({
+            url: '/api/request_prt_for_device',
+            type: 'POST',
+            data: formData,
+            success: function(response) {
+                bootstrapToast("Request PRT", response.message, "success");
+                $('#primary_refresh_tokens').DataTable().ajax.reload(null, false);
+            },
+            error: function(xhr) {
+                bootstrapToast("Request PRT", xhr.responseJSON.message, "danger");
+            }
+        });
+    }
+</script>
+<br>
+<div>
+    <h1>Primary Refresh Tokens</h1>
+    <table id="primary_refresh_tokens" class="table table-striped nowrap" style="table-layout: fixed; width:100%">
+    </table>
+</div>
+<script type="text/javascript" class="init">
+    // Populate the primary_refresh_tokens table
+    let myTable = new DataTable('#primary_refresh_tokens', {
+        ajax: {
+            url: '/api/list_primary_refresh_tokens', dataSrc: "data"
+        },
+        columns: [
+            {
+                className: 'dt-control table-control',
+                orderable: false,
+                data: null,
+                defaultContent: '',
+                'width': '40px'
+            },
+            {
+                className: 'copy-prt-control table-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-rr-copy-alt" title="Copy PRT to Clipboard" style="cursor: pointer"></i>',
+                'width': '40px'
+            },
+            {
+                className: 'copy-key-control table-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-rr-key" title="Copy Session Key to Clipboard" style="cursor: pointer"></i>',
+                'width': '40px'
+            },
+            {
+                className: 'delete-control table-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-rr-trash" title="Delete Primary Refresh Token" style="cursor: pointer"></i>',
+                'width': '40px'
+            },
+            { data: 'id', title: 'ID', 'width': '60px' },
+            { 
+                data: 'issued_at', 
+                title: 'Issued At', 
+                'width': '170px',
+                render: function(data) {
+                    return new Date(data * 1000).toLocaleString();
+                }
+            },
+            { 
+                data: 'expires_at', 
+                title: 'Expires At', 
+                'width': '170px',
+                render: function(data) {
+                    return new Date(data * 1000).toLocaleString();
+                }
+            },
+            { data: 'user', title: 'User', 'width': '370px' },
+            { data: 'device_id', title: 'Device ID', 'width': 'auto' },
+        ],
+        order: [[2, 'desc']],
+        colReorder: {
+            columns: ':gt(1)'
+        },
+        processing: true
+    })
+
+    myTable.on('click', 'td.dt-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+
+        if (row.child.isShown()) {
+            // This row is already open - close it
+            row.child.hide();
+        }
+        else {
+            // Open this row
+            row.child(format(row.data())).show();
+        }
+    });
+
+    myTable.on('click', 'td.copy-prt-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+        copyToClipboard(row.data().prt);
+    });
+
+    myTable.on('click', 'td.copy-key-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+        copyToClipboard(row.data().session_key);
+    });
+
+    myTable.on('click', 'td.delete-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+        if (!confirm("Are you sure you want to delete primary refresh token with ID " + row.data().id + "?")) { return }
+        deletePrimaryRefreshToken(row.data().id);
+        $('#primary_refresh_tokens').DataTable().ajax.reload(null, false);
+    });
+
+    function format(d) {
+        var formatWrapper = $('<dl style="word-break: break-all; white-space: pre-wrap"></dl>');
+        formatWrapper.append($('<dt>Primary Refresh Token:</dt>'));
+        formatWrapper.append($('<dd></dd>').append($('<code></code>').text(d.prt)));
+        formatWrapper.append($('<dt>Session Key:</dt>'));
+        formatWrapper.append($('<dd></dd>').append($('<code></code>').text(d.session_key)));
+        return formatWrapper;
+    }
+
+    function deletePrimaryRefreshToken(id) {
+        $.ajax({
+            url: '/api/delete_primary_refresh_token',
+            type: 'POST',
+            data: {
+                id: id
+            },
+            success: function(response) {
+                if (response.status === 200) {
+                    $('#primary_refresh_tokens').DataTable().ajax.reload(null, false);
+                }
+            }
+        });
+    }
+</script>
+{%endblock content%} 

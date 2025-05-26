@@ -1,0 +1,201 @@
+{% extends 'layout.html'%}
+
+{%block content%}
+
+<br>
+<div class="col-md-6">
+    <h1>Register Device</h1>
+    <form id="register_device_form" class="row g-3">
+        <div class="col-md-6">
+            <div class="input-group">
+                <label for="access_token_id" class="input-group-text">Access token id</label>
+                <input type="text" id="access_token_id" name="access_token_id" class="form-control" required>
+                <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#access_token_modal" onclick="$('#access_token_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="input-group">
+                <label for="device_name" class="input-group-text">Device Name</label>
+                <input type="text" id="device_name" name="device_name" class="form-control" placeholder="GraphSpy-Device">
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="input-group">
+                <label for="join_type" class="input-group-text">Join Type</label>
+                <select id="join_type" name="join_type" class="form-select">
+                    <option value="0">Azure AD Joined</option>
+                    <option value="4">Hybrid Azure AD Joined</option>
+                </select>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="input-group">
+                <label for="device_type" class="input-group-text">Device Type</label>
+                <input type="text" id="device_type" name="device_type" class="form-control" placeholder="Windows">
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="input-group">
+                <label for="os_version" class="input-group-text">OS Version</label>
+                <input type="text" id="os_version" name="os_version" class="form-control" placeholder="10.0.26100">
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="input-group">
+                <label for="target_domain" class="input-group-text">Target Domain</label>
+                <input type="text" id="target_domain" name="target_domain" class="form-control" placeholder="e-corp.local">
+            </div>
+        </div>
+        <div class="col-12">
+            <button type="button" class="btn btn-primary" onclick="registerDevice()">Register Device</button>
+        </div>
+    </form>
+</div>
+<script>
+    getActiveAccessToken(document.getElementById("access_token_id"));
+
+    function registerDevice() {
+        let formData = {
+            access_token_id: $('#access_token_id').val(),
+            device_name: $('#device_name').val() || "GraphSpy-Device",
+            join_type: $('#join_type').val(),
+            device_type: $('#device_type').val() || "Windows",
+            os_version: $('#os_version').val() || "10.0.26100",
+            target_domain: $('#target_domain').val() || "e-corp.local"
+        };
+
+        $.ajax({
+            url: '/api/register_device',
+            type: 'POST',
+            data: formData,
+            success: function(response) {
+                bootstrapToast("Register Device", response.message, "success");
+                $('#device_certificates').DataTable().ajax.reload(null, false);
+            },
+            error: function(xhr) {
+                bootstrapToast("Register Device", xhr.responseJSON.message, "danger");
+            }
+        });
+    }
+</script>
+<br>
+<div>
+    <h1>Device Certificates</h1>
+    <table id="device_certificates" class="table table-striped nowrap" style="table-layout: fixed; width:100%">
+    </table>
+</div>
+<script type="text/javascript" class="init">
+    // Populate the device_certificates table
+    let myTable = new DataTable('#device_certificates', {
+        ajax: {
+            url: '/api/list_device_certificates', dataSrc: "data"
+        },
+        columns: [
+            {
+                className: 'dt-control table-control',
+                orderable: false,
+                data: null,
+                defaultContent: '',
+                'width': '40px'
+            },
+            {
+                className: 'copy-cert-control table-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-rr-degree-credential" title="Copy Certificate to Clipboard" style="cursor: pointer"></i>',
+                'width': '40px'
+            },
+            {
+                className: 'copy-key-control table-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-rr-key" title="Copy Private Key to Clipboard" style="cursor: pointer"></i>',
+                'width': '40px'
+            },
+            {
+                className: 'delete-control table-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-rr-trash" title="Delete Device Certificate" style="cursor: pointer"></i>',
+                'width': '40px'
+            },
+            { data: 'id', title: 'ID', 'width': '60px' },
+            { data: 'device_id', title: 'Device ID', 'width': '320px' },
+            { data: 'device_name', title: 'Device Name', 'width': '250px' },
+            { data: 'join_type', title: 'Join Type', 'width': '150px' },
+            { data: 'device_type', title: 'Device Type', 'width': '150px' },
+            { 
+                data: 'stored_at', 
+                title: 'Stored At', 
+                'width': 'auto',
+                render: function(data) {
+                    return new Date(data * 1000).toLocaleString();
+                }
+            }
+        ],
+        order: [[4, 'desc']],
+        colReorder: {
+            columns: ':gt(3)'
+        },
+        processing: true
+    })
+
+    myTable.on('click', 'td.dt-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+
+        if (row.child.isShown()) {
+            // This row is already open - close it
+            row.child.hide();
+        }
+        else {
+            // Open this row
+            row.child(format(row.data())).show();
+        }
+    });
+
+    myTable.on('click', 'td.copy-cert-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+        copyToClipboard(row.data().certificate);
+    });
+
+    myTable.on('click', 'td.copy-key-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+        copyToClipboard(row.data().priv_key);
+    });
+
+    myTable.on('click', 'td.delete-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+        if (!confirm(`Are you sure you want to delete the device certificate with ID ${row.data().id} from the database? \nNote: This will not remove the device from Entra ID.`)) { return }
+        deleteDeviceCertificate(row.data().id);
+        $('#device_certificates').DataTable().ajax.reload(null, false);
+    });
+
+    function format(d) {
+        var formatWrapper = $('<dl style="word-break: break-all; white-space: pre-wrap"></dl>');
+        formatWrapper.append($('<dt>Certificate:</dt>'));
+        formatWrapper.append($('<dd></dd>').append($('<code></code>').text(d.certificate)));
+        formatWrapper.append($('<dt>Private Key:</dt>'));
+        formatWrapper.append($('<dd></dd>').append($('<code></code>').text(d.priv_key)));
+        return formatWrapper;
+    }
+
+    function deleteDeviceCertificate(id) {
+        $.ajax({
+            url: '/api/delete_device_certificate',
+            type: 'POST',
+            data: {
+                id: id
+            },
+            success: function(response) {
+                if (response.status === 200) {
+                    $('#device_certificates').DataTable().ajax.reload(null, false);
+                }
+            }
+        });
+    }
+</script>
+{%endblock content%} 

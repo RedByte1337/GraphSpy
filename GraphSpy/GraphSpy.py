@@ -25,7 +25,7 @@ def init_db():
     con.execute('CREATE TABLE request_templates (id INTEGER PRIMARY KEY AUTOINCREMENT, template_name TEXT, uri TEXT, method TEXT, request_type TEXT, body TEXT, headers TEXT, variables TEXT)')
     con.execute('CREATE TABLE teams_settings (access_token_id INTEGER PRIMARY KEY, skypeToken TEXT, skype_id TEXT, issued_at INTEGER, expires_at INTEGER, teams_settings_raw TEXT)')
     con.execute('CREATE TABLE mfa_otp (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at TEXT, secret_key TEXT, account_name INTEGER, description TEXT)')
-    con.execute('CREATE TABLE device_certificates (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT, device_name TEXT, device_type TEXT, priv_key TEXT, certificate TEXT)')
+    con.execute('CREATE TABLE device_certificates (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at INTEGER, device_id TEXT, device_name TEXT, device_type TEXT, join_type TEXT, priv_key TEXT, certificate TEXT)')
     con.execute('CREATE TABLE primary_refresh_tokens (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT, user TEXT, prt TEXT, session_key TEXT, issued_at INTEGER, expires_at INTEGER)') # To check if this is complete?
     con.execute('CREATE TABLE settings (setting TEXT UNIQUE, value TEXT)')
     # Valid Settings: active_access_token_id, active_refresh_token_id, schema_version, user_agent
@@ -101,7 +101,7 @@ def update_db():
         current_schema_version = query_db("SELECT value FROM settings where setting = 'schema_version'",one=True)[0]
     if current_schema_version == "4":
         print("[*] Current database is schema version 4, updating to schema version 5")
-        execute_db('CREATE TABLE device_certificates (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT, device_name TEXT, device_type TEXT, priv_key TEXT, certificate TEXT)')
+        execute_db('CREATE TABLE device_certificates (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at INTEGER, device_id TEXT, device_name TEXT, device_type TEXT, join_type TEXT, priv_key TEXT, certificate TEXT)')
         execute_db('CREATE TABLE primary_refresh_tokens (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT, user TEXT, prt TEXT, session_key TEXT, issued_at INTEGER, expires_at INTEGER)')
         execute_db("ALTER TABLE refreshtokens ADD COLUMN client_id TEXT")
         execute_db("UPDATE settings SET value = '5' WHERE setting = 'schema_version'")
@@ -537,7 +537,14 @@ def register_device(access_token_id, device_name, join_type = 0, device_type = "
     headers = {"User-Agent": get_user_agent(), "Authorization": f"Bearer {access_token}"}
     response = requests.post("https://enterpriseregistration.windows.net/EnrollmentServer/device/?api-version=2.0", headers=headers, json=request_body)
     if response.status_code != 200:
-        raise AppError(f"Failed to register device.\n{parse_token_endpoint_error(response)}")
+        try:
+            error_code = response.json().get('code', 'Unknown error')
+            error_description = response.json().get('message', 'Unknown error')
+            error_msg = f"[{response.status_code}] {error_code}: {error_description}"
+            raise AppError(f"Failed to register device.\n{error_msg}")
+        except ValueError as e:
+            error_msg = f"Failed to register device.\n{response.text}"
+        raise AppError(f"Failed to register device.\n{error_msg}")
     response_json = response.json()
     gspy_log.debug(f"Device registration response:\n{response_json}")
     if not "Certificate" in response_json:
@@ -546,7 +553,15 @@ def register_device(access_token_id, device_name, join_type = 0, device_type = "
     certificate_base64 = response_json['Certificate']['RawBody']
     certificate = x509.load_der_x509_certificate(base64.b64decode(certificate_base64))
     device_id = certificate.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
-    execute_db("INSERT INTO device_certificates (device_id, device_name, device_type, priv_key, certificate) VALUES (?, ?, ?, ?, ?)", (device_id, device_name, device_type, private_key_base64, certificate_base64))
+    execute_db("INSERT INTO device_certificates (stored_at, device_id, device_name, device_type, join_type, priv_key, certificate) VALUES (?, ?, ?, ?, ?, ?, ?)", (
+        int(datetime.now().timestamp()), 
+        device_id, 
+        device_name, 
+        device_type, 
+        "joined" if join_type == 0 else "registered" if join_type == 4 else "unknown", 
+        private_key_base64, 
+        certificate_base64
+    ))
     return device_id
 
 def get_srv_challenge_nonce():
@@ -643,8 +658,6 @@ def calculate_derived_key(session_key, context):
     )
     return kdf.derive(session_key)
 
-#    con.execute('CREATE TABLE device_certificates (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT, device_name TEXT, device_type TEXT, priv_key TEXT, certificate TEXT)')
-#    con.execute('CREATE TABLE primary_refresh_tokens (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT, prt TEXT, session_key TEXT, issued_at INTEGER, expires_at INTEGER)')  # To check if this is complete?
 def refresh_prt_to_access_token(prt_id, client_id = "d3590ed6-52b3-4102-aeff-aad2292ab01c", resource = "https://graph.microsoft.com", refresh_prt = True, redirect_uri = None) -> int:
     """
     All credit to:
@@ -1305,6 +1318,14 @@ def init_routes():
     @app.route("/refresh_tokens")
     def refresh_tokens():
         return render_template('refresh_tokens.html', title="Refresh Tokens")
+    
+    @app.route("/device_certificates")
+    def device_certificates():
+        return render_template('device_certificates.html', title="Device Certificates")
+
+    @app.route("/primary_refresh_tokens")
+    def primary_refresh_tokens():
+        return render_template('primary_refresh_tokens.html', title="Primary Refresh Tokens")
 
     @app.route("/device_codes")
     def device_codes():
@@ -1417,19 +1438,16 @@ def init_routes():
     
         # ========== PRT ==========
 
-    #con.execute('CREATE TABLE device_certificates (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT, device_name TEXT, device_type TEXT, priv_key TEXT, certificate TEXT)')
-    #con.execute('CREATE TABLE primary_refresh_tokens (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT, prt TEXT, session_key TEXT, issued_at INTEGER, expires_at INTEGER)') 
-    
     @app.post("/api/register_device")
     def api_register_device():
         if not "access_token_id" in request.form:
             return f"[Error] No access_token_id specified.", 400
         access_token_id = request.form['access_token_id']
-        device_name = request.form.get('device_name', "GraphSpy-Device")
-        join_type = request.form.get('join_type', 0)
-        device_type = request.form.get('device_type', "Windows")
-        os_version = request.form.get('os_version', "10.0.26100")
-        target_domain = request.form.get('target_domain', "e-corp.local")
+        device_name = request.form.get('device_name') or "GraphSpy-Device"
+        join_type = int(request.form.get('join_type')) if request.form.get('join_type') else 0
+        device_type = request.form.get('device_type') or "Windows"
+        os_version = request.form.get('os_version') or "10.0.26100"
+        target_domain = request.form.get('target_domain') or "e-corp.local"
         device_id = register_device(access_token_id, device_name, join_type, device_type, os_version, target_domain)
         if not device_id:
             return create_response(400, "Failed to register device.")
@@ -1450,9 +1468,12 @@ def init_routes():
 
     @app.post("/api/request_prt_for_device")
     def api_request_prt_for_device():
-        if not "device_id" in request.form:
-            return f"[Error] No device_id specified.", 400
-        device_id = request.form['device_id']
+        if not "device_id" in request.form and not "id" in request.form:
+            return f"[Error] No 'device_id' or 'id' specified.", 400
+        if "device_id" in request.form and request.form['device_id']:
+            device_id = request.form['device_id']
+        else:
+            device_id = query_db("SELECT device_id FROM device_certificates WHERE id = ?",[request.form['id']],one=True)
         if not "refresh_token_id" in request.form:
             return f"[Error] No refresh_token_id specified.", 400
         refresh_token_id = request.form['refresh_token_id']
@@ -1481,6 +1502,18 @@ def init_routes():
         id = request.form['id']
         execute_db("DELETE FROM primary_refresh_tokens WHERE id = ?",[id])
         return create_response(200, f"Deleted primary refresh token with ID {id}.")
+    
+    @app.post("/api/refresh_prt_to_access_token")
+    def api_refresh_prt_to_access_token():
+        if not "prt_id" in request.form:
+            return f"[Error] No prt_id specified.", 400
+        prt_id = request.form['prt_id']
+        client_id = request.form.get('client_id', "d3590ed6-52b3-4102-aeff-aad2292ab01c")
+        resource = request.form.get('resource', "https://graph.microsoft.com")
+        refresh_prt = request.form.get('refresh_prt', "true").lower() == "true"
+        redirect_uri = request.form.get('redirect_uri', None)
+        access_token_id = refresh_prt_to_access_token(prt_id, client_id, resource, refresh_prt, redirect_uri)
+        return create_response(200, f"Successfully refreshed PRT to access token with ID {access_token_id}.", {"access_token_id": access_token_id})
     
         # ========== MFA ==========
 
