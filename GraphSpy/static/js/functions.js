@@ -109,6 +109,55 @@ function deleteRefreshToken(token_id) {
     bootstrapToast("Delete refresh token", `[Success] Deleted refresh token with ID ${token_id}.`);
 }
 
+// ========== PRT ==========
+
+function refreshPrtToAccessToken(prt_id, client_id, resource = "", refresh_prt = true, redirect_uri = null, activate = false) {
+    var post_data = {
+        "prt_id": prt_id,
+        "client_id": client_id,
+        "resource": resource,
+        "refresh_prt": refresh_prt
+    };
+    if (redirect_uri) {
+        post_data["redirect_uri"] = redirect_uri;
+    }
+    let response = $.ajax({
+        type: "POST",
+        async: false,
+        url: "/api/refresh_prt_to_access_token",
+        data: post_data,
+        success: function (response) {
+            access_token_id = response.data.access_token_id;
+            if (activate) {
+                setActiveAccessToken(access_token_id, true);
+                bootstrapToast("PRT To Access Token", `[Success] Obtained and activated access token with ID '${access_token_id}'`, "success");
+            } else {
+                bootstrapToast("PRT To Access Token", `[Success] Obtained access token with ID '${access_token_id}'`, "success");
+            }
+        },
+        error: function (xhr, status, error) {
+            bootstrapToast("PRT To Access Token", xhr.responseJSON.message, "danger");
+        }
+    });
+};
+
+
+function getActivePrt(element) {
+    $.get("/api/active_prt", function(data) {
+        element.value = data;
+    });
+}
+
+function setActivePrt(id) {
+    $.get("/api/active_prt/" + id, function(data) {
+        if (document.getElementById("active_prt_id")) {
+            document.getElementById("active_prt_id").value = id;
+        }
+        bootstrapToast("Active PRT", `[Success] Activated PRT with ID ${id}`, "info");
+        reloadTables();
+    });
+}
+
 // ========== Device Codes ==========
 
 function generateDeviceCode(version, client_id, resource, scope, ngcmfa, cae) {

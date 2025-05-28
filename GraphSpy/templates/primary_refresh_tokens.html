@@ -31,8 +31,22 @@
         </div>
     </form>
 </div>
+<br>
+<div class="col-auto">
+    <h2>Active PRT</h2>
+    <form id="prt_form_active" class="row row-cols-auto">
+        <div class="col-auto">
+            <div class="input-group">
+                <label for="active_prt_id" class="input-group-text">Active PRT</label>
+                <input type="text" id="active_prt_id" name="active_prt_id" class="form-control">
+                <button type="Button" class="btn btn-primary" onclick="setActivePrt(active_prt_id.value)">Set active token</button>
+            </div>
+        </div>
+    </form>
+</div>
 <script>
     getActiveRefreshToken(document.getElementById("refresh_token_id"));
+    getActivePrt(document.getElementById("prt_form_active").active_prt_id);
 
     // Create device selection modal
     let deviceModal = createModal("device_modal", "Select Device", `
@@ -95,7 +109,7 @@
 <br>
 <div>
     <h1>Primary Refresh Tokens</h1>
-    <table id="primary_refresh_tokens" class="table table-striped nowrap" style="table-layout: fixed; width:100%">
+    <table id="primary_refresh_tokens" class="table nowrap" style="table-layout: fixed; width:100%">
     </table>
 </div>
 <script type="text/javascript" class="init">
@@ -113,6 +127,13 @@
                 'width': '40px'
             },
             {
+                className: 'active-control table-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-br-check" title="Set as Active PRT" style="cursor: pointer"></i>',
+                'width': '40px'
+            },
+            {
                 className: 'copy-prt-control table-control',
                 orderable: false,
                 data: null,
@@ -124,6 +145,13 @@
                 orderable: false,
                 data: null,
                 defaultContent: '<i class="fi fi-rr-key" title="Copy Session Key to Clipboard" style="cursor: pointer"></i>',
+                'width': '40px'
+            },
+            {
+                className: 'cookie-control table-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-rr-cookie-alt" title="Generate a PRT Cookie and Copy to Clipboard" style="cursor: pointer"></i>',
                 'width': '40px'
             },
             {
@@ -153,11 +181,18 @@
             { data: 'user', title: 'User', 'width': '370px' },
             { data: 'device_id', title: 'Device ID', 'width': 'auto' },
         ],
-        order: [[2, 'desc']],
+        order: [[6, 'desc']],
         colReorder: {
-            columns: ':gt(1)'
+            columns: ':gt(5)'
         },
-        processing: true
+        processing: true,
+        createdRow: function (row, data, dataIndex) {
+            if (new Date(data.expires_at * 1000) > new Date()) {
+                $(row).children().addClass('bg-success-subtle').addClass('text-success-emphasis');
+            } else {
+                $(row).children().addClass('bg-danger-subtle').addClass('text-danger-emphasis');
+            }
+        }
     })
 
     myTable.on('click', 'td.dt-control', function (e) {
@@ -174,6 +209,12 @@
         }
     });
 
+    myTable.on('click', 'td.active-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+        setActivePrt(row.data().id);
+    });
+
     myTable.on('click', 'td.copy-prt-control', function (e) {
         let tr = e.target.closest('tr');
         let row = myTable.row(tr);
@@ -184,6 +225,12 @@
         let tr = e.target.closest('tr');
         let row = myTable.row(tr);
         copyToClipboard(row.data().session_key);
+    });
+
+    myTable.on('click', 'td.cookie-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+        generateAndCopyPrtCookie(row.data().id);
     });
 
     myTable.on('click', 'td.delete-control', function (e) {
@@ -214,6 +261,55 @@
                 if (response.status === 200) {
                     $('#primary_refresh_tokens').DataTable().ajax.reload(null, false);
                 }
+            }
+        });
+    }
+
+    function generateAndCopyPrtCookie(prtId) {
+        $.ajax({
+            url: '/api/generate_prt_cookie',
+            type: 'POST',
+            data: {
+                prt_id: prtId
+            },
+            success: function(response) {
+                bootstrapToast("PRT Cookie", response.message, "success");
+                let prtCookie = response.data.prt_cookie;
+                let cookieName = 'x-ms-RefreshTokenCredential';
+                let domain = 'login.microsoftonline.com';
+
+                createModal("prtCookieModal", "PRT Cookie Information", `
+                    <div class="mb-3">
+                        <b>Successfully generated a new PRT Cookie!</b><br>
+                        This cookie is valid for about 5 minutes and allows signing in to any application using Entra ID SSO within this timeframe.
+                    </div>
+                    <ol class="mb-3">
+                        <li>Go to <code>${domain}</code> in your browser <small class="text-muted">(Consider using a clean incognito Window to ensure you do not have any active sessions yet)</small></li>
+                        <li>Open the developer tools (F12) and navigate to the <code>Cookies</code> section under the <code>Application</code> tab.</li>
+                        <li>Clear any cookies for the <code>${domain}</code> domain, and insert a new cookie with the following details:</li>
+                        <div class="my-3">
+                            <div class="input-group">
+                                <label for="cookieName" class="input-group-text">Cookie Name</label>
+                                <input type="text" id="cookieName" class="form-control" value="${cookieName}" readonly style="max-width: 250px;">
+                                <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('${cookieName}')">
+                                    <i class="fi fi-rr-copy"></i>
+                                </button>
+                                <label for="prtCookie" class="input-group-text">Cookie Value</label>
+                                <input type="text" id="prtCookie" class="form-control" value="${prtCookie}" readonly>
+                                <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('${prtCookie}')">
+                                    <i class="fi fi-rr-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <li>Reload the page, or go to <code>myapps.microsoft.com</code> to gain an overview of some of the applications supporting Entra ID SSO for the current user.</li>
+                    </ol>
+                `);
+
+                let prtCookieModal = new bootstrap.Modal($('#prtCookieModal'));
+                prtCookieModal.show();
+            },
+            error: function(xhr) {
+                bootstrapToast("PRT Cookie", xhr.responseJSON.message, "danger");
             }
         });
     }

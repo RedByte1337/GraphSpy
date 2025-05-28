@@ -41,9 +41,18 @@
         <div class="col-11">
             <h1>Refresh To Access Token</h1>
             <form id="refresh_to_access_token_form" class="row g-3">
+                <div class="col-auto" id="token_type">
+                    <div class="btn-group" role="group">
+                        <span class="input-group-text" style="border-top-right-radius: 0px; border-bottom-right-radius: 0px;">Auth Method</span>
+                        <input type="radio" class="btn-check" name="token_type" id="token_type_refresh" autocomplete="off" value="refresh" checked>
+                        <label class="btn btn-outline-primary" for="token_type_refresh">Refresh token</label>
+                        <input type="radio" class="btn-check" name="token_type" id="token_type_prt" autocomplete="off" value="prt">
+                        <label class="btn btn-outline-primary" for="token_type_prt">PRT</label>
+                    </div>
+                </div>
                 <div class="col-auto" id="api_version">
                     <div class="btn-group" role="group">
-                        <span class="input-group-text">API Version</span>
+                        <span class="input-group-text" style="border-top-right-radius: 0px; border-bottom-right-radius: 0px;">API Version</span>
                         <input type="radio" class="btn-check" name="btnradio" id="api_version_1" autocomplete="off" value="1" checked>
                         <label class="btn btn-outline-primary" for="api_version_1">v1</label>
                         <input type="radio" class="btn-check" name="btnradio" id="api_version_2" autocomplete="off" value="2">
@@ -51,62 +60,114 @@
                     </div>
                 </div>
                 <div id="resource_container" class="col-12">
-                    <label for="resource_list" class="form-label">Resource</label>
-                    <input list="resource_list" id="resource_input" class="form-control" placeholder="https://graph.microsoft.com">
-                    <datalist id="resource_list">
-                        <option value="defined_in_token">Defined in Refresh Token</option>
-                        <option value="https://graph.microsoft.com">MSGraph</option>
-                        <option value="https://graph.windows.net/">AAD Graph</option>
-                        <option value="https://outlook.office365.com">Outlook</option>
-                        <option value="https://api.spaces.skype.com/">MSTeams</option>
-                        <option value="https://management.core.windows.net/">AzureCoreManagement</option>
-                        <option value="https://management.azure.com">AzureManagement</option>
-                    </datalist>
+                    <div class="input-group">
+                        <span class="input-group-text">Resource</span>
+                        <input list="resource_list_refresh" id="resource_input" class="form-control" placeholder="https://graph.microsoft.com" style="border-top-right-radius: 6px; border-bottom-right-radius: 6px;">
+                        <datalist id="resource_list_refresh">
+                            <option value="defined_in_token">Defined in Refresh Token</option>
+                            <option value="https://graph.microsoft.com">MSGraph</option>
+                            <option value="https://graph.windows.net/">AAD Graph</option>
+                            <option value="https://outlook.office365.com">Outlook</option>
+                            <option value="https://api.spaces.skype.com/">MSTeams</option>
+                            <option value="https://management.core.windows.net/">AzureCoreManagement</option>
+                            <option value="https://management.azure.com">AzureManagement</option>
+                        </datalist>
+                        <datalist id="resource_list_prt">
+                            <option value="https://graph.microsoft.com">MSGraph</option>
+                            <option value="https://graph.windows.net/">AAD Graph</option>
+                            <option value="https://outlook.office365.com">Outlook</option>
+                            <option value="https://api.spaces.skype.com/">MSTeams</option>
+                            <option value="https://management.core.windows.net/">AzureCoreManagement</option>
+                            <option value="https://management.azure.com">AzureManagement</option>
+                        </datalist>
+                    </div>
                 </div>
                 <div id="scope_container" class="col-12" style="display: none;">
-                    <label for="scope_list" class="form-label">Scope</label>
-                    <input list="scope_list" id="scope_input" class="form-control" placeholder="https://graph.microsoft.com/.default openid offline_access">
-                    <datalist id="scope_list">
-                        <option value="https://graph.microsoft.com/.default openid offline_access">MSGraph</option>
-                        <option value="https://graph.windows.net/.default openid offline_access">AAD Graph</option>
-                        <option value="https://outlook.office365.com/.default openid offline_access">Outlook</option>
-                        <option value="https://api.spaces.skype.com/.default openid offline_access">MSTeams</option>
-                        <option value="https://management.core.windows.net/.default openid offline_access">AzureCoreManagement</option>
-                        <option value="https://management.azure.com/.default openid offline_access">AzureManagement</option>
-                        <option value="19db86c3-b2b9-44cc-b339-36da233a3be2/.default openid offline_access">My Signins</option>
-                    </datalist>
+                    <div class="input-group">
+                        <span class="input-group-text">Scope</span>
+                        <input list="scope_list" id="scope_input" class="form-control" placeholder="https://graph.microsoft.com/.default openid offline_access" style="border-top-right-radius: 6px; border-bottom-right-radius: 6px;">
+                        <datalist id="scope_list">
+                            <option value="https://graph.microsoft.com/.default openid offline_access">MSGraph</option>
+                            <option value="https://graph.windows.net/.default openid offline_access">AAD Graph</option>
+                            <option value="https://outlook.office365.com/.default openid offline_access">Outlook</option>
+                            <option value="https://api.spaces.skype.com/.default openid offline_access">MSTeams</option>
+                            <option value="https://management.core.windows.net/.default openid offline_access">AzureCoreManagement</option>
+                            <option value="https://management.azure.com/.default openid offline_access">AzureManagement</option>
+                            <option value="19db86c3-b2b9-44cc-b339-36da233a3be2/.default openid offline_access">My Signins</option>
+                        </datalist>
+                    </div>
                 </div>
                 <div class="col-12">
-                    <label for="client_id_list" class="form-label">Client ID</label>
-                    <input list="client_id_list" id="client_id_input" class="form-control" placeholder="d3590ed6-52b3-4102-aeff-aad2292ab01c">
-                    <datalist id="client_id_list">
-                        <option value="defined_in_token">Defined in Refresh Token</option>
-                        <option value="d3590ed6-52b3-4102-aeff-aad2292ab01c">Microsoft Office</option>
-                        <option value="1fec8e78-bce4-4aaf-ab1b-5451cc387264">Microsoft Teams</option>
-                        <option value="27922004-5251-4030-b22d-91ecd9a37ea4">Outlook Mobile</option>
-                        <option value="b26aadf8-566f-4478-926f-589f601d9c74">OneDrive</option>
-                        <option value="d326c1ce-6cc6-4de2-bebc-4591e5e13ef0">SharePoint</option>
-                        <option value="00b41c95-dab0-4487-9791-b9d2c32c80f2">Office 365 Management</option>
-                        <option value="04b07795-8ddb-461a-bbee-02f9e1bf7b46">Microsoft Azure CLI</option>
-                        <option value="1950a258-227b-4e31-a9cf-717495945fc2">Microsoft Azure PowerShell</option>
-                    </datalist>
+                    <div class="input-group">
+                        <span class="input-group-text">Client ID</span>
+                        <input list="client_id_list_refresh" id="client_id_input" class="form-control" placeholder="d3590ed6-52b3-4102-aeff-aad2292ab01c" style="border-top-right-radius: 6px; border-bottom-right-radius: 6px;">
+                        <datalist id="client_id_list_refresh">
+                            <option value="defined_in_token">Defined in Refresh Token</option>
+                            <option value="d3590ed6-52b3-4102-aeff-aad2292ab01c">Microsoft Office</option>
+                            <option value="1fec8e78-bce4-4aaf-ab1b-5451cc387264">Microsoft Teams</option>
+                            <option value="27922004-5251-4030-b22d-91ecd9a37ea4">Outlook Mobile</option>
+                            <option value="b26aadf8-566f-4478-926f-589f601d9c74">OneDrive</option>
+                            <option value="d326c1ce-6cc6-4de2-bebc-4591e5e13ef0">SharePoint</option>
+                            <option value="00b41c95-dab0-4487-9791-b9d2c32c80f2">Office 365 Management</option>
+                            <option value="04b07795-8ddb-461a-bbee-02f9e1bf7b46">Microsoft Azure CLI</option>
+                            <option value="1950a258-227b-4e31-a9cf-717495945fc2">Microsoft Azure PowerShell</option>
+                        </datalist>
+                        <datalist id="client_id_list_prt">
+                            <option value="d3590ed6-52b3-4102-aeff-aad2292ab01c">Microsoft Office</option>
+                            <option value="1fec8e78-bce4-4aaf-ab1b-5451cc387264">Microsoft Teams</option>
+                            <option value="27922004-5251-4030-b22d-91ecd9a37ea4">Outlook Mobile</option>
+                            <option value="b26aadf8-566f-4478-926f-589f601d9c74">OneDrive</option>
+                            <option value="d326c1ce-6cc6-4de2-bebc-4591e5e13ef0">SharePoint</option>
+                            <option value="00b41c95-dab0-4487-9791-b9d2c32c80f2">Office 365 Management</option>
+                            <option value="04b07795-8ddb-461a-bbee-02f9e1bf7b46">Microsoft Azure CLI</option>
+                            <option value="1950a258-227b-4e31-a9cf-717495945fc2">Microsoft Azure PowerShell</option>
+                        </datalist>
+                    </div>
+                </div>
+                <div class="col-12" id="redirect_uri_container" style="display: none;">
+                    <div class="input-group">
+                        <span class="input-group-text">Redirect URI</span>
+                        <input list="redirect_uri_list" id="redirect_uri" name="redirect_uri" class="form-control" placeholder="Leave empty for default (ms-appx-web://Microsoft.AAD.BrokerPlugin/{client_id})">
+                        <datalist id="redirect_uri_list">
+                            <option value="https://login.microsoftonline.com/common/oauth2/nativeclient">Native Client</option>
+                            <option value="urn:ietf:wg:oauth:2.0:oob">Out-Of-Band</option>
+                            <option value="http://localhost">Localhost</option>
+                        </datalist>
+                    </div>
+                    <small class="text-muted">
+                        Find more redirect URIs for <a href="https://github.com/zh54321/GraphPreConsentExplorer/blob/main/GraphPreConsent.yaml" target="_blank" rel="noopener noreferrer">specific clients here</a>
+                    </small>
                 </div>
                 <div class="col-6">
-                    <div class="col-12 pt-3">
+                    <div class="col-12">
                         <input type="checkbox" id="activate_access_token" class="form-check-input" checked value="1">
                         <label for="activate_access_token" class="form-check-label">Activate access token</label>
                     </div>
-                    <div class="col-12">
+                    <div class="col-12" id="store_refresh_token_container">
                         <input type="checkbox" id="store_refresh_token" class="form-check-input" value="1">
                         <label for="store_refresh_token" class="form-check-label">Store refresh token</label>
                     </div>
+                    <div class="col-12" id="refresh_prt_container" style="display: none;">
+                        <input type="checkbox" id="refresh_prt" class="form-check-input" checked value="1">
+                        <label for="refresh_prt" class="form-check-label" data-bs-toggle="tooltip" data-bs-placement="right" title="When enabled, this will result in a new PRT to be requested and stored with the same session key. If disabled, this will return a regular refresh token, which is stored in the refresh token table.">Refresh PRT</label>
+                    </div>
                 </div>
                 <div class="col-6">
-                    <label for="refresh_token_id" class="form-label"><b>Refresh Token id *</b></label>
-                    <input type="text" id="refresh_token_id" name="refresh_token_id" class="form-control" required>
+                    <div id="refresh_token_id_container">
+                        <div class="input-group">
+                            <span class="input-group-text">Refresh Token ID</span>
+                            <input type="text" id="refresh_token_id" name="refresh_token_id" class="form-control" required>
+                        </div>
+                    </div>
+                    <div id="prt_id_container" style="display: none;">
+                        <div class="input-group">
+                            <span class="input-group-text">PRT ID</span>
+                            <input type="text" id="prt_id" name="prt_id" class="form-control" required>
+                        </div>
+                    </div>
                 </div>
                 <div class="col-12">
-                    <button type="Button" class="btn btn-primary" onclick="refreshToAccessToken(refresh_token_id.value, client_id_input.value, resource_input.value, scope_input.value, store_refresh_token.checked, activate_access_token.checked, parseInt($('#api_version input:radio:checked').val()));reloadTables()">Submit</button>
+                    <button type="Button" class="btn btn-primary" onclick="handleTokenRefresh()">Submit</button>
                 </div>
             </form>
         </div>
@@ -114,7 +175,44 @@
 </div>
 <script>
     getActiveAccessToken(document.getElementById("access_token_form").access_token_id);
-    getActiveRefreshToken(document.getElementById("refresh_to_access_token_form").refresh_token_id);
+    getActiveRefreshToken(document.getElementById("refresh_token_id"));
+    
+    // Initialize tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
+    
+    // Show/hide fields based on token type
+    $("#refresh_to_access_token_form #token_type").on('click', 'input', function (e) {
+        if ($(e.target).val() == "refresh") {
+            $("#store_refresh_token_container").show();
+            $("#refresh_prt_container").hide();
+            $("#api_version").show();
+            $("#refresh_token_id_container").show();
+            $("#prt_id_container").hide();
+            $("#redirect_uri_container").hide();
+            $("#api_version_1").prop("checked", true);
+            $("#resource_container").show();
+            $("#scope_container").hide();
+            $("#resource_input").attr("list", "resource_list_refresh");
+            $("#client_id_input").attr("list", "client_id_list_refresh");
+            getActiveRefreshToken(document.getElementById("refresh_token_id"));
+        } else if ($(e.target).val() == "prt") {
+            $("#store_refresh_token_container").hide();
+            $("#refresh_prt_container").show();
+            $("#api_version").hide();
+            $("#resource_container").show();
+            $("#scope_container").hide();
+            $("#refresh_token_id_container").hide();
+            $("#prt_id_container").show();
+            $("#redirect_uri_container").show();
+            $("#resource_input").attr("list", "resource_list_prt");
+            $("#client_id_input").attr("list", "client_id_list_prt");
+            getActivePrt(document.getElementById("prt_id"));
+        }
+    });
+
     // Show the resource field if the API version is 1 or show the scope field if the API version is 2
     $("#refresh_to_access_token_form #api_version").on('click', 'input', function (e) {
         if ($(e.target).val() == "1") {
@@ -125,6 +223,27 @@
             $("#scope_container").show();
         }
     });
+
+    function handleTokenRefresh() {
+        const tokenType = $('input[name="token_type"]:checked').val();
+        const clientId = document.getElementById("client_id_input").value;
+        const resource = document.getElementById("resource_input").value;
+        const scope = document.getElementById("scope_input").value;
+        const activate = document.getElementById("activate_access_token").checked;
+        
+        if (tokenType === "refresh") {
+            const tokenId = document.getElementById("refresh_token_id").value;
+            const storeRefreshToken = document.getElementById("store_refresh_token").checked;
+            const apiVersion = parseInt($('#api_version input:radio:checked').val());
+            refreshToAccessToken(tokenId, clientId, resource, scope, storeRefreshToken, activate, apiVersion);
+        } else if (tokenType === "prt") {
+            const tokenId = document.getElementById("prt_id").value;
+            const refreshPrt = document.getElementById("refresh_prt").checked;
+            const redirectUri = document.getElementById("redirect_uri").value;
+            refreshPrtToAccessToken(tokenId, clientId, resource, refreshPrt, redirectUri, activate);
+        }
+        reloadTables();
+    }
 </script>
 <div>
     <br>

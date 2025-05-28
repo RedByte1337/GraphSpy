@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 import time
 import os,sys,shutil,traceback,logging,inspect
 from threading import Thread
-import json, base64, uuid, urllib.parse
+import json, base64, uuid, urllib.parse, binascii
 import re
 import pyotp
 
@@ -262,7 +262,10 @@ def save_access_token(accesstoken, description):
 def save_refresh_token(refreshtoken, description, user, tenant, resource, foci, client_id = "d3590ed6-52b3-4102-aeff-aad2292ab01c"):
     # Used to convert potential boolean inputs to an integer, as the DB uses an integer to store this value
     foci_int = 1 if foci else 0
-    tenant_id = tenant.strip('"{}-[]\\/\' ') if is_valid_uuid(tenant.strip('"{}-[]\\/\' ')) else get_tenant_id(tenant)
+    if tenant == "common":
+        tenant_id = "common"
+    else:
+        tenant_id = tenant.strip('"{}-[]\\/\' ') if is_valid_uuid(tenant.strip('"{}-[]\\/\' ')) else get_tenant_id(tenant)
     execute_db("INSERT INTO refreshtokens (stored_at, description, user, tenant_id, client_id, resource, foci, refreshtoken) VALUES (?,?,?,?,?,?,?,?)",(
             f"{datetime.now()}".split(".")[0],
             description,
@@ -666,7 +669,6 @@ def refresh_prt_to_access_token(prt_id, client_id = "d3590ed6-52b3-4102-aeff-aad
     from cryptography.hazmat.primitives import hashes, padding
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-    import binascii
     prt_row = query_db_json("SELECT * FROM primary_refresh_tokens WHERE id = ?",[prt_id],one=True)
     if not prt_row:
         raise AppError(f"No PRT found with ID {prt_id}!")
@@ -762,6 +764,35 @@ def refresh_prt_to_access_token(prt_id, client_id = "d3590ed6-52b3-4102-aeff-aad
     else:
         raise gspy_log.debug("No refresh token or PRT found in decrypted response. Only stored access token.")
     return access_token_row_id
+
+def generate_prt_cookie(prt_id):
+    from cryptography.hazmat.primitives import hashes
+    prt_row = query_db_json("SELECT * FROM primary_refresh_tokens WHERE id = ?",[prt_id],one=True)
+    if not prt_row:
+        raise AppError(f"No PRT found with ID {prt_id}!")
+    prt = prt_row["prt"]
+    session_key = binascii.unhexlify(prt_row["session_key"])
+    nonce = get_srv_challenge_nonce()
+    context = os.urandom(24)
+    jwt_headers = {
+        'ctx': base64.b64encode(context).decode('utf-8'),
+        'kdf_ver': 2
+    }
+    jwt_payload = {
+        "refresh_token": prt,
+        "is_primary": "true",
+        "request_nonce": nonce
+    }
+    tempjwt = jwt.encode(jwt_payload, os.urandom(32), algorithm='HS256', headers=jwt_headers)
+    jbody = tempjwt.split('.')[1]
+    jwtbody = base64.urlsafe_b64decode(jbody+('='*(len(jbody)%4)))
+    digest = hashes.Hash(hashes.SHA256())
+    digest.update(context)
+    digest.update(jwtbody)
+    kdfcontext = digest.finalize()
+    derived_key = calculate_derived_key(session_key,kdfcontext)
+    prt_cookie = jwt.encode(jwt_payload, derived_key, algorithm='HS256', headers=jwt_headers)
+    return prt_cookie
         
 # ========== MFA Functions ==========
 
@@ -1477,7 +1508,7 @@ def init_routes():
         if not "refresh_token_id" in request.form:
             return f"[Error] No refresh_token_id specified.", 400
         refresh_token_id = request.form['refresh_token_id']
-        os_version = request.form.get('os_version', "10.0.26100")
+        os_version = request.form.get('os_version') or "10.0.26100"
         prt_id = request_prt_for_device(device_id, refresh_token_id, os_version)
         if not prt_id:
             return create_response(400, f"Failed to request PRT for device with ID {device_id}.")
@@ -1508,13 +1539,35 @@ def init_routes():
         if not "prt_id" in request.form:
             return f"[Error] No prt_id specified.", 400
         prt_id = request.form['prt_id']
-        client_id = request.form.get('client_id', "d3590ed6-52b3-4102-aeff-aad2292ab01c")
-        resource = request.form.get('resource', "https://graph.microsoft.com")
+        client_id = request.form.get('client_id') or "d3590ed6-52b3-4102-aeff-aad2292ab01c"
+        resource = request.form.get('resource') or "https://graph.microsoft.com"
         refresh_prt = request.form.get('refresh_prt', "true").lower() == "true"
         redirect_uri = request.form.get('redirect_uri', None)
         access_token_id = refresh_prt_to_access_token(prt_id, client_id, resource, refresh_prt, redirect_uri)
         return create_response(200, f"Successfully refreshed PRT to access token with ID {access_token_id}.", {"access_token_id": access_token_id})
     
+    @app.route("/api/active_prt/<id>")
+    def api_set_active_prt(id):
+        previous_id = query_db("SELECT value FROM settings WHERE setting = 'active_prt_id'",one=True)
+        if not previous_id:
+            execute_db("INSERT INTO settings (setting, value) VALUES ('active_prt_id',?)",(id,))
+        else:
+            execute_db("UPDATE settings SET value = ? WHERE setting = 'active_prt_id'",(id,))
+        return id
+
+    @app.route("/api/active_prt")
+    def api_get_active_prt():
+        active_prt = query_db("SELECT value FROM settings WHERE setting = 'active_prt_id'",one=True)
+        return f"{active_prt[0]}" if active_prt else "0"
+    
+    @app.post("/api/generate_prt_cookie")
+    def api_generate_prt_cookie():
+        if not "prt_id" in request.form:
+            return f"[Error] No prt_id specified.", 400
+        prt_id = request.form['prt_id']
+        prt_cookie = generate_prt_cookie(prt_id)
+        return create_response(200, f"Successfully generated PRT cookie using PRT {prt_id}.", {"prt_cookie": prt_cookie})
+
         # ========== MFA ==========
 
     @app.post("/api/get_available_authentication_info")
@@ -1844,8 +1897,8 @@ def init_routes():
     def api_generic_graph():
         graph_uri = request.form['graph_uri']
         access_token_id = request.form['access_token_id']
-        method = request.form.get('method', 'GET')
-        body = json.loads(request.form.get('body', '{}'))
+        method = request.form.get('method') or 'GET'
+        body = json.loads(request.form.get('body') or '{}')
         graph_response = graph_request(graph_uri, access_token_id, method, body)
         return graph_response
     
