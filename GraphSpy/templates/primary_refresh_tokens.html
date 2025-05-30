@@ -3,46 +3,97 @@
 {%block content%}
 
 <br>
-<div class="col-md-8">
-    <h1>Request Primary Refresh Token</h1>
-    <form id="prt_form" class="row g-3">
-        <div class="col-lg-6">
-            <div class="input-group">
-                <label for="refresh_token_id" class="input-group-text">Refresh token id</label>
-                <input type="text" id="refresh_token_id" name="refresh_token_id" class="form-control" required>
-                <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#refresh_token_modal" onclick="$('#refresh_token_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
+<div class="row">
+    <div class="col-md-6">
+        <h1>Request New PRT</h1>
+        <form id="prt_form" class="row g-3">
+            <div class="col-xl-6">
+                <div class="input-group">
+                    <label for="refresh_token_id" class="input-group-text">Refresh token id</label>
+                    <input type="text" id="refresh_token_id" name="refresh_token_id" class="form-control" required>
+                    <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#refresh_token_modal" onclick="$('#refresh_token_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
+                </div>
             </div>
-        </div>
-        <div class="col-lg-6">
-            <div class="input-group">
-                <label for="device_id" class="input-group-text">Device ID</label>
-                <input type="text" id="device_id" name="device_id" class="form-control" required>
-                <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#device_modal" onclick="$('#device_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
+            <div class="col-lg-6">
+                <div class="input-group">
+                    <label for="os_version" class="input-group-text">OS Version</label>
+                    <input type="text" id="os_version" name="os_version" class="form-control" placeholder="10.0.26100">
+                </div>
             </div>
-        </div>
-        <div class="col-md-6">
-            <div class="input-group">
-                <label for="os_version" class="input-group-text">OS Version</label>
-                <input type="text" id="os_version" name="os_version" class="form-control" placeholder="10.0.26100">
+            <div class="col-xl-8">
+                <div class="input-group">
+                    <label for="device_id" class="input-group-text">Device ID</label>
+                    <input type="text" id="device_id" name="device_id" class="form-control" required>
+                    <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#device_modal" onclick="$('#device_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
+                </div>
             </div>
-        </div>
-        <div class="col-12">
-            <button type="button" class="btn btn-primary" onclick="requestPRT()">Request PRT</button>
-        </div>
-    </form>
-</div>
-<br>
-<div class="col-auto">
-    <h2>Active PRT</h2>
-    <form id="prt_form_active" class="row row-cols-auto">
-        <div class="col-auto">
-            <div class="input-group">
-                <label for="active_prt_id" class="input-group-text">Active PRT</label>
-                <input type="text" id="active_prt_id" name="active_prt_id" class="form-control">
-                <button type="Button" class="btn btn-primary" onclick="setActivePrt(active_prt_id.value)">Set active token</button>
+            <div class="col-auto">
+                <button type="button" class="btn btn-primary" onclick="requestPRT()">Request PRT</button>
             </div>
-        </div>
-    </form>
+        </form>
+        <br>
+        <h1>Active PRT</h1>
+        <form id="prt_form_active" class="row row-cols-auto">
+            <div class="col-auto">
+                <div class="input-group">
+                    <label for="active_prt_id" class="input-group-text">Active PRT</label>
+                    <input type="text" id="active_prt_id" name="active_prt_id" class="form-control">
+                    <button type="Button" class="btn btn-primary" onclick="setActivePrt(active_prt_id.value)">Set active token</button>
+                </div>
+            </div>
+        </form>
+    </div>
+    <div class="col-md-6">
+        <h1>Import PRT</h1>
+        <form id="import_prt_form" class="row g-3">
+            <div class="col-12">
+                <div class="input-group">
+                    <label for="import_prt" class="input-group-text">PRT</label>
+                    <input type="text" id="import_prt" name="prt" class="form-control" required>
+                </div>
+            </div>
+            <div class="col-12">
+                <div class="input-group">
+                    <label for="import_session_key" class="input-group-text">Session Key (hex)</label>
+                    <input type="text" id="import_session_key" name="session_key" class="form-control" required>
+                </div>
+            </div>
+            <div class="col-xl-6">
+                <div class="input-group">
+                    <label for="import_issued_at" class="input-group-text">Issued At (epoch)</label>
+                    <input type="text" id="import_issued_at" name="issued_at" class="form-control" placeholder="1735732800 (optional)">
+                </div>
+            </div>
+            <div class="col-xl-6">
+                <div class="input-group">
+                    <label for="import_expires_at" class="input-group-text">Expires At (epoch)</label>
+                    <input type="text" id="import_expires_at" name="expires_at" class="form-control" placeholder="1735732800 (optional)">
+                </div>
+            </div>
+            <div class="col-xl-6">
+                <div class="input-group">
+                    <label for="import_user" class="input-group-text">User</label>
+                    <input type="text" id="import_user" name="user" class="form-control" placeholder="john.doe@e-corp.local (optional)">
+                </div>
+            </div>
+            <div class="col-xl-6">
+                <div class="input-group">
+                    <label for="import_description" class="input-group-text">Description</label>
+                    <input type="text" id="import_description" name="description" class="form-control" placeholder="(optional)">
+                </div>
+            </div>
+            <div class="col-xl-8">
+                <div class="input-group">
+                    <label for="import_device_id" class="input-group-text">Device ID</label>
+                    <input type="text" id="import_device_id" name="import_device_id" class="form-control" placeholder="00000000-0000-0000-0000-000000000000 (optional)">
+                    <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#device_modal" onclick="$('#device_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
+                </div>
+            </div>
+            <div class="col-auto">
+                <button type="button" class="btn btn-primary" onclick="importPRT()">Import PRT</button>
+            </div>
+        </form>
+    </div>
 </div>
 <script>
     getActiveRefreshToken(document.getElementById("refresh_token_id"));
@@ -67,6 +118,33 @@
             },
             error: function(xhr) {
                 bootstrapToast("Request PRT", xhr.responseJSON.message, "danger");
+            }
+        });
+    }
+
+    function importPRT() {
+        let formData = {
+            prt: $('#import_prt').val(),
+            session_key: $('#import_session_key').val(),
+            device_id: $('#import_device_id').val() || "Unknown",
+            user: $('#import_user').val() || "Unknown",
+            description: $('#import_description').val() || null,
+            issued_at: $('#import_issued_at').val() || null,
+            expires_at: $('#import_expires_at').val() || null
+        };
+
+        $.ajax({
+            url: '/api/import_prt',
+            type: 'POST',
+            data: formData,
+            success: function(response) {
+                bootstrapToast("Import PRT", response.message, "success");
+                $('#primary_refresh_tokens').DataTable().ajax.reload(null, false);
+                // Clear form
+                $('#import_prt_form')[0].reset();
+            },
+            error: function(xhr) {
+                bootstrapToast("Import PRT", xhr.responseJSON.message, "danger");
             }
         });
     }
@@ -132,7 +210,7 @@
                 title: 'Issued At', 
                 'width': '170px',
                 render: function(data) {
-                    return new Date(data * 1000).toLocaleString();
+                    return data ? (new Date(data * 1000).toLocaleString()) : "Unknown";
                 }
             },
             { 
@@ -140,11 +218,12 @@
                 title: 'Expires At', 
                 'width': '170px',
                 render: function(data) {
-                    return new Date(data * 1000).toLocaleString();
+                    return data ? (new Date(data * 1000).toLocaleString()) : "Unknown";
                 }
             },
             { data: 'user', title: 'User', 'width': '370px' },
-            { data: 'device_id', title: 'Device ID', 'width': 'auto' },
+            { data: 'device_id', title: 'Device ID', 'width': '370px' },
+            { data: 'description', title: 'Description', 'width': 'auto' }
         ],
         order: [[6, 'desc']],
         colReorder: {
@@ -152,7 +231,10 @@
         },
         processing: true,
         createdRow: function (row, data, dataIndex) {
-            if (new Date(data.expires_at * 1000) > new Date()) {
+            if (!data.expires_at) {
+                $(row).children().addClass('bg-warning-subtle').addClass('text-warning-emphasis');
+            }
+            else if (new Date(data.expires_at * 1000) > new Date()) {
                 $(row).children().addClass('bg-success-subtle').addClass('text-success-emphasis');
             } else {
                 $(row).children().addClass('bg-danger-subtle').addClass('text-danger-emphasis');
@@ -223,9 +305,11 @@
                 id: id
             },
             success: function(response) {
-                if (response.status === 200) {
-                    $('#primary_refresh_tokens').DataTable().ajax.reload(null, false);
-                }
+                bootstrapToast("Delete PRT", response.message, "success");
+                $('#primary_refresh_tokens').DataTable().ajax.reload(null, false);
+            },
+            error: function(xhr) {
+                bootstrapToast("Delete PRT", xhr.responseJSON.message, "danger");
             }
         });
     }

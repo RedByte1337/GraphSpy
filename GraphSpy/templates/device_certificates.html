@@ -3,53 +3,110 @@
 {%block content%}
 
 <br>
-<div class="col-md-6">
-    <h1>Register Device</h1>
-    <form id="register_device_form" class="row g-3">
-        <div class="col-md-6">
-            <div class="input-group">
-                <label for="access_token_id" class="input-group-text">Access token id</label>
-                <input type="text" id="access_token_id" name="access_token_id" class="form-control" required>
-                <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#access_token_modal" onclick="$('#access_token_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
+<div class="row">
+    <div class="col-md-6">
+        <h1>Register Device</h1>
+        <form id="register_device_form" class="row g-3">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <label for="access_token_id" class="input-group-text">Access token id</label>
+                    <input type="text" id="access_token_id" name="access_token_id" class="form-control" required>
+                    <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#access_token_modal" onclick="$('#access_token_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
+                </div>
             </div>
-        </div>
-        <div class="col-md-6">
-            <div class="input-group">
-                <label for="device_name" class="input-group-text">Device Name</label>
-                <input type="text" id="device_name" name="device_name" class="form-control" placeholder="GraphSpy-Device">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <label for="device_name" class="input-group-text">Device Name</label>
+                    <input type="text" id="device_name" name="device_name" class="form-control" placeholder="GraphSpy-Device">
+                </div>
             </div>
-        </div>
-        <div class="col-md-6">
-            <div class="input-group">
-                <label for="join_type" class="input-group-text">Join Type</label>
-                <select id="join_type" name="join_type" class="form-select">
-                    <option value="0">Azure AD Joined</option>
-                    <option value="4">Hybrid Azure AD Joined</option>
-                </select>
+            <div class="col-md-6">
+                <div class="input-group">
+                    <label for="join_type" class="input-group-text">Join Type</label>
+                    <select id="join_type" name="join_type" class="form-select">
+                        <option value="0">Entra ID Joined</option>
+                        <option value="4">Entra ID Registered</option>
+                    </select>
+                </div>
             </div>
-        </div>
-        <div class="col-md-6">
-            <div class="input-group">
-                <label for="device_type" class="input-group-text">Device Type</label>
-                <input type="text" id="device_type" name="device_type" class="form-control" placeholder="Windows">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <label for="device_type" class="input-group-text">Device Type</label>
+                    <input type="text" id="device_type" name="device_type" class="form-control" placeholder="Windows">
+                </div>
             </div>
-        </div>
-        <div class="col-md-6">
-            <div class="input-group">
-                <label for="os_version" class="input-group-text">OS Version</label>
-                <input type="text" id="os_version" name="os_version" class="form-control" placeholder="10.0.26100">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <label for="os_version" class="input-group-text">OS Version</label>
+                    <input type="text" id="os_version" name="os_version" class="form-control" placeholder="10.0.26100">
+                </div>
             </div>
-        </div>
-        <div class="col-md-6">
-            <div class="input-group">
-                <label for="target_domain" class="input-group-text">Target Domain</label>
-                <input type="text" id="target_domain" name="target_domain" class="form-control" placeholder="e-corp.local">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <label for="target_domain" class="input-group-text">Target Domain</label>
+                    <input type="text" id="target_domain" name="target_domain" class="form-control" placeholder="e-corp.local">
+                </div>
             </div>
-        </div>
-        <div class="col-12">
-            <button type="button" class="btn btn-primary" onclick="registerDevice()">Register Device</button>
-        </div>
-    </form>
+            <div class="col-12">
+                <button type="button" class="btn btn-primary" onclick="registerDevice()">Register Device</button>
+            </div>
+        </form>
+    </div>
+    <div class="col-md-6">
+        <h1>Import Device Certificate</h1>
+        <form id="import_device_certificate_form" class="row g-3">
+            <div class="col-12">
+                <div class="input-group">
+                    <label for="import_certificate" class="input-group-text">Certificate (Base64 or PEM)</label>
+                    <textarea id="import_certificate" class="form-control" rows="2"></textarea>
+                    <input type="file" id="import_certificate_file" class="d-none" accept=".pem,.cer,.crt,.cert">
+                    <button class="btn btn-outline-secondary" type="button" onclick="$('#import_certificate_file').click()">
+                        <i class="fi fi-rr-upload"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="col-12">
+                <div class="input-group">
+                    <label for="import_private_key" class="input-group-text">Private Key (Base64 or PEM)</label>
+                    <textarea id="import_private_key" class="form-control" rows="2"></textarea>
+                    <input type="file" id="import_private_key_file" class="d-none" accept=".pem,.key">
+                    <button class="btn btn-outline-secondary" type="button" onclick="$('#import_private_key_file').click()">
+                        <i class="fi fi-rr-upload"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="col-xl-8">
+                <div class="input-group">
+                    <label for="import_device_id" class="input-group-text">Device ID</label>
+                    <input type="text" id="import_device_id" class="form-control" placeholder="Leave empty to auto-extract from certificate">
+                </div>
+            </div>
+            <div class="col-xl-6">
+                <div class="input-group">
+                    <label for="import_device_name" class="input-group-text">Device Name</label>
+                    <input type="text" id="import_device_name" class="form-control" placeholder="GraphSpy-Device (optional)">
+                </div>
+            </div>
+            <div class="col-xl-6">
+                <div class="input-group">
+                    <label for="import_device_type" class="input-group-text">Device Type</label>
+                    <input type="text" id="import_device_type" class="form-control" placeholder="Windows (optional)">
+                </div>
+            </div>
+            <div class="col-xl-6">
+                <div class="input-group">
+                    <label for="import_join_type" class="input-group-text">Join Type</label>
+                    <select id="import_join_type" class="form-select">
+                        <option value="0">Microsoft Entra Joined</option>
+                        <option value="4">Microsoft Entra Registered</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-auto">
+                <button type="button" class="btn btn-primary" onclick="importDeviceCertificate()">Import Certificate</button>
+            </div>
+        </form>
+    </div>
 </div>
 <script>
     getActiveAccessToken(document.getElementById("access_token_id"));
@@ -77,6 +134,97 @@
             }
         });
     }
+
+    function importDeviceCertificate() {
+        let certificate = $('#import_certificate').val();
+        // Check if the certificate is a base64 encoded PEM
+        if (!certificate.includes('-----BEGIN CERTIFICATE-----')) {
+            try {
+                let decoded = atob(certificate);
+                if (decoded.includes('-----BEGIN CERTIFICATE-----')) {
+                    certificate = decoded;
+                }
+            } catch (e) {
+                // If base64 decoding fails, this is likely not a valid certificate format
+                bootstrapToast("Import Device Certificate", "Invalid certificate format", "danger");
+                return;
+            }
+        }
+        // Check if it's a PEM certificate, and if so, remove the PEM headers and line breaks
+        if (certificate.includes('-----BEGIN CERTIFICATE-----')) {
+            certificate = certificate.replace('-----BEGIN CERTIFICATE-----', '')
+                                   .replace('-----END CERTIFICATE-----', '')
+                                   .replace(/\r?\n/g, '')
+                                   .trim();
+        }
+
+        let privateKey = $('#import_private_key').val();
+        // Check if the private key is a base64 encoded PEM
+        if (!privateKey.includes('-----BEGIN RSA PRIVATE KEY-----')) {
+            try {
+                let decoded = atob(privateKey);
+                if (!decoded.includes('-----BEGIN RSA PRIVATE KEY-----')) {
+                    // This is likely a raw base64 private key string, wrap it in PEM headers
+                    privateKey = '-----BEGIN RSA PRIVATE KEY-----\n' + 
+                           privateKey.match(/.{1,64}/g).join('\n') + 
+                           '\n-----END RSA PRIVATE KEY-----';
+                }
+            } catch (e) {
+                // If decoding fails, this is likely not a valid private key format
+                bootstrapToast("Import Device Certificate", "Invalid private key format", "danger");
+                return;
+            }
+        }
+        // If it's a PEM but not base64 encoded, encode it
+        if (privateKey.includes('-----BEGIN RSA PRIVATE KEY-----')) {
+            privateKey = btoa(privateKey);
+        }
+
+        let formData = {
+            certificate_base64: certificate,
+            private_key_pem_base64: privateKey,
+            device_id: $('#import_device_id').val(),
+            device_name: $('#import_device_name').val(),
+            device_type: $('#import_device_type').val(),
+            join_type: $('#import_join_type').val()
+        };
+
+        $.ajax({
+            url: '/api/import_device_certificate',
+            type: 'POST',
+            data: formData,
+            success: function(response) {
+                bootstrapToast("Import Device Certificate", response.message, "success");
+                $('#device_certificates').DataTable().ajax.reload(null, false);
+            },
+            error: function(xhr) {
+                bootstrapToast("Import Device Certificate", xhr.responseJSON.message, "danger");
+            }
+        });
+    }
+
+    // Add file input handlers
+    document.getElementById('import_certificate_file').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                $('#import_certificate').val(e.target.result);
+            };
+            reader.readAsText(file);
+        }
+    });
+
+    document.getElementById('import_private_key_file').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                $('#import_private_key').val(e.target.result);
+            };
+            reader.readAsText(file);
+        }
+    });
 </script>
 <br>
 <div>
@@ -191,9 +339,11 @@
                 id: id
             },
             success: function(response) {
-                if (response.status === 200) {
-                    $('#device_certificates').DataTable().ajax.reload(null, false);
-                }
+                bootstrapToast("Delete Device Certificate", response.message, "success");
+                $('#device_certificates').DataTable().ajax.reload(null, false);
+            },
+            error: function(xhr) {
+                bootstrapToast("Delete Device Certificate", xhr.responseJSON.message, "danger");
             }
         });
     }

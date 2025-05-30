@@ -26,10 +26,10 @@ def init_db():
     con.execute('CREATE TABLE teams_settings (access_token_id INTEGER PRIMARY KEY, skypeToken TEXT, skype_id TEXT, issued_at INTEGER, expires_at INTEGER, teams_settings_raw TEXT)')
     con.execute('CREATE TABLE mfa_otp (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at TEXT, secret_key TEXT, account_name INTEGER, description TEXT)')
     con.execute('CREATE TABLE device_certificates (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at INTEGER, device_id TEXT, device_name TEXT, device_type TEXT, join_type TEXT, priv_key TEXT, certificate TEXT)')
-    con.execute('CREATE TABLE primary_refresh_tokens (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT, user TEXT, prt TEXT, session_key TEXT, issued_at INTEGER, expires_at INTEGER)') # To check if this is complete?
+    con.execute('CREATE TABLE primary_refresh_tokens (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT, user TEXT, prt TEXT, session_key TEXT, issued_at INTEGER, expires_at INTEGER, description TEXT)')
     con.execute('CREATE TABLE winhello_keys (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at INTEGER, key_id TEXT, device_id TEXT, user TEXT, priv_key TEXT)')
     con.execute('CREATE TABLE settings (setting TEXT UNIQUE, value TEXT)')
-    # Valid Settings: active_access_token_id, active_refresh_token_id, schema_version, user_agent
+    # Valid Settings: active_access_token_id, active_refresh_token_id, active_prt_id, schema_version, user_agent
     cur = con.cursor()
     cur.execute("INSERT INTO settings (setting, value) VALUES ('schema_version', '5')")
     con.commit()
@@ -103,7 +103,7 @@ def update_db():
     if current_schema_version == "4":
         print("[*] Current database is schema version 4, updating to schema version 5")
         execute_db('CREATE TABLE device_certificates (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at INTEGER, device_id TEXT, device_name TEXT, device_type TEXT, join_type TEXT, priv_key TEXT, certificate TEXT)')
-        execute_db('CREATE TABLE primary_refresh_tokens (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT, user TEXT, prt TEXT, session_key TEXT, issued_at INTEGER, expires_at INTEGER)')
+        execute_db('CREATE TABLE primary_refresh_tokens (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT, user TEXT, prt TEXT, session_key TEXT, issued_at INTEGER, expires_at INTEGER, description TEXT)')
         execute_db('CREATE TABLE winhello_keys (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at INTEGER, key_id TEXT, device_id TEXT, user TEXT, priv_key TEXT)')
         execute_db("ALTER TABLE refreshtokens ADD COLUMN client_id TEXT")
         execute_db("UPDATE settings SET value = '5' WHERE setting = 'schema_version'")
@@ -650,7 +650,15 @@ def request_prt_for_device(device_id, refresh_token_id, os_version = "10.0.26100
     # Store PRT
     issued_at = int(datetime.now().timestamp())
     expires_at = response_json["expires_on"]
-    prt_id = execute_db("INSERT INTO primary_refresh_tokens (device_id, user, prt, session_key, issued_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)", (device_id, refresh_token_user, prt, session_key_hex, issued_at, expires_at))
+    prt_id = execute_db("INSERT INTO primary_refresh_tokens (device_id, user, prt, session_key, issued_at, expires_at, description) VALUES (?, ?, ?, ?, ?, ?, ?)", (
+        device_id, 
+        refresh_token_user, 
+        prt, 
+        session_key_hex, 
+        issued_at, 
+        expires_at, 
+        f"Created using refresh token {refresh_token_id}"
+    ))
     return prt_id
 
 def calculate_derived_key(session_key, context):
@@ -751,13 +759,14 @@ def refresh_prt_to_access_token(prt_id, client_id = "d3590ed6-52b3-4102-aeff-aad
     issued_at = int(datetime.now().timestamp())
     expires_at = issued_at + int(decrypted_response_json["refresh_token_expires_in"])
     if refresh_prt and "refresh_token" in decrypted_response_json:
-        prt_id = execute_db("INSERT INTO primary_refresh_tokens (device_id, user, prt, session_key, issued_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)", (
+        prt_id = execute_db("INSERT INTO primary_refresh_tokens (device_id, user, prt, session_key, issued_at, expires_at, description) VALUES (?, ?, ?, ?, ?, ?, ?)", (
             prt_row["device_id"], 
             prt_row["user"], 
             decrypted_response_json["refresh_token"], 
             prt_row["session_key"], 
             issued_at, 
-            expires_at
+            expires_at,
+            f"Refreshed from PRT {prt_id}"
             )
         )
     elif "refresh_token" in decrypted_response_json:
@@ -926,8 +935,18 @@ def winhello_to_prt(winhello_id, device_id = None, winhello_username = None):
     # Store PRT
     issued_at = int(datetime.now().timestamp())
     expires_at = response_json["expires_on"]
-    prt_id = execute_db("INSERT INTO primary_refresh_tokens (device_id, user, prt, session_key, issued_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)", (device_id, winhello_username, prt, session_key_hex, issued_at, expires_at))
+    prt_id = execute_db("INSERT INTO primary_refresh_tokens (device_id, user, prt, session_key, issued_at, expires_at, description) VALUES (?, ?, ?, ?, ?, ?, ?)", (
+        device_id, winhello_username, 
+        prt, 
+        session_key_hex, 
+        issued_at, 
+        expires_at, 
+        f"Created with WinHello key {winhello_id}"
+    ))
     return prt_id
+
+    # To Do:
+    # Allow manually adding a PRT, device certificate, and WinHello key in the UI with APIs
         
 # ========== MFA Functions ==========
 
@@ -1623,6 +1642,40 @@ def init_routes():
             return create_response(400, "Failed to register device.")
         return create_response(200, f"Successfully registered new device with Device ID {device_id}.", {"device_id": device_id})
 
+    @app.post("/api/import_device_certificate")
+    def api_import_device_certificate():
+        certificate_base64 = request.form.get('certificate_base64')
+        if not certificate_base64:
+            return create_response(400, "[Error] No certificate_base64 specified.")
+        private_key_pem_base64 = request.form.get('private_key_pem_base64')
+        if not private_key_pem_base64:
+            return create_response(400, "[Error] No private_key_pem_base64 specified.")
+        device_id = request.form.get('device_id')
+        if not device_id:
+            try:  
+                from cryptography import x509
+                from cryptography.x509.oid import NameOID
+                certificate = x509.load_der_x509_certificate(base64.b64decode(certificate_base64))
+                device_id = certificate.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
+            except:
+                return create_response(400, "[Error] Invalid certificate format.")
+        device_name = request.form.get('device_name') or "GraphSpy-Device"
+        device_type = request.form.get('device_type') or "Windows"
+        join_type = int(request.form.get('join_type')) if request.form.get('join_type') else 0
+        device_certificate_id = execute_db("INSERT INTO device_certificates (stored_at, device_id, device_name, device_type, join_type, priv_key, certificate) VALUES (?, ?, ?, ?, ?, ?, ?)", (
+            int(time.time()),
+            device_id, 
+            device_name, 
+            device_type, 
+            "joined" if join_type == 0 else "registered" if join_type == 4 else "unknown", 
+            private_key_pem_base64, 
+            certificate_base64
+        ))
+        if device_certificate_id:
+            return create_response(200, f"Successfully added device certificate with ID {device_certificate_id} to the database.", {"device_certificate_id": device_certificate_id})
+        else:
+            return create_response(400, "[Error] Failed to add device certificate to database.")
+
     @app.route("/api/list_device_certificates")
     def api_list_device_certificates():
         rows = query_db_json("SELECT * FROM device_certificates")
@@ -1652,6 +1705,43 @@ def init_routes():
         if not prt_id:
             return create_response(400, f"Failed to request PRT for device with ID {device_id}.")
         return create_response(200, f"Successfully requested PRT with ID {prt_id}.", {"prt_id": prt_id})
+
+    @app.post("/api/import_prt")
+    def api_import_prt():
+        prt = request.form.get('prt')
+        if not prt:
+            return create_response(400, "[Error] No prt specified.")
+        session_key = request.form.get('session_key')
+        if not session_key:
+            return create_response(400, "[Error] No session_key specified.")
+        device_id = request.form.get('device_id') or "Unknown"
+        user = request.form.get('user') or "Unknown"
+        issued_at = request.form.get('issued_at') or None
+        if type(issued_at) != int:
+            try:
+                issued_at = int(issued_at)
+            except:
+                issued_at = None
+        expires_at = request.form.get('expires_at') or None
+        if type(expires_at) != int:
+            try:
+                expires_at = int(expires_at)
+            except:
+                expires_at = None
+        description = request.form.get('description') or f"Manually added at {str(datetime.now()).split('.')[0]}"
+        prt_id = execute_db("INSERT INTO primary_refresh_tokens (device_id, user, prt, session_key, issued_at, expires_at, description) VALUES (?, ?, ?, ?, ?, ?, ?)", (
+            device_id, 
+            user, 
+            prt, 
+            session_key, 
+            issued_at, 
+            expires_at, 
+            description
+        ))
+        if prt_id:
+            return create_response(200, f"Successfully added PRT with ID {prt_id} to the database.", {"prt_id": prt_id})
+        else:
+            return create_response(400, "[Error] Failed to add PRT to database.")
 
     @app.route("/api/list_primary_refresh_tokens")
     def api_list_primary_refresh_tokens():
@@ -1715,6 +1805,30 @@ def init_routes():
         winhello_id = register_winhello(access_token_id)
         return create_response(200, f"Successfully registered WinHello for device with ID {winhello_id}.", {"winhello_id": winhello_id})
     
+    @app.post("/api/import_winhello_key")
+    def api_import_winhello_key():
+        private_key_pem_base64 = request.form.get('private_key_pem_base64')
+        if not private_key_pem_base64:
+            return create_response(400, "[Error] No private_key_pem_base64 specified.")
+        device_id = request.form.get('device_id')
+        if not device_id:
+            return create_response(400, "[Error] No device_id specified.")
+        user = request.form.get('user')
+        if not user:
+            return create_response(400, "[Error] No user specified.")
+        key_id = request.form.get('key_id') or "Unknown"
+        winhello_key_id = execute_db("INSERT INTO winhello_keys (stored_at, key_id, device_id, user, priv_key) VALUES (?, ?, ?, ?, ?)", (
+            int(time.time()),
+            key_id, 
+            device_id, 
+            user, 
+            private_key_pem_base64
+        ))
+        if winhello_key_id:
+            return create_response(200, f"Successfully added WinHello key with ID {winhello_key_id} to the database.", {"winhello_key_id": winhello_key_id})
+        else:
+            return create_response(400, "[Error] Failed to add WinHello key to database.")
+
     @app.route("/api/list_winhello_keys")
     def api_list_winhello_keys():
         rows = query_db_json("SELECT * FROM winhello_keys")

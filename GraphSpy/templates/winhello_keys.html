@@ -18,8 +18,7 @@
                 <button type="button" class="btn btn-primary" onclick="registerWinHello()">Register WinHello Key</button>
             </div>
         </form>
-    </div>
-    <div class="col-md-6">
+        <br>
         <h1>Generate PRT from WinHello</h1>
         <form id="winhello_to_prt_form" class="row g-3">
             <div class="col-auto">
@@ -29,21 +28,58 @@
                     <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#winhello_modal" onclick="$('#winhello_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
                 </div>
             </div>
-            <div class="col-md-12">
+            <div class="col-xl-8">
                 <div class="input-group">
-                    <label for="device_id" class="input-group-text">Device ID (Optional)</label>
-                    <input type="text" id="device_id" name="device_id" class="form-control">
+                    <label for="device_id" class="input-group-text">Device ID</label>
+                    <input type="text" id="device_id" name="device_id" class="form-control" placeholder="Leave empty to use device linked to WinHello key">
                     <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#device_modal" onclick="$('#device_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
                 </div>
             </div>
-            <div class="col-md-12">
+            <div class="col-xl-8">
                 <div class="input-group">
-                    <label for="winhello_username" class="input-group-text">Username (Optional)</label>
-                    <input type="text" id="winhello_username" name="winhello_username" class="form-control">
+                    <label for="winhello_username" class="input-group-text">Username</label>
+                    <input type="text" id="winhello_username" name="winhello_username" class="form-control" placeholder="Leave empty to use username linked to WinHello key">
                 </div>
             </div>
             <div class="col-12">
                 <button type="button" class="btn btn-primary" onclick="generatePRTFromWinHello()">Generate PRT</button>
+            </div>
+        </form>
+    </div>
+    <div class="col-md-6">
+        <h1>Import WinHello Key</h1>
+        <form id="import_winhello_form" class="row g-3">
+            <div class="col-12">
+                <div class="input-group">
+                    <label for="import_private_key" class="input-group-text">Private Key (Base64 or PEM)</label>
+                    <textarea id="import_private_key" class="form-control" rows="2"></textarea>
+                    <input type="file" id="import_private_key_file" class="d-none" accept=".pem,.key">
+                    <button class="btn btn-outline-secondary" type="button" onclick="$('#import_private_key_file').click()">
+                        <i class="fi fi-rr-upload"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="col-xl-8">
+                <div class="input-group">
+                    <label for="import_device_id" class="input-group-text">Device ID</label>
+                    <input type="text" id="import_device_id" class="form-control" required>
+                    <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#device_modal" onclick="$('#device_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
+                </div>
+            </div>
+            <div class="col-xl-6">
+                <div class="input-group">
+                    <label for="import_user" class="input-group-text">Username</label>
+                    <input type="text" id="import_user" class="form-control" required placeholder="john.doe@e-corp.local">
+                </div>
+            </div>
+            <div class="col-xl-6">
+                <div class="input-group">
+                    <label for="import_key_id" class="input-group-text">Key ID</label>
+                    <input type="text" id="import_key_id" class="form-control" placeholder="00000000-0000-0000-0000-000000000000 (optional)">
+                </div>
+            </div>
+            <div class="col-auto">
+                <button type="button" class="btn btn-primary" onclick="importWinHelloKey()">Import Key</button>
             </div>
         </form>
     </div>
@@ -100,6 +136,62 @@ function generatePRTFromWinHelloForm() {
     let device_id = $('#device_id').val();
     let winhello_username = $('#winhello_username').val();
     generatePRTFromWinHello(winhello_id, device_id, winhello_username);
+}
+
+// Add file input handler for private key
+document.getElementById('import_private_key_file').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            $('#import_private_key').val(e.target.result);
+        };
+        reader.readAsText(file);
+    }
+});
+
+function importWinHelloKey() {
+    let privateKey = $('#import_private_key').val();
+    // Check if the private key is a base64 encoded PEM
+    if (!privateKey.includes('-----BEGIN RSA PRIVATE KEY-----')) {
+        try {
+            let decoded = atob(privateKey);
+            if (!decoded.includes('-----BEGIN RSA PRIVATE KEY-----')) {
+                // This is likely a raw base64 private key string, wrap it in PEM headers
+                privateKey = '-----BEGIN RSA PRIVATE KEY-----\n' + 
+                            privateKey.match(/.{1,64}/g).join('\n') + 
+                            '\n-----END RSA PRIVATE KEY-----';
+            }
+        } catch (e) {
+            // If decoding fails, this is likely not a valid private key format
+            bootstrapToast("Import WinHello Key", "Invalid private key format", "danger");
+            return;
+        }
+    }
+    // If it's a PEM but not base64 encoded, encode it
+    if (privateKey.includes('-----BEGIN RSA PRIVATE KEY-----')) {
+        privateKey = btoa(privateKey);
+    }
+
+    let formData = {
+        private_key_pem_base64: privateKey,
+        device_id: $('#import_device_id').val(),
+        user: $('#import_user').val(),
+        key_id: $('#import_key_id').val() || "Unknown"
+    };
+
+    $.ajax({
+        url: '/api/import_winhello_key',
+        type: 'POST',
+        data: formData,
+        success: function(response) {
+            bootstrapToast("Import WinHello Key", response.message, "success");
+            $('#winhello_keys').DataTable().ajax.reload(null, false);
+        },
+        error: function(xhr) {
+            bootstrapToast("Import WinHello Key", xhr.responseJSON.message, "danger");
+        }
+    });
 }
 </script>
 

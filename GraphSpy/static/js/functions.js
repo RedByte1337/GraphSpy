@@ -191,6 +191,7 @@ function loadDeviceModalTable() {
         let tr = e.target.closest('tr');
         let row = deviceTable.row(tr);
         $('input#device_id').val(row.data().device_id);
+        $('input#import_device_id').val(row.data().device_id);
         $('#device_modal').modal('hide');
     });
 }
