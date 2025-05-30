@@ -1,0 +1,227 @@
+{% extends 'layout.html'%}
+
+{%block content%}
+
+<br>
+<div class="row">
+    <div class="col-md-6">
+        <h1>Register WinHello Key</h1>
+        <form id="register_winhello_form" class="row g-3">
+            <div class="col-auto">
+                <div class="input-group">
+                    <label for="access_token_id" class="input-group-text">Access token id</label>
+                    <input type="text" id="access_token_id" name="access_token_id" class="form-control" required>
+                    <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#access_token_modal" onclick="$('#access_token_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
+                </div>
+            </div>
+            <div class="col-12">
+                <button type="button" class="btn btn-primary" onclick="registerWinHello()">Register WinHello Key</button>
+            </div>
+        </form>
+    </div>
+    <div class="col-md-6">
+        <h1>Generate PRT from WinHello</h1>
+        <form id="winhello_to_prt_form" class="row g-3">
+            <div class="col-auto">
+                <div class="input-group">
+                    <label for="winhello_id" class="input-group-text">WinHello ID</label>
+                    <input type="text" id="winhello_id" name="winhello_id" class="form-control" required>
+                    <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#winhello_modal" onclick="$('#winhello_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
+                </div>
+            </div>
+            <div class="col-md-12">
+                <div class="input-group">
+                    <label for="device_id" class="input-group-text">Device ID (Optional)</label>
+                    <input type="text" id="device_id" name="device_id" class="form-control">
+                    <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#device_modal" onclick="$('#device_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
+                </div>
+            </div>
+            <div class="col-md-12">
+                <div class="input-group">
+                    <label for="winhello_username" class="input-group-text">Username (Optional)</label>
+                    <input type="text" id="winhello_username" name="winhello_username" class="form-control">
+                </div>
+            </div>
+            <div class="col-12">
+                <button type="button" class="btn btn-primary" onclick="generatePRTFromWinHello()">Generate PRT</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    getActiveAccessToken(document.getElementById("access_token_id"));
+    loadDeviceModalTable();
+    loadWinHelloModalTable();
+
+    function registerWinHello() {
+        $.ajax({
+            url: '/api/register_winhello',
+            type: 'POST',
+            data: {
+                access_token_id: $('#access_token_id').val()
+            },
+            success: function(response) {
+                bootstrapToast("Register WinHello", response.message, "success");
+                $('#winhello_keys').DataTable().ajax.reload(null, false);
+            },
+            error: function(xhr) {
+                bootstrapToast("Register WinHello", xhr.responseJSON.message, "danger");
+            }
+        });
+    }
+
+function generatePRTFromWinHello(winhello_id, device_id = null, winhello_username = null) {
+    let formData = {
+        winhello_id: winhello_id
+    };
+    if (device_id) {
+        formData.device_id = device_id;
+    }
+    if (winhello_username) {
+        formData.winhello_username = winhello_username;
+    }
+    $.ajax({
+        url: '/api/winhello_to_prt',
+        type: 'POST',
+        data: formData,
+        success: function(response) {
+            bootstrapToast("Generate PRT from WinHello", response.message, "success");
+            $('#winhello_keys').DataTable().ajax.reload(null, false);
+        },
+        error: function(xhr) {
+            bootstrapToast("Generate PRT from WinHello", xhr.responseJSON.message, "danger");
+        }
+    });
+}
+
+function generatePRTFromWinHelloForm() {
+    let winhello_id = $('#winhello_id').val();
+    let device_id = $('#device_id').val();
+    let winhello_username = $('#winhello_username').val();
+    generatePRTFromWinHello(winhello_id, device_id, winhello_username);
+}
+</script>
+
+<br>
+<div>
+    <h1>WinHello Keys</h1>
+    <table id="winhello_keys" class="table table-striped nowrap" style="table-layout: fixed; width:100%">
+    </table>
+</div>
+
+<script type="text/javascript" class="init">
+    // Populate the winhello_keys table
+    let myTable = new DataTable('#winhello_keys', {
+        ajax: {
+            url: '/api/list_winhello_keys', dataSrc: "data"
+        },
+        columns: [
+            {
+                className: 'dt-control table-control',
+                orderable: false,
+                data: null,
+                defaultContent: '',
+                'width': '40px'
+            },
+            {
+                className: 'copy-key-control table-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-rr-key" title="Copy Private Key to Clipboard" style="cursor: pointer"></i>',
+                'width': '40px'
+            },
+            {
+                className: 'generate-prt-control table-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-rr-laptop-refresh" title="Generate PRT from WinHello Key" style="cursor: pointer"></i>',
+                'width': '40px'
+            },
+            {
+                className: 'delete-control table-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-rr-trash" title="Delete WinHello Key" style="cursor: pointer"></i>',
+                'width': '40px'
+            },
+            { data: 'id', title: 'ID', 'width': '60px' },
+            { 
+                data: 'stored_at', 
+                title: 'Stored At', 
+                'width': '170px',
+                render: function(data) {
+                    return new Date(data * 1000).toLocaleString();
+                }
+            },
+            { data: 'user', title: 'User', 'width': '370px' },
+            { data: 'device_id', title: 'Device ID', 'width': '370px' },
+            { data: 'key_id', title: 'Key ID', 'width': 'auto' }
+        ],
+        order: [[4, 'desc']],
+        colReorder: {
+            columns: ':gt(3)'
+        },
+        processing: true
+    });
+
+    myTable.on('click', 'td.dt-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+
+        if (row.child.isShown()) {
+            // This row is already open - close it
+            row.child.hide();
+        }
+        else {
+            // Open this row
+            row.child(format(row.data())).show();
+        }
+    });
+
+    myTable.on('click', 'td.copy-key-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+        copyToClipboard(row.data().priv_key);
+    });
+
+    myTable.on('click', 'td.generate-prt-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+        generatePRTFromWinHello(row.data().id);
+    });
+
+    myTable.on('click', 'td.delete-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = myTable.row(tr);
+        if (!confirm(`Are you sure you want to delete the WinHello key with ID ${row.data().id}?`)) { return }
+        deleteWinHelloKey(row.data().id);
+        $('#winhello_keys').DataTable().ajax.reload(null, false);
+    });
+
+    function format(d) {
+        var formatWrapper = $('<dl style="word-break: break-all; white-space: pre-wrap"></dl>');
+        formatWrapper.append($('<dt>Private Key:</dt>'));
+        formatWrapper.append($('<dd></dd>').append($('<code></code>').text(d.priv_key)));
+        return formatWrapper;
+    }
+
+    function deleteWinHelloKey(id) {
+        $.ajax({
+            url: '/api/delete_winhello_key',
+            type: 'POST',
+            data: {
+                id: id
+            },
+            success: function(response) {
+                bootstrapToast("Delete WinHello Key", response.message, "success");
+                $('#winhello_keys').DataTable().ajax.reload(null, false);
+            },
+            error: function(xhr) {
+                bootstrapToast("Delete WinHello Key", xhr.responseJSON.message, "danger");
+            }
+        });
+    }
+</script>
+
+{%endblock content%} 

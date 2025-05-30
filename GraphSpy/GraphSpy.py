@@ -849,7 +849,7 @@ def register_winhello(access_token_id):
     ))
     return winhello_id
     
-def winhello_to_prt(winhello_id, device_id = None):
+def winhello_to_prt(winhello_id, device_id = None, winhello_username = None):
     """
     All credit to:
     https://github.com/dirkjanm/ROADtools
@@ -868,7 +868,8 @@ def winhello_to_prt(winhello_id, device_id = None):
     kid = base64.b64encode(digest.finalize()).decode('utf-8')
     if not device_id:
         device_id = winhello["device_id"]
-    winhello_username = winhello["user"]
+    if not winhello_username:
+        winhello_username = winhello["user"]
     
     winhello_assertion_payload = {
           "iss": winhello_username,
@@ -1492,6 +1493,10 @@ def init_routes():
     def primary_refresh_tokens():
         return render_template('primary_refresh_tokens.html', title="Primary Refresh Tokens")
 
+    @app.route("/winhello_keys")
+    def winhello_keys():
+        return render_template('winhello_keys.html', title="Windows Hello Keys")
+
     @app.route("/device_codes")
     def device_codes():
         return render_template('device_codes.html', title="Device Codes")
@@ -1606,7 +1611,7 @@ def init_routes():
     @app.post("/api/register_device")
     def api_register_device():
         if not "access_token_id" in request.form:
-            return f"[Error] No access_token_id specified.", 400
+            return create_response(400, "[Error] No access_token_id specified.")
         access_token_id = request.form['access_token_id']
         device_name = request.form.get('device_name') or "GraphSpy-Device"
         join_type = int(request.form.get('join_type')) if request.form.get('join_type') else 0
@@ -1626,7 +1631,7 @@ def init_routes():
     @app.post("/api/delete_device_certificate")
     def api_delete_device_certificate():
         if not "id" in request.form:
-            return f"[Error] No id specified.", 400
+            return create_response(400, "[Error] No id specified.")
         id = request.form['id']
         execute_db("DELETE FROM device_certificates WHERE id = ?",[id])
         return create_response(200, f"Deleted device certificate with ID {id}.")
@@ -1634,13 +1639,13 @@ def init_routes():
     @app.post("/api/request_prt_for_device")
     def api_request_prt_for_device():
         if not "device_id" in request.form and not "id" in request.form:
-            return f"[Error] No 'device_id' or 'id' specified.", 400
+            return create_response(400, "[Error] No 'device_id' or 'id' specified.")
         if "device_id" in request.form and request.form['device_id']:
             device_id = request.form['device_id']
         else:
             device_id = query_db("SELECT device_id FROM device_certificates WHERE id = ?",[request.form['id']],one=True)
         if not "refresh_token_id" in request.form:
-            return f"[Error] No refresh_token_id specified.", 400
+            return create_response(400, "[Error] No refresh_token_id specified.")
         refresh_token_id = request.form['refresh_token_id']
         os_version = request.form.get('os_version') or "10.0.26100"
         prt_id = request_prt_for_device(device_id, refresh_token_id, os_version)
@@ -1663,7 +1668,7 @@ def init_routes():
     @app.post("/api/delete_primary_refresh_token")
     def api_delete_primary_refresh_token():
         if not "id" in request.form:
-            return f"[Error] No id specified.", 400
+            return create_response(400, "[Error] No id specified.")
         id = request.form['id']
         execute_db("DELETE FROM primary_refresh_tokens WHERE id = ?",[id])
         return create_response(200, f"Deleted primary refresh token with ID {id}.")
@@ -1671,7 +1676,7 @@ def init_routes():
     @app.post("/api/refresh_prt_to_access_token")
     def api_refresh_prt_to_access_token():
         if not "prt_id" in request.form:
-            return f"[Error] No prt_id specified.", 400
+            return create_response(400, "[Error] No prt_id specified.")
         prt_id = request.form['prt_id']
         client_id = request.form.get('client_id') or "d3590ed6-52b3-4102-aeff-aad2292ab01c"
         resource = request.form.get('resource') or "https://graph.microsoft.com"
@@ -1697,7 +1702,7 @@ def init_routes():
     @app.post("/api/generate_prt_cookie")
     def api_generate_prt_cookie():
         if not "prt_id" in request.form:
-            return f"[Error] No prt_id specified.", 400
+            return create_response(400, "[Error] No prt_id specified.")
         prt_id = request.form['prt_id']
         prt_cookie = generate_prt_cookie(prt_id)
         return create_response(200, f"Successfully generated PRT cookie using PRT {prt_id}.", {"prt_cookie": prt_cookie})
@@ -1705,7 +1710,7 @@ def init_routes():
     @app.post("/api/register_winhello")
     def api_register_winhello():
         if not "access_token_id" in request.form:
-            return f"[Error] No access_token_id specified.", 400
+            return create_response(400, "[Error] No access_token_id specified.")
         access_token_id = request.form['access_token_id']
         winhello_id = register_winhello(access_token_id)
         return create_response(200, f"Successfully registered WinHello for device with ID {winhello_id}.", {"winhello_id": winhello_id})
@@ -1718,13 +1723,22 @@ def init_routes():
     @app.post("/api/winhello_to_prt")
     def api_winhello_to_prt():
         if not "winhello_id" in request.form:
-            return f"[Error] No winhello_id specified.", 400
+            return create_response(400, "[Error] No winhello_id specified.")
         winhello_id = request.form['winhello_id']
         device_id = request.form.get('device_id') 
+        winhello_username = request.form.get('winhello_username') 
         if not device_id and "device_db_id" in request.form:
             device_id = query_db("SELECT device_id FROM device_certificates WHERE id = ?",[request.form['device_db_id']],one=True) or None
-        prt_id = winhello_to_prt(winhello_id, device_id)
+        prt_id = winhello_to_prt(winhello_id, device_id, winhello_username)
         return create_response(200, f"Successfully used WinHello key to obtain PRT with ID {prt_id}.", {"prt_id": prt_id})
+
+    @app.post("/api/delete_winhello_key")
+    def api_delete_winhello_key():
+        if not "id" in request.form:
+            return create_response(400, "[Error] No id specified.")
+        id = request.form['id']
+        execute_db("DELETE FROM winhello_keys WHERE id = ?", [id])
+        return create_response(200, f"Successfully deleted WinHello key with ID {id}.")
 
         # ========== MFA ==========
 

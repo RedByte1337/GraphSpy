@@ -158,6 +158,87 @@ function setActivePrt(id) {
     });
 }
 
+function loadDeviceModalTable() {
+    // Create device selection modal
+    let deviceModal = createModal("device_modal", "Select Device", `
+        <div id="dTable" class="box-body table-responsive" style="padding:10px;">
+            <table id="device_modal_table" class="table table-striped nowrap" style="width:100%">
+            </table>
+        </div>
+    `, "modal-xl");
+    // Initialize device selection table
+    let deviceTable = new DataTable('#device_modal_table', {
+        ajax: {
+            url: '/api/list_device_certificates', dataSrc: "data"
+        },
+        columns: [
+            {
+                className: 'select-control table-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-rr-check" title="Select Device" style="cursor: pointer"></i>',
+                'width': '40px'
+            },
+            { data: 'id', title: 'ID', 'width': '60px' },
+            { data: 'device_id', title: 'Device ID', 'width': '320px' },
+            { data: 'device_name', title: 'Device Name', 'width': '250px' },
+            { data: 'join_type', title: 'Join Type', 'width': '150px' },
+            { data: 'device_type', title: 'Device Type', 'width': '150px' }
+        ],
+        order: [[1, 'desc']]
+    });
+    deviceTable.on('click', 'td.select-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = deviceTable.row(tr);
+        $('input#device_id').val(row.data().device_id);
+        $('#device_modal').modal('hide');
+    });
+}
+
+function loadWinHelloModalTable() {
+    // Create WinHello key selection modal
+    let winhelloModal = createModal("winhello_modal", "Select WinHello Key", `
+        <div id="dTable" class="box-body table-responsive" style="padding:10px;">
+            <table id="winhello_modal_table" class="table table-striped nowrap" style="width:100%">
+            </table>
+        </div>
+    `, "modal-xl");
+    // Initialize WinHello key selection table
+    let winhelloTable = new DataTable('#winhello_modal_table', {
+        ajax: {
+            url: '/api/list_winhello_keys', dataSrc: "data"
+        },
+        columns: [
+            {
+                className: 'select-control table-control',
+                orderable: false,
+                data: null,
+                defaultContent: '<i class="fi fi-rr-check" title="Select WinHello Key" style="cursor: pointer"></i>',
+                'width': '40px'
+            },
+            { data: 'id', title: 'ID', 'width': '60px' },
+            { 
+                data: 'stored_at', 
+                title: 'Stored At', 
+                'width': '170px',
+                render: function(data) {
+                    return new Date(data * 1000).toLocaleString();
+                }
+            },
+            { data: 'user', title: 'User', 'width': '370px' },
+            { data: 'device_id', title: 'Device ID', 'width': '370px' }
+        ],
+        order: [[1, 'desc']]
+    });
+    winhelloTable.on('click', 'td.select-control', function (e) {
+        let tr = e.target.closest('tr');
+        let row = winhelloTable.row(tr);
+        $('input#winhello_id').val(row.data().id);
+        $('#winhello_modal').modal('hide');
+    });
+}
+
+
 // ========== Device Codes ==========
 
 function generateDeviceCode(version, client_id, resource, scope, ngcmfa, cae) {

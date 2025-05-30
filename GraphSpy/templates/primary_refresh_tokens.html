@@ -48,42 +48,7 @@
     getActiveRefreshToken(document.getElementById("refresh_token_id"));
     getActivePrt(document.getElementById("prt_form_active").active_prt_id);
 
-    // Create device selection modal
-    let deviceModal = createModal("device_modal", "Select Device", `
-        <div id="dTable" class="box-body table-responsive" style="padding:10px;">
-            <table id="device_modal_table" class="table table-striped nowrap" style="width:100%">
-            </table>
-        </div>
-    `, "modal-xl");
-
-    // Initialize device selection table
-    let deviceTable = new DataTable('#device_modal_table', {
-        ajax: {
-            url: '/api/list_device_certificates', dataSrc: "data"
-        },
-        columns: [
-            {
-                className: 'select-control table-control',
-                orderable: false,
-                data: null,
-                defaultContent: '<i class="fi fi-rr-check" title="Select Device" style="cursor: pointer"></i>',
-                'width': '40px'
-            },
-            { data: 'id', title: 'ID', 'width': '60px' },
-            { data: 'device_id', title: 'Device ID', 'width': '320px' },
-            { data: 'device_name', title: 'Device Name', 'width': '250px' },
-            { data: 'join_type', title: 'Join Type', 'width': '150px' },
-            { data: 'device_type', title: 'Device Type', 'width': '150px' }
-        ],
-        order: [[1, 'desc']]
-    });
-
-    deviceTable.on('click', 'td.select-control', function (e) {
-        let tr = e.target.closest('tr');
-        let row = deviceTable.row(tr);
-        $('#device_id').val(row.data().device_id);
-        $('#device_modal').modal('hide');
-    });
+    loadDeviceModalTable();
 
     function requestPRT() {
         let formData = {
