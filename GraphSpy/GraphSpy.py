@@ -944,9 +944,6 @@ def winhello_to_prt(winhello_id, device_id = None, winhello_username = None):
         f"Created with WinHello key {winhello_id}"
     ))
     return prt_id
-
-    # To Do:
-    # Allow manually adding a PRT, device certificate, and WinHello key in the UI with APIs
         
 # ========== MFA Functions ==========
 
