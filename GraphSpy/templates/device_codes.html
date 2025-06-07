@@ -2,58 +2,76 @@
 
 {%block content%}
 
-<div class="col-sm-5">
+<div class="col-md-6">
     <h1>Generate Device Code</h1>
     <form class="row g-3" id="device_code_form">
         <div class="col-auto" id="api_version">
             <div class="btn-group" role="group">
-                <span class="input-group-text">API Version</span>
+                <span class="input-group-text" style="border-top-right-radius: 0px; border-bottom-right-radius: 0px;">API Version</span>
                 <input type="radio" class="btn-check" name="btnradio" id="api_version_1" autocomplete="off" value="1" checked>
                 <label class="btn btn-outline-primary" for="api_version_1">v1</label>
                 <input type="radio" class="btn-check" name="btnradio" id="api_version_2" autocomplete="off" value="2">
                 <label class="btn btn-outline-primary" for="api_version_2">v2</label>
             </div>
         </div>
+        <div class="col-auto" id="auto_action">
+            <div class="btn-group" role="group">
+                <span class="input-group-text" style="border-top-right-radius: 0px; border-bottom-right-radius: 0px;">Auto Action</span>
+                <input type="radio" class="btn-check" name="auto_action_radio" id="auto_action_none" autocomplete="off" value="none" checked>
+                <label class="btn btn-outline-primary" for="auto_action_none">None</label>
+                <input type="radio" class="btn-check" name="auto_action_radio" id="auto_action_prt" autocomplete="off" value="device_prt">
+                <label class="btn btn-outline-primary" for="auto_action_prt">Device PRT</label>
+                <input type="radio" class="btn-check" name="auto_action_radio" id="auto_action_winhello" autocomplete="off" value="winhello">
+                <label class="btn btn-outline-primary" for="auto_action_winhello">Winhello</label>
+            </div>
+        </div>
         <div id="resource_container" class="col-12">
-            <label for="resource_list" class="form-label">Resource</label>
-            <input list="resource_list" id="resource_input" class="form-control" placeholder="https://graph.microsoft.com">
-            <datalist id="resource_list">
-                <option value="https://graph.microsoft.com">MSGraph</option>
-                <option value="https://graph.windows.net/">AAD Graph</option>
-                <option value="https://outlook.office365.com">Outlook</option>
-                <option value="https://api.spaces.skype.com/">MSTeams</option>
-                <option value="https://management.core.windows.net/">AzureCoreManagement</option>
-                <option value="https://management.azure.com">AzureManagement</option>
-                <option value="urn:ms-drs:enterpriseregistration.windows.net">Entra ID Device Join</option>
-            </datalist>
+            <div class="input-group">
+                <span class="input-group-text">Resource</span>
+                <input list="resource_list" id="resource_input" class="form-control" placeholder="https://graph.microsoft.com">
+                <datalist id="resource_list">
+                    <option value="https://graph.microsoft.com">MSGraph</option>
+                    <option value="https://graph.windows.net/">AAD Graph</option>
+                    <option value="https://outlook.office365.com">Outlook</option>
+                    <option value="https://api.spaces.skype.com/">MSTeams</option>
+                    <option value="https://management.core.windows.net/">AzureCoreManagement</option>
+                    <option value="https://management.azure.com">AzureManagement</option>
+                    <option value="urn:ms-drs:enterpriseregistration.windows.net">Entra ID Device Join</option>
+                </datalist>
+            </div>
         </div>
         <div id="scope_container" class="col-12" style="display: none;">
-            <label for="scope_list" class="form-label">Scope</label>
-            <input list="scope_list" id="scope_input" class="form-control" placeholder="https://graph.microsoft.com/.default openid offline_access">
-            <datalist id="scope_list">
-                <option value="https://graph.microsoft.com/.default openid offline_access">MSGraph</option>
-                <option value="https://graph.windows.net/.default openid offline_access">AAD Graph</option>
-                <option value="https://outlook.office365.com/.default openid offline_access">Outlook</option>
-                <option value="https://api.spaces.skype.com/.default openid offline_access">MSTeams</option>
-                <option value="https://management.core.windows.net/.default openid offline_access">AzureCoreManagement</option>
-                <option value="https://management.azure.com/.default openid offline_access">AzureManagement</option>
-                <option value="19db86c3-b2b9-44cc-b339-36da233a3be2/.default openid offline_access">My Signins</option>
-            </datalist>
+            <div class="input-group">
+                <span class="input-group-text">Scope</span>
+                <input list="scope_list" id="scope_input" class="form-control" placeholder="https://graph.microsoft.com/.default openid offline_access">
+                <datalist id="scope_list">
+                    <option value="https://graph.microsoft.com/.default openid offline_access">MSGraph</option>
+                    <option value="https://graph.windows.net/.default openid offline_access">AAD Graph</option>
+                    <option value="https://outlook.office365.com/.default openid offline_access">Outlook</option>
+                    <option value="https://api.spaces.skype.com/.default openid offline_access">MSTeams</option>
+                    <option value="https://management.core.windows.net/.default openid offline_access">AzureCoreManagement</option>
+                    <option value="https://management.azure.com/.default openid offline_access">AzureManagement</option>
+                    <option value="19db86c3-b2b9-44cc-b339-36da233a3be2/.default openid offline_access">My Signins</option>
+                    <option value="urn:ms-drs:enterpriseregistration.windows.net/.default openid offline_access">Entra ID Device Join</option>
+                </datalist>
+            </div>
         </div>
         <div class="col-12">
-            <label for="client_id_list" class="form-label">Client ID</label>
-            <input list="client_id_list" id="client_id_input" class="form-control" placeholder="d3590ed6-52b3-4102-aeff-aad2292ab01c">
-            <datalist id="client_id_list">
-                <option value="d3590ed6-52b3-4102-aeff-aad2292ab01c">Microsoft Office</option>
-                <option value="1fec8e78-bce4-4aaf-ab1b-5451cc387264">Microsoft Teams</option>
-                <option value="27922004-5251-4030-b22d-91ecd9a37ea4">Outlook Mobile</option>
-                <option value="b26aadf8-566f-4478-926f-589f601d9c74">OneDrive</option>
-                <option value="d326c1ce-6cc6-4de2-bebc-4591e5e13ef0">SharePoint</option>
-                <option value="00b41c95-dab0-4487-9791-b9d2c32c80f2">Office 365 Management</option>
-                <option value="04b07795-8ddb-461a-bbee-02f9e1bf7b46">Microsoft Azure CLI</option>
-                <option value="1950a258-227b-4e31-a9cf-717495945fc2">Microsoft Azure PowerShell</option>
-                <option value="29d9ed98-a469-4536-ade2-f981bc1d605e">Microsoft Authentication Broker</option>
-            </datalist>
+            <div class="input-group">
+                <span class="input-group-text">Client ID</span>
+                <input list="client_id_list" id="client_id_input" class="form-control" placeholder="d3590ed6-52b3-4102-aeff-aad2292ab01c">
+                <datalist id="client_id_list">
+                    <option value="d3590ed6-52b3-4102-aeff-aad2292ab01c">Microsoft Office</option>
+                    <option value="1fec8e78-bce4-4aaf-ab1b-5451cc387264">Microsoft Teams</option>
+                    <option value="27922004-5251-4030-b22d-91ecd9a37ea4">Outlook Mobile</option>
+                    <option value="b26aadf8-566f-4478-926f-589f601d9c74">OneDrive</option>
+                    <option value="d326c1ce-6cc6-4de2-bebc-4591e5e13ef0">SharePoint</option>
+                    <option value="00b41c95-dab0-4487-9791-b9d2c32c80f2">Office 365 Management</option>
+                    <option value="04b07795-8ddb-461a-bbee-02f9e1bf7b46">Microsoft Azure CLI</option>
+                    <option value="1950a258-227b-4e31-a9cf-717495945fc2">Microsoft Azure PowerShell</option>
+                    <option value="29d9ed98-a469-4536-ade2-f981bc1d605e">Microsoft Authentication Broker</option>
+                </datalist>
+            </div>
         </div>
         <div>
             <div>
@@ -65,6 +83,43 @@
                 <label for="cae_checkbox" class="form-check-label" id="cae_tooltip" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Request an access token with Continuous Access Evaluation (CAE) claims. Note: Access tokens with CAE will be valid for longer, however, they can instantly be revoked based on user risk or location changes!">Request CAE claim</label>
             </div>
         </div>
+        <div id="auto_fields_container" class="col-12" style="display: none;">
+            <div class="row g-2">
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <label for="device_name" class="input-group-text">Device Name</label>
+                        <input type="text" id="device_name" name="device_name" class="form-control" placeholder="GraphSpy-Device">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <label for="join_type" class="input-group-text">Join Type</label>
+                        <select id="join_type" name="join_type" class="form-select">
+                            <option value="0">Entra ID Joined</option>
+                            <option value="4">Entra ID Registered</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <label for="device_type" class="input-group-text">Device Type</label>
+                        <input type="text" id="device_type" name="device_type" class="form-control" placeholder="Windows">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <label for="os_version" class="input-group-text">OS Version</label>
+                        <input type="text" id="os_version" name="os_version" class="form-control" placeholder="10.0.26100">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <label for="target_domain" class="input-group-text">Target Domain</label>
+                        <input type="text" id="target_domain" name="target_domain" class="form-control" placeholder="e-corp.local">
+                    </div>
+                </div>
+            </div>
+        </div>
         <div>
             <button type="button" class="btn btn-primary" onclick="generateDeviceCodeButton();">Generate Device Code</button>
         </div>
@@ -73,6 +128,7 @@
 <script>
     new bootstrap.Tooltip(document.getElementById('ngcmfa_tooltip'));
     new bootstrap.Tooltip(document.getElementById('cae_tooltip'));
+    
     $("#device_code_form #api_version").on('click', 'input', function (e) {
         if ($(e.target).val() == "1") {
             $("#resource_container").show();
@@ -84,27 +140,26 @@
             $("#cae_container").show();
         }
     });
+
+    $("#device_code_form #auto_action").on('click', 'input', function (e) {
+        const autoAction = $(e.target).val();
+        if (autoAction === "none") {
+            $("#auto_fields_container").hide();
+        } else {
+            $("#auto_fields_container").show();
+            // Set default values for device registration
+            $("#resource_input").val("urn:ms-drs:enterpriseregistration.windows.net");
+            $("#scope_input").val("urn:ms-drs:enterpriseregistration.windows.net/.default openid offline_access");
+            $("#client_id_input").val("29d9ed98-a469-4536-ade2-f981bc1d605e");
+            $("#ngcmfa_checkbox").prop("checked", true);
+        }
+    });
 </script>
 <br>
 <div>
     <h1>Device Code List</h1>
     <button type="button" class="btn btn-primary" onclick="restartDeviceCodePolling()">Restart Polling</button>
     <table id="device_codes" class="table" style="table-layout:fixed; width:100%">
-        <thead>
-            <tr>
-                <th></th>
-                <th></th>
-                <th></th>
-                <th></th>
-                <th>ID</th>
-                <th>Generated At</th>
-                <th>Expires At</th>
-                <th>Last Polled At</th>
-                <th>User Code</th>
-                <th>Client ID</th>
-                <th>Status</th>
-            </tr>
-        </thead>
     </table>
 </div>
 <script type="text/javascript" class="init">
@@ -142,19 +197,29 @@
                 defaultContent: '<i class="fi fi-rr-trash" style="cursor: pointer"></i>',
                 'width': '40px'
             },
-            { data: 'id', 'width': '60px' },
-            { data: 'generated_at', 'width': '170px' },
-            { data: 'expires_at', 'width': '170px' },
-            { data: 'last_poll', 'width': '170px' },
-            { data: 'user_code', 'width': '145px' },
-            { data: 'client_id', 'width': '330px' },
-            { data: 'status' }
+            { data: 'id', title: 'ID', 'width': '60px' },
+            { data: 'generated_at', title: 'Generated At', 'width': '170px' },
+            { data: 'expires_at', title: 'Expires At', 'width': '170px' },
+            { data: 'last_poll', title: 'Last Polled At', 'width': '170px' },
+            { data: 'user_code', title: 'User Code', 'width': '145px' },
+            { data: 'client_id', title: 'Client ID', 'width': '330px' },
+            { data: 'auto_action', title: 'Auto Action', 'width': '145px' },
+            { data: 'status', title: 'Status' }
         ],
         order: [[4, 'desc']],
+        colReorder: {
+            columns: ':gt(3)'
+        },
         createdRow: function (row, data, dataIndex) {
             switch (data.status) {
                 case "SUCCESS":
                     $(row).children().addClass('bg-success-subtle').addClass('text-success-emphasis');
+                    break;
+                case "PARTIAL_SUCCESS":
+                    $(row).children().addClass('bg-warning-subtle').addClass('text-warning-emphasis');
+                    break;
+                case "ACTION_IN_PROGRESS":
+                    $(row).children().addClass('bg-info-subtle').addClass('text-info-emphasis');
                     break;
                 case "EXPIRED":
                     $(row).children().addClass('bg-danger-subtle').addClass('text-danger-emphasis');
@@ -176,6 +241,7 @@
         else {
             // Open this row
             row.child(format(row.data())).show();
+            Prism.highlightAll();
         }
     });
 
@@ -199,14 +265,14 @@
     });
 
     function format(d) {
-        return (
+        var formatWrapper = $(
             '<dl>' +
-            '<dt>Device Code:</dt>' +
-            '<dd><code>' +
-            d.device_code +
-            '</code></dd>' +
+            '<dt>Raw Token:</dt>' +
             '</dl>'
         );
+        var formatPre = formatJsonCode(d);
+        formatWrapper.append($('<dd></dd>').append(formatPre));
+        return formatWrapper;
     }
 
     function deleteDeviceCode(id) {
@@ -219,16 +285,23 @@
     }
 
     function generateDeviceCodeButton(){
+        const autoAction = $('input[name="auto_action_radio"]:checked').val();
+        
         generateDeviceCode(
             parseInt($('#api_version input:radio:checked').val()), 
             client_id_input.value, 
             resource_input.value,
             scope_input.value,
             ngcmfa_checkbox.checked,
-            cae_checkbox.checked
-        )
-        //generateDeviceCode(version, client_id, resource, scope, ngcmfa, cae)
-    };
+            cae_checkbox.checked,
+            autoAction !== "none" ? autoAction : undefined,
+            autoAction !== "none" ? $("#device_name").val() : undefined,
+            autoAction !== "none" ? $("#join_type").val() : undefined,
+            autoAction !== "none" ? $("#device_type").val() : undefined,
+            autoAction !== "none" ? $("#os_version").val() : undefined,
+            autoAction !== "none" ? $("#target_domain").val() : undefined
+        );
+    }
 
     function generateDeviceCodeReprocessUrl(userCode) {
         let response = $.ajax({
