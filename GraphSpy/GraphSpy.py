@@ -32,7 +32,7 @@ def init_db():
     con.execute('CREATE TABLE settings (setting TEXT UNIQUE, value TEXT)')
     # Valid Settings: active_access_token_id, active_refresh_token_id, active_prt_id, schema_version, user_agent
     cur = con.cursor()
-    cur.execute("INSERT INTO settings (setting, value) VALUES ('schema_version', '5')")
+    cur.execute("INSERT INTO settings (setting, value) VALUES ('schema_version', '6')")
     con.commit()
     con.close()
 
