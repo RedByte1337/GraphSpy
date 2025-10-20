@@ -187,13 +187,6 @@
                 'width': '40px'
             },
             {
-                className: 'link-control',
-                orderable: false,
-                data: null,
-                defaultContent: '<i class="fi fi-br-link-alt" style="cursor: pointer"></i>',
-                'width': '40px'
-            },
-            {
                 className: 'delete-control',
                 orderable: false,
                 data: null,
@@ -209,9 +202,9 @@
             { data: 'auto_action', title: 'Auto Action', 'width': '145px' },
             { data: 'status', title: 'Status' }
         ],
-        order: [[4, 'desc']],
+        order: [[3, 'desc']],
         colReorder: {
-            columns: ':gt(3)'
+            columns: ':gt(2)'
         },
         createdRow: function (row, data, dataIndex) {
             switch (data.status) {
@@ -252,12 +245,6 @@
         let tr = e.target.closest('tr');
         let row = myTable.row(tr);
         copyToClipboard(row.data().user_code);
-    });
-
-    myTable.on('click', 'td.link-control', function (e) {
-        let tr = e.target.closest('tr');
-        let row = myTable.row(tr);
-        generateDeviceCodeReprocessUrl(row.data().user_code);
     });
 
     myTable.on('click', 'td.delete-control', function (e) {
@@ -306,21 +293,6 @@
         );
     }
 
-    function generateDeviceCodeReprocessUrl(userCode) {
-        let response = $.ajax({
-            type: "POST",
-            url: "/api/generate_device_code_reprocess_url",
-            data: {
-                user_code: userCode
-            },
-            success: function(reprocessUrl){
-                copyToClipboard(reprocessUrl);
-            },
-            error: function(xhr, status, error){
-                bootstrapToast("Device Code Reprocess URL", xhr.responseJSON["message"], "danger");
-            }
-        });
-    }
     // Auto refresh the table every 5 seconds
     setInterval(function () {
         $('#device_codes').DataTable().ajax.reload(null, false)
