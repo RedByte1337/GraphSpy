@@ -2,8 +2,9 @@
 
 {%block content%}
 
-<div class="col-md-6">
-    <h1>Generate Device Code</h1>
+<div class="row">
+    <div class="col-md-6">
+        <h1>Generate Device Code</h1>
     <form class="row g-3" id="device_code_form">
         <div class="col-auto" id="api_version">
             <div class="btn-group" role="group">
@@ -124,6 +125,43 @@
             <button type="button" class="btn btn-primary" onclick="generateDeviceCodeButton();">Generate Device Code</button>
         </div>
     </form>
+    </div>
+    <div class="col-md-6 mt-4">
+        <!-- Device Login URLs - positioned at bottom of right column -->
+        <div class="card w-auto d-inline-block float-end">
+            <div class="card-header py-2">
+                <h6 class="card-title mb-0">Device Login URLs</h6>
+            </div>
+            <div class="card-body py-2">
+                <div class="d-flex flex-column gap-1">
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="copyToClipboard('https://login.microsoftonline.com/common/oauth2/deviceauth')" title="Copy URL">
+                            <i class="fi fi-rr-copy-alt"></i>
+                        </button>
+                        <small class="text-break">https://login.microsoftonline.com/common/oauth2/deviceauth</small>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="copyToClipboard('https://login.microsoft.com/common/oauth2/deviceauth')" title="Copy URL">
+                            <i class="fi fi-rr-copy-alt"></i>
+                        </button>
+                        <small class="text-break">https://login.microsoft.com/common/oauth2/deviceauth</small>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="copyToClipboard('https://microsoft.com/devicelogin')" title="Copy URL">
+                            <i class="fi fi-rr-copy-alt"></i>
+                        </button>
+                        <small class="text-break">https://microsoft.com/devicelogin</small>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="copyToClipboard('https://aka.ms/devicelogin')" title="Copy URL">
+                            <i class="fi fi-rr-copy-alt"></i>
+                        </button>
+                        <small class="text-break">https://aka.ms/devicelogin</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 <script>
     new bootstrap.Tooltip(document.getElementById('ngcmfa_tooltip'));
