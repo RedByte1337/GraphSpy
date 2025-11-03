@@ -1,0 +1,27 @@
+[build-system]
+requires = ["poetry-core>=2.1.1,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[project]
+name = "graphspy"
+version = "1.5.1"
+description = "Initial Access and Post-Exploitation Tool for AAD and O365 with a browser-based GUI."
+authors = [
+    {name = "RedByte1337"}
+]
+license = {text = "BSD-3-Clause"}
+readme = "README.md"
+requires-python = ">=3.10,<4.0"
+dependencies = [
+    "flask (>=3.1.2,<4.0.0)",
+    "pyjwt (>=2.10.1,<3.0.0)",
+    "requests (>=2.32.5,<3.0.0)",
+    "pyotp (>=2.9.0,<3.0.0)",
+    "fido2 (>=2.0.0,<3.0.0)"
+]
+
+[project.urls]
+repository  = "https://github.com/RedByte1337/GraphSpy"
+
+[project.scripts]
+graphspy = 'graphspy.cli:main'
