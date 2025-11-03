@@ -2820,6 +2820,3 @@ def main():
     # Run flask
     print(f"[*] Starting GraphSpy. Open in your browser by going to the url displayed below.\n")
     app.run(debug=args.debug, host=args.interface, port=args.port)
-
-if __name__ == '__main__':
-    main()
