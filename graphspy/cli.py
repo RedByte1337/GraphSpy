@@ -12,8 +12,8 @@ import json, base64, uuid, urllib.parse, binascii
 import re
 import pyotp
 
-with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),"version.txt")) as f:
-    __version__ = f.read()
+# Local library imports
+from graphspy import __version__
 
 # ========== Database ==========
 
@@ -2758,7 +2758,7 @@ def main():
                 """)
     # Argument Parser
     import argparse
-    parser = argparse.ArgumentParser(prog="GraphSpy", description="Launches the GraphSpy Flask application", epilog="For more information, see https://github.com/RedByte1337/GraphSpy")
+    parser = argparse.ArgumentParser(prog="graphspy", description="Launches the GraphSpy Flask application", epilog="For more information, see https://github.com/RedByte1337/GraphSpy")
     parser.add_argument("-i","--interface", type=str, help="The interface to bind to. Use 0.0.0.0 for all interfaces. (Default = 127.0.0.1)")
     parser.add_argument("-p", "--port", type=int, help="The port to bind to. (Default = 5000)")
     parser.add_argument("-d","--database", type=str, default="database.db", help="Database file to utilize. (Default = database.db)")
