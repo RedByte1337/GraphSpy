@@ -98,6 +98,13 @@ Easily create and poll multiple device codes at once. If a user used the device 
 
 ![Device Codes](images/device_codes.png)
 
+Configure automatic actions to take place instantly after a successful device code authentication.
+1. **Device PRT:** Register/join a new device to Entra ID, obtain the device certificate, and use it to generate a [Primary Refresh Token (PRT)](#Primary-Refresh-Tokens-(PRTs))
+2. **Winhello:** Everything in Device PRT + try to enroll the fake device with Windows Hello For Business (whfb) to obtain winhello keys.
+3. More to come later...
+
+![Device Code Winhello Action](images/device_code_winhello_action.png)
+
 ## MFA Methods
 
 View, modify and create MFA methods linked to the account of the user.
@@ -112,6 +119,26 @@ The following MFA methods can be added from GraphSpy to set up persistance:
 - Mobile/Office/Alternative Phones (SMS or call)
 
 ![MFA Methods FIDO](images/mfa_methods_fido.png)
+
+## Primary Refresh Tokens (PRTs)
+
+Request, import or use primary refresh tokens from within GraphSpy. 
+
+These PRTs are a lot more powerful than regular refresh tokens, since these are not bound to one specific application, but can instead be used to obtain access tokens for ANY application/scope as the user (both FOCI and non-FOCI ones).
+
+![PRT Overview](images/primary_refresh_tokens_overview.png)
+
+Additionally, these PRT tokens can be used to generate PRT Cookies, which can be imported directly in a browser to provide a full interactive access to any web application integrated with Entra ID SSO.
+
+![PRT Cookies](images/primary_refresh_tokens_cookie.png)
+
+## Windows Hello For Business
+
+Register Windows Hello For Business (whfb) keys in GraphSpy for a user & device combination, or import them from a different tool or a compromised device.
+
+These WinHello keys can be used to generate new Primary Refresh Tokens for the user, even after password password resets, making them very powerful account persistence!
+
+![Winhello Keys](images/winhello_keys.png)
 
 ## Files and SharePoint
 
@@ -225,5 +252,6 @@ However, a lot of previous research was done by countless other persons (specifi
 	* [Introducing a new phishing technique for compromising Office 365 accounts](https://aadinternals.com/post/phishing/)
 	* [The Art of the Device Code Phish](https://0xboku.com/2021/07/12/ArtOfDeviceCodePhish.html)
 	* [GraphRunner](https://github.com/dafthack/GraphRunner) is a PowerShell tool with a lot of similar features, which was released while GraphSpy was already in development. Regardless, both tools still have their distinguishing factors.
+	* [Roadtools](https://github.com/dirkjanm/ROADtools) by the awesome Dirk-Jan Mollema
 * Assets
 	* UIcons by [Flaticon](https://www.flaticon.com/uicons)
