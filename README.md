@@ -99,8 +99,8 @@ Easily create and poll multiple device codes at once. If a user used the device 
 ![Device Codes](images/device_codes.png)
 
 Configure automatic actions to take place instantly after a successful device code authentication.
-1. **Device PRT:** Register/join a new device to Entra ID, obtain the device certificate, and use it to generate a [Primary Refresh Token (PRT)](#Primary-Refresh-Tokens-(PRTs))
-2. **Winhello:** Everything in Device PRT + try to enroll the fake device with Windows Hello For Business (whfb) to obtain winhello keys.
+1. **Device PRT:** Register/join a new device to Entra ID, obtain the device certificate, and use it to generate a [Primary Refresh Token (PRT)](#primary-refresh-tokens-prts)
+2. **Winhello:** Everything in Device PRT + try to enroll the fake device with Windows Hello For Business (whfb) to obtain [WinHello keys](#windows-hello-for-business).
 3. More to come later...
 
 ![Device Code Winhello Action](images/device_code_winhello_action.png)
