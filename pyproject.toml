@@ -1,6 +1,6 @@
 [build-system]
-requires = ["poetry-core>=2.1.1,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["uv_build"]
+build-backend = "uv_build"
 
 [project]
 name = "graphspy"

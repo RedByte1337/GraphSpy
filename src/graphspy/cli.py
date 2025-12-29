@@ -1,19 +1,32 @@
-#!/usr/bin/env python3
-from flask import Flask,render_template,request,g,redirect,Response,jsonify
+# graphspy/cli.py
+
+# Built-in imports
+import os
+import sys
+import shutil
+import traceback
+import logging
+import inspect
+import sqlite3
+import time
+import json
+import base64
+import uuid
+import urllib.parse
+import binascii
+import re
+from datetime import datetime, timezone
+from threading import Thread
+
+# External library imports
+from flask import Flask, render_template, request, g, redirect, Response, jsonify
 import flask.helpers
 import requests
 import jwt
-import sqlite3
-from datetime import datetime, timezone
-import time
-import os,sys,shutil,traceback,logging,inspect
-from threading import Thread
-import json, base64, uuid, urllib.parse, binascii
-import re
 import pyotp
 
 # Local library imports
-from graphspy import __version__
+from . import __version__
 
 # ========== Database ==========
 
