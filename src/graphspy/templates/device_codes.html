@@ -166,7 +166,7 @@
 <script>
     new bootstrap.Tooltip(document.getElementById('ngcmfa_tooltip'));
     new bootstrap.Tooltip(document.getElementById('cae_tooltip'));
-    
+
     $("#device_code_form #api_version").on('click', 'input', function (e) {
         if ($(e.target).val() == "1") {
             $("#resource_container").show();
@@ -197,6 +197,31 @@
     });
 </script>
 <br>
+<!-- Device Code semantics explanation (collapsible, collapsed by default) -->
+<div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>Device Code Semantics (Microsoft Entra ID)</strong>
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#device_code_semantics_collapse" aria-expanded="false" aria-controls="device_code_semantics_collapse">Details</button>
+    </div>
+    <div id="device_code_semantics_collapse" class="collapse">
+        <div class="card-body small">
+            <p>Microsoft Entra ID implements <a href="https://datatracker.ietf.org/doc/html/rfc8628" target="_blank">RFC 8628</a> with strict single-use semantics.</p>
+            <ul>
+                <li>While a device code is <strong>CREATED / POLLING</strong> you may poll <code>/token</code> using <code>grant_type=urn:ietf:params:oauth:grant-type:device_code</code> and receive an <em>access_token</em> (and a <em>refresh_token</em> only if <code>offline_access</code> was requested and allowed).</li>
+                <li>This polling window is the only time the device code is valid. Once the device code is <strong>SUCCESS</strong>, it is consumed and further <code>/token</code> calls with that device code return <code>invalid_grant</code>. No additional access tokens and no new refresh tokens will be issued.</li>
+                <li>After initial token issuance, if you possess a valid refresh token you may use <code>grant_type=refresh_token</code> to obtain new access tokens (and rotated refresh tokens). If a refresh token is rejected (for example <code>AADSTS70043</code>), reauthentication is required and you must generate a new device code.</li>
+            </ul>
+            <p><strong>Key constraints (non-bypassable):</strong></p>
+            <ul>
+                <li>Device code is single-use; it is not a session or renewable credential.</li>
+                <li>Refresh token issuance and lifetimes are controlled by tenant policy (Conditional Access, sign-in frequency, security defaults), not by the client.</li>
+                <li>If Conditional Access or sign-in frequency forces reauth, the only remedy is to request a new device code and have the user sign in again.</li>
+            </ul>
+            <p class="mb-0"> One token exchange opportunity per device code. If refresh tokens are not available or are rejected, generate a new device code and reauthenticate.</p>
+            <p class="mb-0">References: <a href="https://datatracker.ietf.org/doc/html/rfc8628" target="_blank">RFC 8628 (Device Authorization Grant)</a> · <a href="https://learn.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-device-code" target="_blank">Microsoft documentation: Device code flow</a></p>
+        </div>
+    </div>
+</div>
 <div>
     <h1>Device Code List</h1>
     <button type="button" class="btn btn-primary" onclick="restartDeviceCodePolling()">Restart Polling</button>
@@ -314,10 +339,10 @@
 
     function generateDeviceCodeButton(){
         const autoAction = $('input[name="auto_action_radio"]:checked').val();
-        
+
         generateDeviceCode(
-            parseInt($('#api_version input:radio:checked').val()), 
-            client_id_input.value, 
+            parseInt($('#api_version input:radio:checked').val()),
+            client_id_input.value,
             resource_input.value,
             scope_input.value,
             ngcmfa_checkbox.checked,
