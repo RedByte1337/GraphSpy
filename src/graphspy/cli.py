@@ -1,19 +1,32 @@
-#!/usr/bin/env python3
-from flask import Flask,render_template,request,g,redirect,Response,jsonify
+# graphspy/cli.py
+
+# Built-in imports
+import os
+import sys
+import shutil
+import traceback
+import logging
+import inspect
+import sqlite3
+import time
+import json
+import base64
+import uuid
+import urllib.parse
+import binascii
+import re
+from datetime import datetime, timezone
+from threading import Thread
+
+# External library imports
+from flask import Flask, render_template, request, g, redirect, Response, jsonify
 import flask.helpers
 import requests
 import jwt
-import sqlite3
-from datetime import datetime, timezone
-import time
-import os,sys,shutil,traceback,logging,inspect
-from threading import Thread
-import json, base64, uuid, urllib.parse, binascii
-import re
 import pyotp
 
-with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),"version.txt")) as f:
-    __version__ = f.read()
+# Local library imports
+from . import __version__
 
 # ========== Database ==========
 
@@ -2758,7 +2771,7 @@ def main():
                 """)
     # Argument Parser
     import argparse
-    parser = argparse.ArgumentParser(prog="GraphSpy", description="Launches the GraphSpy Flask application", epilog="For more information, see https://github.com/RedByte1337/GraphSpy")
+    parser = argparse.ArgumentParser(prog="graphspy", description="Launches the GraphSpy Flask application", epilog="For more information, see https://github.com/RedByte1337/GraphSpy")
     parser.add_argument("-i","--interface", type=str, help="The interface to bind to. Use 0.0.0.0 for all interfaces. (Default = 127.0.0.1)")
     parser.add_argument("-p", "--port", type=int, help="The port to bind to. (Default = 5000)")
     parser.add_argument("-d","--database", type=str, default="database.db", help="Database file to utilize. (Default = database.db)")
@@ -2820,6 +2833,3 @@ def main():
     # Run flask
     print(f"[*] Starting GraphSpy. Open in your browser by going to the url displayed below.\n")
     app.run(debug=args.debug, host=args.interface, port=args.port)
-
-if __name__ == '__main__':
-    main()

@@ -1,0 +1,27 @@
+[build-system]
+requires = ["uv_build"]
+build-backend = "uv_build"
+
+[project]
+name = "graphspy"
+version = "1.6.0"
+description = "Initial Access and Post-Exploitation Tool for AAD and O365 with a browser-based GUI."
+authors = [
+    {name = "RedByte1337"}
+]
+license = {text = "BSD-3-Clause"}
+readme = "README.md"
+requires-python = ">=3.10,<4.0"
+dependencies = [
+    "flask>=3.0.0,<4.0.0",
+    "pyjwt>=2.8.0,<3.0.0",
+    "requests>=2.30.0,<3.0.0",
+    "pyotp>=2.9.0,<3.0.0",
+    "fido2>=1.1.0,<3.0.0"
+]
+
+[project.urls]
+repository = "https://github.com/RedByte1337/GraphSpy"
+
+[project.scripts]
+graphspy = 'graphspy.cli:main'
