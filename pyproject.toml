@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "graphspy"
-version = "1.6.0"
+version = "1.6.1"
 description = "Initial Access and Post-Exploitation Tool for AAD and O365 with a browser-based GUI."
 authors = [
     {name = "RedByte1337"}
