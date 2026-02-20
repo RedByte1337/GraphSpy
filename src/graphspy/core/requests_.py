@@ -50,41 +50,47 @@ def graph_upload_request(upload_uri: str, access_token_id: int, file) -> tuple:
         response.status_code,
     )
 
-
 def make_request(
     uri: str,
     access_token_id: int,
     method: str,
     request_type: str,
     body,
-    headers: dict = {},
-    cookies: dict = {},
+    headers: dict | None = None,
+    cookies: dict | None = None,
 ) -> dict:
+    if headers is None:
+        headers = {}
+    if cookies is None:
+        cookies = {}
+
     access_token = connection.query_db(
         "SELECT accesstoken FROM accesstokens WHERE id = ?", [access_token_id], one=True
-    )[0]
-    headers["Authorization"] = f"Bearer {access_token}"
+    )
+    if not access_token:
+        return {"response_status_code": 400, "response_type": "text", "response_text": f"No access token with ID {access_token_id}", "response_headers": {}}
+    headers["Authorization"] = f"Bearer {access_token[0]}"
     headers["User-Agent"] = ua.get()
 
     retry_count = 3
     while retry_count > 0:
         if not body:
-            response = requests.request(method, uri, headers=headers)
+            response = requests.request(method, uri, headers=headers, cookies=cookies)
         elif request_type in ["text", "urlencoded", "xml"]:
             if request_type == "urlencoded" and "Content-Type" not in headers:
                 headers["Content-Type"] = "application/x-www-form-urlencoded"
             if request_type == "xml" and "Content-Type" not in headers:
                 headers["Content-Type"] = "application/xml"
-            response = requests.request(method, uri, headers=headers, data=body)
+            response = requests.request(method, uri, headers=headers, data=body, cookies=cookies)
         elif request_type == "json":
             try:
                 if isinstance(body, str):
                     body = json.loads(body)
-                response = requests.request(method, uri, headers=headers, json=body)
+                response = requests.request(method, uri, headers=headers, json=body, cookies=cookies)
             except ValueError:
-                return "[Error] The body does not contain valid JSON.", 400
+                return {"response_status_code": 400, "response_type": "text", "response_text": "[Error] The body does not contain valid JSON.", "response_headers": {}}
         else:
-            return "[Error] Invalid request type.", 400
+            return {"response_status_code": 400, "response_type": "text", "response_text": "[Error] Invalid request type.", "response_headers": {}}
 
         if response.status_code == 429 and "Retry-After" in response.headers:
             retry_count -= 1
@@ -93,17 +99,9 @@ def make_request(
             break
 
     content_type = response.headers.get("Content-Type", "")
-    if "json" in content_type:
-        response_type = "json"
-    elif "xml" in content_type:
-        response_type = "xml"
-    else:
-        response_type = "text"
-
+    response_type = "json" if "json" in content_type else "xml" if "xml" in content_type else "text"
     try:
-        response_text = (
-            json.dumps(response.json()) if response_type == "json" else response.text
-        )
+        response_text = json.dumps(response.json()) if response_type == "json" else response.text
     except ValueError:
         response_text = response.text
 
