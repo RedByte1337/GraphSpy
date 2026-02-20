@@ -5,7 +5,6 @@ from flask import Blueprint, render_template
 
 bp = Blueprint("pages", __name__)
 
-
 @bp.get("/")
 def settings():
     return render_template("settings.html", title="Settings")

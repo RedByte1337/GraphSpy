@@ -11,20 +11,17 @@ import requests
 from ..db import connection
 from ..core import user_agent as ua
 
-
-def graph_request(
-    graph_uri: str, access_token_id: int, method: str = "GET", body: dict = {}
-) -> str:
-    access_token = connection.query_db(
+def graph_request(graph_uri: str, access_token_id: int, method: str = "GET", body: dict = {}) -> str:
+    row = connection.query_db(
         "SELECT accesstoken FROM accesstokens WHERE id = ?", [access_token_id], one=True
-    )[0]
+    )
+    if not row:
+        return json.dumps({"error": f"No access token with ID {access_token_id}"})
     headers = {
-        "Authorization": f"Bearer {access_token}",
+        "Authorization": f"Bearer {row[0]}",
         "User-Agent": ua.get(),
     }
-    response = requests.request(
-        method, graph_uri, headers=headers, **({"json": body} if body else {})
-    )
+    response = requests.request(method, graph_uri, headers=headers, **({"json": body} if body else {}))
     try:
         return json.dumps(response.json())
     except ValueError:

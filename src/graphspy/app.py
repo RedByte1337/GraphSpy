@@ -1,10 +1,10 @@
 # graphspy/app.py
 
 # External library imports
-from flask import Flask
+from flask import Flask, jsonify
 
 # Local library imports
-from . import api, web
+from .core.errors import AppError
 from .db import connection
 
 
@@ -14,8 +14,17 @@ def create_app(db_path: str, db_folder: str, debug: bool = False) -> Flask:
     app.config["graph_spy_db_folder"] = db_folder
     app.config["table_error_messages"] = "disabled"
 
-    api.register_blueprints(app)
-    web.register_blueprint(app)
+    from .api import access_tokens, database, device_codes, devices, entra, mfa, refresh_tokens, requests_, settings, teams
+    for module in [access_tokens, database, device_codes, devices, entra, mfa, refresh_tokens, requests_, settings, teams]:
+        app.register_blueprint(module.bp)
+
+    from .web.pages import bp as pages_bp
+    app.register_blueprint(pages_bp, name="")
+
+    @app.errorhandler(AppError)
+    def handle_app_error(e):
+        return jsonify({"message": e.message}), e.status_code
+
     app.teardown_appcontext(connection.close)
 
     return app
