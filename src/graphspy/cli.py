@@ -49,15 +49,26 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def get_data_dir() -> str:
+    """Return the platform-appropriate data directory following XDG on Linux/Mac."""
+    if os.name == "nt":
+        # Windows: use %APPDATA%\graphspy
+        base = os.environ.get("APPDATA", os.path.expanduser("~"))
+    else:
+        # Linux/Mac: XDG_DATA_HOME defaults to ~/.local/share
+        base = os.environ.get("XDG_DATA_HOME", os.path.join(os.path.expanduser("~"), ".local", "share"))
+    return os.path.normpath(os.path.join(base, "graphspy"))
+
+
 def resolve_paths(database: str) -> tuple[str, str]:
     """Resolve and create required directories, return (db_folder, db_path)."""
-    gspy_folder = os.path.normpath(os.path.expanduser("~/.gspy/"))
-    db_folder = os.path.normpath(os.path.join(gspy_folder, "databases/"))
+    data_dir = get_data_dir()
+    db_folder = os.path.join(data_dir, "databases")
 
-    for directory in (gspy_folder, db_folder):
+    for directory in (data_dir, db_folder):
         if not os.path.exists(directory):
             print(f"[*] Creating directory '{directory}'.")
-            os.mkdir(directory)
+            os.makedirs(directory, exist_ok=True)
             if not os.path.exists(directory):
                 sys.exit(f"Failed creating directory '{directory}'. Unable to proceed.")
 
