@@ -1,10 +1,9 @@
 # graphspy/api/teams.py
 
 # Built-in imports
-import json
 
 # External library imports
-from flask import Blueprint, Response, request
+from flask import Blueprint, request
 
 # Local library imports
 from ..core import teams
