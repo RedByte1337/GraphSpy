@@ -18,8 +18,8 @@ def create_app(db_path: str, db_folder: str, debug: bool = False) -> Flask:
     for module in [access_tokens, database, device_codes, devices, entra, mfa, refresh_tokens, requests_, settings, teams]:
         app.register_blueprint(module.bp)
 
-    from .web.pages import bp as pages_bp
-    app.register_blueprint(pages_bp, name="")
+    from .web import pages
+    pages.register(app)
 
     @app.errorhandler(AppError)
     def handle_app_error(e):
