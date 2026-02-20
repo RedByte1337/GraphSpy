@@ -7,7 +7,7 @@ import re
 # External library imports
 import jwt
 import requests
-from flask import Response, current_app
+from flask import Response
 
 # Local library imports
 from ..core import user_agent as ua
