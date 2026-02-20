@@ -1,16 +1,22 @@
 # graphspy/core/mfa.py
 
 # Built-in imports
+import base64
 import json
 import traceback
 import uuid
 from datetime import datetime
 
 # External library imports
-import pyotp
+from flask import current_app
 import requests
+import pyotp
+from fido2.hid import CtapHidDevice
+from fido2.client import Fido2Client, UserInteraction
+from fido2.client.windows import WindowsClient
 
 # Local library imports
+from ..api.helpers import create_response
 from ..db import connection
 from ..core import user_agent as ua
 
@@ -283,10 +289,6 @@ def add_security_key(
     client_type: str = "Windows",
     device_pin: str = None,
 ):
-    from flask import current_app
-    from fido2.hid import CtapHidDevice
-    from fido2.client import Fido2Client, WindowsClient, UserInteraction
-    from ..api.helpers import create_response
 
     current_app.config["add_security_key_status"] = "INIT"
     access_token = _get_access_token_for_mfa(access_token_id)
@@ -369,8 +371,6 @@ def add_security_key(
         return create_response(400, "Credential registration failed.")
 
     current_app.config["add_security_key_status"] = "VERIFY_DATA"
-    import base64
-    import uuid as _uuid
 
     client_data_json = json.loads(credential.client_data)
     verification_data = {
