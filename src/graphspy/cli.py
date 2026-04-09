@@ -3,6 +3,7 @@
 # Built-in imports
 import argparse
 import os
+from pathlib import Path
 import sys
 
 # Local library imports
@@ -50,14 +51,23 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def get_data_dir() -> str:
-    """Return the platform-appropriate data directory following XDG on Linux/Mac."""
+    """Return the data directory, preferring XDG/platform paths, falling back to legacy ~/.gspy/."""
+    # New XDG-compliant / platform-appropriate path
     if os.name == "nt":
-        # Windows: use %APPDATA%\graphspy
-        base = os.environ.get("APPDATA", os.path.expanduser("~"))
+        base = os.environ.get("APPDATA", str(Path.home()))
     else:
-        # Linux/Mac: XDG_DATA_HOME defaults to ~/.local/share
-        base = os.environ.get("XDG_DATA_HOME", os.path.join(os.path.expanduser("~"), ".local", "share"))
-    return os.path.normpath(os.path.join(base, "graphspy"))
+        base = os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))
+    xdg_dir = os.path.normpath(os.path.join(base, "graphspy"))
+    if os.path.isdir(xdg_dir):
+        return xdg_dir
+
+    # Fall back to legacy path used by older versions
+    legacy_dir = Path.home() / ".gspy"
+    if legacy_dir.is_dir():
+        return str(legacy_dir)
+
+    # Neither exists yet — use the new XDG path
+    return xdg_dir
 
 
 def resolve_paths(database: str) -> tuple[str, str]:
