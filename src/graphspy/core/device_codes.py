@@ -83,10 +83,10 @@ def generate(
     return response.json()["device_code"]
 
 
-def poll() -> None:
+def poll(app) -> None:
     import time
 
-    with current_app.app_context():
+    with app.app_context():
         while True:
             rows = connection.query_db_json(
                 "SELECT * FROM devicecodes WHERE status IN ('CREATED','POLLING')"
@@ -186,11 +186,12 @@ def poll() -> None:
 
 
 def start_polling_thread() -> str:
-    if "device_code_thread" in current_app.config:
-        if current_app.config["device_code_thread"].is_alive():
+    app = current_app._get_current_object()
+    if "device_code_thread" in app.config:
+        if app.config["device_code_thread"].is_alive():
             return "[Error] Device Code polling thread is still running."
-    current_app.config["device_code_thread"] = Thread(target=poll)
-    current_app.config["device_code_thread"].start()
+    app.config["device_code_thread"] = Thread(target=poll, args=(app,))
+    app.config["device_code_thread"].start()
     return "[Success] Started device code polling thread."
 
 
