@@ -5,9 +5,11 @@ import json
 
 # External library imports
 from flask import Blueprint, redirect, request
+import jwt
 
 # Local library imports
 from ..db import connection
+from ..core import tokens
 
 bp = Blueprint("access_tokens", __name__)
 
@@ -23,7 +25,7 @@ def add_access_token():
     accesstoken = request.form.get("accesstoken", "")
     description = request.form.get("description", "")
     if accesstoken:
-        connection.save_access_token(accesstoken, description)
+        tokens.save_access_token(accesstoken, description)
     return redirect("/access_tokens")
 
 

@@ -21,6 +21,89 @@ from ..db import connection
 from ..core import user_agent as ua
 
 
+def _get_security_info_type(type_id):
+    security_info_types_dict = {
+        -1: "done",
+        0: "unknown",
+        1: "appNotificationAndCode",
+        2: "appNotificationOnly",
+        3: "appCodeOnly",
+        4: "mobilePhoneCallAndSMS",
+        5: "mobilePhoneCall",
+        6: "mobilePhoneSMS",
+        7: "officePhone",
+        8: "email",
+        9: "securityQuestions",
+        10: "appPassword",
+        11: "altMobilePhoneCall",
+        12: "fido",
+        13: "phoneSignIn",
+        14: "temporaryAccessPass",
+        15: "hardwareOath",
+        16: "password",
+        18: "passkey",
+        19: "passkeyFromAuthenticator",
+        100: "unsupportedAuthMethods"
+    }
+    return security_info_types_dict[type_id] if type_id in security_info_types_dict else security_info_types_dict[0]
+
+def _get_verification_state(verification_state_id):
+    verification_state_dict = {
+        0: "unknown",
+        1: "verificationPending",
+        2: "verified",
+        3: "verificationFailed",
+        4: "systemError",
+        5: "activationPending",
+        6: "activationFailure",
+        7: "activationSucceeded",
+        8: "challengeExpired",
+        9: "activationThrottled",
+        10: "captchaRequired"
+    }
+    return verification_state_dict[verification_state_id] if verification_state_id in verification_state_dict else verification_state_dict[0]
+
+def _get_security_info_error(error_id):
+    add_security_info_error_dict = {
+        0: "none",
+        1: "userIsBlockedBySAS",
+        2: "systemError",
+        3: "invalidCanary",
+        4: "badRequest",
+        5: "dataNotFound",
+        6: "ngcMfaRequired", # Access token requires the "ngcmfa" value in the "amr" claim
+        7: "keyDisallowedByPolicy",
+        8: "challengeExpired",
+        9: "authorizationRequestDenied",
+        10: "authTokenNotForTargetTenant",
+        11: "authTokenNotFound",
+        12: "invalidAikChain",
+        13: "invalidAttestationDataFormat",
+        14: "requiredParamMissing",
+        15: "retryWebAuthN",
+        16: "userNotFound",
+        17: "badDirectoryRequest",
+        18: "replicaUnavailable",
+        19: "requestThrottled",
+        20: "userGroupRestriction",
+        21: "featureDisallowedByPolicy",
+        22: "invalidKeyDataFormat",
+        23: "attestationValidationFailed",
+        24: "verificationFailed",
+        25: "appSessionTimedOut",
+        26: "activationThrottled",
+        27: "appRequestTimedOut",
+        28: "captchaRequired", # Trigger captcha. Usually after multiple failed SMS codes
+        29: "badPhoneNumber",
+        30: "deviceNotFound",
+        31: "phoneAppNotificationDenied",
+        32: "KeyNotFound",
+        33: "InvalidSession",
+        34: "OtherDefaultAvailable",
+        35: "HardwareTokenAssigned"
+    }
+    return add_security_info_error_dict[error_id] if error_id in add_security_info_error_dict else add_security_info_error_dict[0]
+
 def get_session_ctx(access_token_id: int):
     row = connection.query_db(
         "SELECT accesstoken FROM accesstokens WHERE id = ? AND resource LIKE '%19db86c3-b2b9-44cc-b339-36da233a3be2%'",
@@ -294,7 +377,7 @@ def add_security_key(
     access_token = _get_access_token_for_mfa(access_token_id)
     if not access_token:
         return create_response(
-            400, f"No access token with ID {access_token_id} and required resource."
+            400, f"No access token with ID {access_token_id} and resource containing '19db86c3-b2b9-44cc-b339-36da233a3be2'!"
         )
 
     security_info_response = add_security_info(access_token_id, 12)
@@ -324,9 +407,7 @@ def add_security_key(
         "timeout": 600000,
         "excludeCredentials": [],
         "authenticatorSelection": {
-            "authenticatorAttachment": security_info_data["requestData"][
-                "authenticator"
-            ],
+            "authenticatorAttachment": security_info_data["requestData"]["authenticator"],
             "requireResidentKey": True,
             "userVerification": "required",
         },
@@ -336,7 +417,7 @@ def add_security_key(
     current_app.config["add_security_key_status"] = "CLIENT_SETUP"
     if client_type == "Windows":
         if not WindowsClient.is_available():
-            return create_response(400, "WindowsClient is not available!")
+            return create_response(400, "Windows client requested, but WindowsClient is not available! Are you sure the GraphSpy server is running on a compatible Windows device?")
         client = WindowsClient("https://login.microsoft.com")
     else:
         dev = next(CtapHidDevice.list_devices(), None)
@@ -348,7 +429,7 @@ def add_security_key(
             except Exception:
                 traceback.print_exc()
         if not dev:
-            return create_response(400, "No valid FIDO authenticator device found.")
+            return create_response(400, "No valid FIDO authenticator device found. Admin/root privileges might be required to discover your Authenticator device when not using the Windows WebAuthn API.")
 
         class CliInteraction(UserInteraction):
             def prompt_up(self):
@@ -389,7 +470,7 @@ def add_security_key(
             str(credential.extension_results).encode()
         ).decode(),
         "PostInfo": "",
-        "AAGuid": str(_uuid.uuid4()),
+        "AAGuid": str(uuid.uuid4()),
         "CredentialDeviceType": "singleDevice",
     }
     response = verify_security_info(
