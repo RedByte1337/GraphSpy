@@ -5,7 +5,7 @@ build-backend = "uv_build"
 [project]
 name = "graphspy"
 version = "1.6.1"
-description = "Initial Access and Post-Exploitation Tool for AAD and O365 with a browser-based GUI."
+description = "Initial Access and Post-Exploitation Tool for Entra ID and M365 with a browser-based GUI."
 authors = [
     {name = "RedByte1337"}
 ]
@@ -17,7 +17,7 @@ dependencies = [
     "pyjwt>=2.8.0,<3.0.0",
     "requests>=2.30.0,<3.0.0",
     "pyotp>=2.9.0,<3.0.0",
-    "fido2>=1.1.0,<3.0.0"
+    "fido2>=2.0.0,<3.0.0"
 ]
 
 [project.urls]

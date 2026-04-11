@@ -12,8 +12,7 @@ from flask import current_app
 import requests
 import pyotp
 from fido2.hid import CtapHidDevice
-from fido2.client import Fido2Client, UserInteraction
-from fido2.client.windows import WindowsClient
+from fido2.client import Fido2Client, DefaultClientDataCollector, UserInteraction
 
 # Local library imports
 from ..api.helpers import create_response
@@ -237,6 +236,7 @@ def add_security_info(access_token_id: int, security_info_type, data=None):
             not security_info_response["VerificationContext"]
             and security_info_response.get("ErrorCode") == 28
         ):
+            # ErrorCode 28 indicates that a Captcha needs to be solved (happens after a couple of failed attempts in a short timeframe)
             captcha_response = requests.get(
                 "https://mysignins.microsoft.com/api/captcha/?challengeType=Visual&locale=en-US",
                 headers=headers,
@@ -250,7 +250,15 @@ def add_security_info(access_token_id: int, security_info_type, data=None):
 
 def verify_security_info(
     access_token_id: int, security_info_type, verification_context, verification_data
-):
+):    
+    # Types:
+    #   2 - Microsoft Authenticator App
+    #   3 - OTP
+    #   6 - MobilePhone
+    #   7 - OfficePhone
+    #   8 - Email
+    #   11 - AltMobilePhone
+    #   12 - FIDO
     headers = _mfa_headers(access_token_id)
     if not headers:
         return False
@@ -318,13 +326,13 @@ def add_email(access_token_id: int, email: str):
     return add_security_info(access_token_id, 8, email)
 
 
-def add_mfa_app(access_token_id: int, security_info_type, secret_key: str):
+def add_mfa_app(access_token_id: int, security_info_type, secret_key: str, affinity_region: str = None):
     return add_security_info(
         access_token_id,
         security_info_type,
         {
             "secretKey": secret_key,
-            "affinityRegion": None,
+            "affinityRegion": affinity_region,
             "isResendNotificationChallenge": False,
         },
     )
@@ -416,18 +424,16 @@ def add_security_key(
     }
     current_app.config["add_security_key_status"] = "CLIENT_SETUP"
     if client_type == "Windows":
-        if not WindowsClient.is_available():
+        try:
+            from fido2.client.windows import WindowsClient # Only importable on Windows!
+            if not WindowsClient.is_available():
+                return create_response(400, "Windows client requested, but WindowsClient is not available! Are you sure the GraphSpy server is running on a compatible Windows device?")
+            client = WindowsClient(client_data_collector=DefaultClientDataCollector("https://login.microsoft.com"))
+        except Exception:
+            traceback.print_exc()
             return create_response(400, "Windows client requested, but WindowsClient is not available! Are you sure the GraphSpy server is running on a compatible Windows device?")
-        client = WindowsClient("https://login.microsoft.com")
     else:
         dev = next(CtapHidDevice.list_devices(), None)
-        if dev is None:
-            try:
-                from fido2.pcsc import CtapPcscDevice
-
-                dev = next(CtapPcscDevice.list_devices(), None)
-            except Exception:
-                traceback.print_exc()
         if not dev:
             return create_response(400, "No valid FIDO authenticator device found. Admin/root privileges might be required to discover your Authenticator device when not using the Windows WebAuthn API.")
 
@@ -443,31 +449,32 @@ def add_security_key(
                 return True
 
         client = Fido2Client(
-            dev, "https://login.microsoft.com", user_interaction=CliInteraction()
+            dev, client_data_collector=DefaultClientDataCollector("https://login.microsoft.com"), user_interaction=CliInteraction()
         )
 
     current_app.config["add_security_key_status"] = "CREDENTIAL_REGISTRATION"
     credential = client.make_credential(public_key_options)
-    if not credential:
+    if not credential or not "response" in credential:
         return create_response(400, "Credential registration failed.")
 
+    credential_response = credential.response
     current_app.config["add_security_key_status"] = "VERIFY_DATA"
 
-    client_data_json = json.loads(credential.client_data)
+    client_data_json = json.loads(credential_response.client_data)
     verification_data = {
         "Name": key_description,
         "Canary": security_info_data["requestData"]["canary"],
         "AttestationObject": base64.urlsafe_b64encode(
-            credential.attestation_object
+            credential_response.attestation_object
         ).decode(),
         "ClientDataJson": base64.urlsafe_b64encode(
-            json.dumps(client_data_json, separators=(",", ":")).encode()
+            json.dumps(client_data_json, separators=(",", ":")).encode("utf-8")
         ).decode(),
         "CredentialId": base64.urlsafe_b64encode(
-            credential.attestation_object.auth_data.credential_data.credential_id
+            credential_response.attestation_object.auth_data.credential_data.credential_id
         ).decode(),
         "ClientExtensionResults": base64.urlsafe_b64encode(
-            str(credential.extension_results).encode()
+            str(credential.client_extension_results).encode("utf-8")
         ).decode(),
         "PostInfo": "",
         "AAGuid": str(uuid.uuid4()),

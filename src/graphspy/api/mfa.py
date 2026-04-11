@@ -76,7 +76,8 @@ def add_mfa_app():
     secret_key = request.form.get("secret_key")
     if not secret_key:
         return "[Error] No secret_key specified.", 400
-    result = mfa.add_mfa_app(access_token_id, security_info_type, secret_key)
+    affinity_region = request.form.get("affinity_region", None)
+    result = mfa.add_mfa_app(access_token_id, security_info_type, secret_key, affinity_region)
     if not result:
         return "[Error] Failed to add MFA app.", 400
     return result
@@ -174,9 +175,7 @@ def verify_security_info():
     verification_context = request.form.get("verification_context")
     if not verification_context:
         return "[Error] No verification_context specified.", 400
-    verification_data = request.form.get("verification_data")
-    if not verification_data:
-        return "[Error] No verification_data specified.", 400
+    verification_data = request.form.get("verification_data", None)
     result = mfa.verify_security_info(
         access_token_id, security_info_type, verification_context, verification_data
     )
