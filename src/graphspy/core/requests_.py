@@ -6,6 +6,7 @@ import time
 
 # External library imports
 import requests
+from loguru import logger
 
 # Local library imports
 from ..db import connection
@@ -94,7 +95,9 @@ def make_request(
 
         if response.status_code == 429 and "Retry-After" in response.headers:
             retry_count -= 1
-            time.sleep(int(response.headers["Retry-After"]) + 1)
+            retry_delay = int(response.headers["Retry-After"]) + 1
+            logger.debug("Request throttled. Received status code 429. Retrying after {} seconds [{} attempts left]", retry_delay, retry_count)
+            time.sleep(retry_delay)
         else:
             break
 

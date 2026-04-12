@@ -7,6 +7,7 @@ from datetime import datetime
 # External library imports
 import jwt
 import requests
+from loguru import logger
 
 # Local library imports
 from ..db import connection
@@ -54,6 +55,7 @@ def save_access_token(accesstoken: str, description: str) -> int:
             or decoded.get("oid")
             or "unknown"
         )
+    logger.debug("Saving access token for user '{}', resource '{}': {}", user, decoded.get('aud', 'unknown'), description)
     return connection.execute_db(
         "INSERT INTO accesstokens (stored_at, issued_at, expires_at, description, user, resource, accesstoken) VALUES (?,?,?,?,?,?,?)",
         (
@@ -77,6 +79,7 @@ def save_refresh_token(
     foci: int,
     client_id: str = "d3590ed6-52b3-4102-aeff-aad2292ab01c",
 ) -> int:
+    logger.debug("Saving refresh token for user '{}', tenant '{}': {}", user, tenant, description)
     foci_int = 1 if foci else 0
     if tenant == "common":
         tenant_id = "common"

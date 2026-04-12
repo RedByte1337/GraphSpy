@@ -1,5 +1,5 @@
 [build-system]
-requires = ["uv_build"]
+requires = ["uv_build<0.12"]
 build-backend = "uv_build"
 
 [project]
@@ -17,7 +17,9 @@ dependencies = [
     "pyjwt>=2.8.0,<3.0.0",
     "requests>=2.30.0,<3.0.0",
     "pyotp>=2.9.0,<3.0.0",
-    "fido2>=2.0.0,<3.0.0"
+    "fido2>=2.0.0,<3.0.0",
+    "loguru>=0.7.0,<1.0.0",
+    "waitress>=3.0.0,<4.0.0",
 ]
 
 [project.urls]

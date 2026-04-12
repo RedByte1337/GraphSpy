@@ -2,13 +2,14 @@
 
 # External library imports
 from flask import Flask, jsonify
+from loguru import logger
 
 # Local library imports
 from .core.errors import AppError
 from .db import connection
 
 
-def create_app(db_path: str, db_folder: str, debug: bool = False) -> Flask:
+def create_app(db_path: str, db_folder: str) -> Flask:
     app = Flask(__name__, template_folder="web/templates", static_folder="web/static")
     app.config["graph_spy_db_path"] = db_path
     app.config["graph_spy_db_folder"] = db_folder
@@ -23,6 +24,7 @@ def create_app(db_path: str, db_folder: str, debug: bool = False) -> Flask:
 
     @app.errorhandler(AppError)
     def handle_app_error(e):
+        logger.error("AppError in {}():{} - {}", e.func_name, e.line_number, e.message)
         return jsonify({"message": e.message}), e.status_code
 
     app.teardown_appcontext(connection.close)

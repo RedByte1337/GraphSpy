@@ -1,11 +1,11 @@
 # graphspy/api/refresh_tokens.py
 
 # Built-in imports
-import traceback
 import json
 
 # External library imports
 from flask import Blueprint, redirect, request
+from loguru import logger
 
 # Local library imports
 from ..db import connection
@@ -69,7 +69,7 @@ def refresh_to_access_token():
         status_code = 200 if isinstance(result, int) and result != 0 else 400
         return f"{result}", status_code
     except Exception as e:
-        traceback.print_exc()
+        logger.exception("Unexpected error in refresh_to_access_token")
         return f"[Error] Unexpected error occurred. Exception: {repr(e)}", 400
 
 

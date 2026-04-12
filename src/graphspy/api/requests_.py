@@ -5,6 +5,7 @@ import json
 
 # External library imports
 from flask import Blueprint, request
+from loguru import logger
 
 # Local library imports
 from ..core import requests_ as generic
@@ -24,8 +25,6 @@ def generic_graph():
 
 @bp.post("/api/generic_graph_upload")
 def generic_graph_upload():
-    import traceback
-
     try:
         upload_uri = request.form["upload_uri"]
         access_token_id = request.form["access_token_id"]
@@ -34,14 +33,12 @@ def generic_graph_upload():
             return json.dumps({"error": "Missing required parameters"}), 400
         return generic.graph_upload_request(upload_uri, access_token_id, file)
     except Exception as e:
-        traceback.print_exc()
+        logger.exception("Error in generic_graph_upload")
         return json.dumps({"error": "Internal server error.", "details": str(e)}), 500
 
 
 @bp.post("/api/custom_api_request")
 def custom_api_request():
-    import traceback
-
     if not request.is_json:
         return "[Error] Expecting JSON input.", 400
     data = request.get_json()
@@ -72,14 +69,12 @@ def custom_api_request():
             uri, access_token_id, method, request_type, body, headers
         )
     except Exception as e:
-        traceback.print_exc()
+        logger.exception("Error in custom_api_request")
         return f"[Error] Unexpected error. Exception: {repr(e)}", 400
 
 
 @bp.post("/api/save_request_template")
 def save_request_template():
-    import traceback
-
     if not request.is_json:
         return "[Error] Expecting JSON input.", 400
     data = request.get_json()
@@ -120,7 +115,7 @@ def save_request_template():
         )
         return f"[Success] {'Updated' if existing else 'Saved'} template '{template_name}'."
     except Exception as e:
-        traceback.print_exc()
+        logger.exception("Error in save_request_template")
         return f"[Error] Unexpected error. Exception: {repr(e)}", 400
 
 

@@ -10,6 +10,7 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
+from loguru import logger
 
 # Local library imports
 from ..db import connection
@@ -99,6 +100,7 @@ def register(
         except ValueError:
             raise AppError(f"Failed to register device.\n{response.text}")
     response_json = response.json()
+    logger.debug("Device registration response:\n{}", response_json)
     if "Certificate" not in response_json:
         raise AppError("Failed to register device. No certificate in response.")
     certificate_base64 = response_json["Certificate"]["RawBody"]

@@ -16,6 +16,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.kbkdf import KBKDFHMAC, CounterLocation, Mode
 from cryptography.hazmat.backends import default_backend
+from loguru import logger
 
 # Local library imports
 from ..db import connection
@@ -126,6 +127,7 @@ def request_for_device(
     if response.status_code != 200:
         raise AppError(parse_token_endpoint_error(response))
     response_json = response.json()
+    logger.debug("PRT request response:\n{}", response_json)
     if "refresh_token" not in response_json or "session_key_jwe" not in response_json:
         raise AppError(
             "Failed to request PRT. No 'refresh_token' or 'session_key_jwe' in response."
@@ -204,6 +206,7 @@ def refresh_to_access_token(
     if response.status_code != 200:
         raise AppError(parse_token_endpoint_error(response))
     headerdata, enckey, iv, ciphertext, authtag = response.text.split(".")
+    logger.debug("PRT to access token response:\n{}", response.text)
     response_context = json.loads(
         base64.urlsafe_b64decode(headerdata + "=" * (len(headerdata) % 4))
     ).get("ctx")
@@ -225,6 +228,7 @@ def refresh_to_access_token(
         unpadder = padding.PKCS7(128).unpadder()
         decrypted = unpadder.update(decrypted_data) + unpadder.finalize()
     decrypted_json = json.loads(decrypted)
+    logger.debug("Decrypted PRT to access token response:\n{}", decrypted_json)
     if "access_token" not in decrypted_json:
         raise AppError(
             "Failed to request access token with PRT. No 'access_token' in decrypted response."

@@ -5,6 +5,7 @@ import json
 
 # External library imports
 from flask import Blueprint, request
+from loguru import logger
 
 # Local library imports
 from ..core import mfa
@@ -105,7 +106,6 @@ def add_graphspy_otp():
 
 @bp.post("/api/delete_graphspy_otp")
 def delete_graphspy_otp():
-    import traceback
     from ..db import connection
 
     try:
@@ -115,13 +115,12 @@ def delete_graphspy_otp():
         connection.execute_db("DELETE FROM mfa_otp WHERE id = ?", [otp_code_id])
         return f"[Success] OTP code with ID {otp_code_id} deleted from database."
     except Exception as e:
-        traceback.print_exc()
+        logger.exception("Failed to delete OTP code")
         return "[Error] Failed to delete OTP code.", 400
 
 
 @bp.post("/api/generate_otp_code")
 def generate_otp_code():
-    import traceback
     import pyotp
 
     try:
@@ -130,14 +129,12 @@ def generate_otp_code():
             return "[Error] No secret_key specified.", 400
         return pyotp.TOTP(secret_key).now()
     except Exception as e:
-        traceback.print_exc()
+        logger.exception("Failed to create OTP code from the provided secret key")
         return "[Error] Failed to create OTP code from the provided secret key.", 400
 
 
 @bp.post("/api/add_security_key")
 def add_security_key():
-    import traceback
-
     try:
         access_token_id = request.form.get("access_token_id")
         if not access_token_id:
@@ -151,7 +148,7 @@ def add_security_key():
             access_token_id, description, client_type, device_pin
         )
     except Exception as e:
-        traceback.print_exc()
+        logger.exception("Unexpected error when trying to add the security key")
         return create_response(
             400, "An unexpected error occurred when trying to add the security key."
         )

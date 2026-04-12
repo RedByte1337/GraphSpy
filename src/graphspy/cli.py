@@ -4,12 +4,15 @@
 import argparse
 import os
 from pathlib import Path
-import sys
 
 # Local library imports
 from . import __version__, banner
 from .app import create_app
 from .db import connection, migrations, schema
+from .utils import logbook
+
+# Third party library imports
+from loguru import logger
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -42,70 +45,130 @@ def build_parser() -> argparse.ArgumentParser:
         default="database.db",
         help="Database file to utilize. (Default: database.db)",
     )
-    parser.add_argument(
+
+    advanced_group = parser.add_argument_group(
+        "Advanced Options", "Additional advanced or debugging options."
+    )
+
+    advanced_group.add_argument(
         "--debug",
         action="store_true",
-        help="Enable Flask debug mode.",
+        help="Enable debug logging (shortcut for --log-level DEBUG).",
     )
+
+    advanced_group.add_argument(
+        "--trace",
+        action="store_true",
+        help="Enable TRACE logging (shortcut for --log-level TRACE).",
+    )
+
+    advanced_group.add_argument(
+        "--log-level",
+        type=str,
+        choices=["TRACE", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        default=None,
+        help="Set the logging level explicitly.",
+    )
+
+    advanced_group.add_argument(
+        "--dev",
+        action="store_true",
+        help="Run with Flask development server (auto-reload, debugger). Do not use in production.",
+    )
+
     return parser
 
 
-def get_data_dir() -> str:
+def get_data_dir() -> Path:
     """Return the data directory, preferring XDG/platform paths, falling back to legacy ~/.gspy/."""
     # New XDG-compliant / platform-appropriate path
     if os.name == "nt":
-        base = os.environ.get("APPDATA", str(Path.home()))
+        base = Path(os.environ.get("APPDATA", str(Path.home())))
     else:
-        base = os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))
-    xdg_dir = os.path.normpath(os.path.join(base, "graphspy"))
-    if os.path.isdir(xdg_dir):
+        base = Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share")))
+    xdg_dir = (base / "graphspy").resolve()
+    if xdg_dir.is_dir():
         return xdg_dir
 
     # Fall back to legacy path used by older versions
     legacy_dir = Path.home() / ".gspy"
     if legacy_dir.is_dir():
-        return str(legacy_dir)
+        return legacy_dir
 
     # Neither exists yet — use the new XDG path
     return xdg_dir
 
 
-def resolve_paths(database: str) -> tuple[str, str]:
+def resolve_paths(database: str) -> tuple[Path, Path]:
     """Resolve and create required directories, return (db_folder, db_path)."""
     data_dir = get_data_dir()
-    db_folder = os.path.join(data_dir, "databases")
+    db_folder = data_dir / "databases"
 
     for directory in (data_dir, db_folder):
-        if not os.path.exists(directory):
-            print(f"[*] Creating directory '{directory}'.")
-            os.makedirs(directory, exist_ok=True)
-            if not os.path.exists(directory):
-                sys.exit(f"Failed creating directory '{directory}'. Unable to proceed.")
+        if not directory.exists():
+            logger.info("Creating directory '{}'.", directory)
+            directory.mkdir(parents=True, exist_ok=True)
+            if not directory.exists():
+                raise OSError(f"Failed creating directory '{directory}'.")
 
     db_name = database if database.endswith(".db") else f"{database}.db"
-    db_path = connection.safe_join(db_folder, db_name)
+    db_path = connection.safe_join(str(db_folder), db_name)
     if not db_path:
-        sys.exit(f"Invalid database name '{db_name}'.")
+        raise ValueError(f"Invalid database name '{db_name}'.")
 
-    return db_folder, db_path
+    return db_folder, Path(db_path)
 
 
-def main():
-    print(banner.display_banner())
+def main() -> int:
+    # Only show banner in the main process, not the reloader child
+    if os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+        print(banner.display_banner())
 
-    args = build_parser().parse_args()
-    db_folder, db_path = resolve_paths(args.database)
+    parser = build_parser()
+    args = parser.parse_args()
 
-    if not os.path.exists(db_path):
-        print(f"[*] Database '{db_path}' not found. Initializing new database.")
-        schema.init_db(db_path)
+    # Determine log level: --log-level takes precedence, then --debug, then --trace, then default INFO
+    if args.log_level:
+        log_level = args.log_level
+    elif args.debug:
+        log_level = "DEBUG"
+    elif args.trace:
+        log_level = "TRACE"
+    else:
+        log_level = "INFO"
 
-    print(f"[*] Utilizing database '{db_path}'.")
+    logbook.setup_logging(level=log_level)
 
-    app = create_app(db_path=db_path, db_folder=db_folder, debug=args.debug)
+    is_reloader = os.environ.get("WERKZEUG_RUN_MAIN") == "true"
+
+    try:
+        db_folder, db_path = resolve_paths(args.database)
+    except (OSError, ValueError) as exc:
+        logger.error(str(exc))
+        return 1
+
+    if not db_path.exists():
+        if not is_reloader:
+            logger.info("Database '{}' not found. Initializing new database.", db_path)
+        schema.init_db(str(db_path))
+
+    if not is_reloader:
+        logger.info("Utilizing database '{}'.", db_path)
+
+    app = create_app(db_path=str(db_path), db_folder=str(db_folder))
 
     with app.app_context():
         migrations.update_db()
 
-    print("[*] Starting GraphSpy. Open in your browser at the URL displayed below.\n")
-    app.run(debug=args.debug, host=args.interface, port=args.port)
+    if not is_reloader:
+        logger.info("Starting GraphSpy on http://{}:{}", args.interface, args.port)
+
+    if args.dev:
+        logger.warning("Running in development mode. Do not use in production.")
+        app.run(debug=True, host=args.interface, port=args.port)
+    else:
+        # Avoid using Flask's built-in server in production.
+        from waitress import serve
+
+        serve(app, host=args.interface, port=args.port)
+    return 0
