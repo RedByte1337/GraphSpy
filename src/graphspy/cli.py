@@ -151,6 +151,9 @@ def main() -> int:
         if not is_reloader:
             logger.info("Database '{}' not found. Initializing new database.", db_path)
         schema.init_db(str(db_path))
+        if not db_path.exists():
+            logger.error("Failed creating database file at '{}'. Unable to proceed.", db_path)
+            return 1
 
     if not is_reloader:
         logger.info("Utilizing database '{}'.", db_path)
@@ -161,7 +164,7 @@ def main() -> int:
         migrations.update_db()
 
     if not is_reloader:
-        logger.info("Starting GraphSpy on http://{}:{}", args.interface, args.port)
+        logger.info("Starting GraphSpy. Open in your browser by going to the url displayed below.\n")
 
     if args.dev:
         logger.warning("Running in development mode. Do not use in production.")
