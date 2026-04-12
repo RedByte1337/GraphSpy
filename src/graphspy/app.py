@@ -27,6 +27,7 @@ def create_app(db_path: str, db_folder: str) -> Flask:
         settings,
         teams,
     )
+    from .web import pages
 
     for module in [
         access_tokens,
@@ -39,12 +40,9 @@ def create_app(db_path: str, db_folder: str) -> Flask:
         requests_,
         settings,
         teams,
+        pages,
     ]:
         app.register_blueprint(module.bp)
-
-    from .web import pages
-
-    pages.register(app)
 
     @app.errorhandler(AppError)
     def handle_app_error(e):
