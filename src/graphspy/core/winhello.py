@@ -30,7 +30,9 @@ def register(access_token_id: int) -> int:
     decoded = jwt.decode(access_token, options={"verify_signature": False})
     device_id = decoded.get("deviceid", "00000000-0000-0000-0000-000000000000")
     if "deviceid" not in decoded:
-        logger.error("No device ID found in access token with ID {}! This will probably fail!", access_token_id)
+        logger.error(
+            f"No device ID found in access token with ID {access_token_id}! This will probably fail!"
+        )
     private_key, private_key_bytes, public_key = generate_key_pair()
     private_key_base64 = base64.b64encode(private_key_bytes).decode("utf-8")
     pubkeycngblob = generate_public_key_rsa_blob(public_key)
@@ -126,7 +128,7 @@ def to_prt(
     if response.status_code != 200:
         raise AppError(parse_token_endpoint_error(response))
     response_json = response.json()
-    logger.debug("PRT request response:\n{}", response_json)
+    logger.debug(f"PRT request response:\n{response_json}")
     if "refresh_token" not in response_json or "session_key_jwe" not in response_json:
         raise AppError(
             "Failed to request PRT. No 'refresh_token' or 'session_key_jwe' in response."

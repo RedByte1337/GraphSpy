@@ -332,7 +332,7 @@ def create_conversation(
                 "Failed creating group chat conversation. Received response status {}",
                 response.status_code,
             )
-    logger.debug("Created {} conversations.", len(created))
+    logger.debug(f"Created {len(created)} conversations.")
     if not created:
         return "[Error] Failed to create conversation(s).", 400
     if message_content:

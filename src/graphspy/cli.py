@@ -108,7 +108,7 @@ def resolve_paths(database: str) -> tuple[Path, Path]:
 
     for directory in (data_dir, db_folder):
         if not directory.exists():
-            logger.info("Creating directory '{}'.", directory)
+            logger.info(f"Creating directory '{directory}'.")
             directory.mkdir(parents=True, exist_ok=True)
             if not directory.exists():
                 raise OSError(f"Failed creating directory '{directory}'.")
@@ -153,7 +153,7 @@ def main() -> int:
 
     if not db_path.exists():
         if not is_reloader:
-            logger.info("Database '{}' not found. Initializing new database.", db_path)
+            logger.info(f"Database '{db_path}' not found. Initializing new database.")
         schema.init_db(str(db_path))
         if not db_path.exists():
             logger.error(
@@ -162,7 +162,7 @@ def main() -> int:
             return 1
 
     if not is_reloader:
-        logger.info("Utilizing database '{}'.", db_path)
+        logger.info(f"Utilizing database '{db_path}'.")
 
     app = create_app(db_path=str(db_path), db_folder=str(db_folder))
 

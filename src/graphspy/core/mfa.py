@@ -149,7 +149,7 @@ def get_session_ctx(access_token_id: int):
             )
             return False
         session_ctx = response.json()["sessionCtxV2"]
-        logger.debug("Received sessionCtxV2: '{}'", session_ctx)
+        logger.debug(f"Received sessionCtxV2: '{session_ctx}'")
         return session_ctx
     except Exception:
         logger.exception("Failed to obtain sessionCtxV2 value.")
@@ -190,11 +190,10 @@ def get_available_authentication_info(access_token_id: int):
         )
         if response.status_code != 200:
             logger.error(
-                "Failed to obtain AvailableAuthenticationInfo. Received status code {}",
-                response.status_code,
+                f"Failed to obtain AvailableAuthenticationInfo. Received status code {response.status_code}"
             )
             return False
-        logger.debug("AvailableAuthenticationInfo Raw Response:\n{}", response.text)
+        logger.debug(f"AvailableAuthenticationInfo Raw Response:\n{response.text}")
         info = response.json()
         return [{**info[m], "MethodName": m} for m in info.keys()]
     except Exception:
@@ -225,11 +224,10 @@ def validate_captcha(
         )
         if response.status_code != 200:
             logger.error(
-                "Failed to validate captcha. Received status code {}",
-                response.status_code,
+                f"Failed to validate captcha. Received status code {response.status_code}"
             )
             return False
-        logger.debug("ValidateCaptcha Raw Response:\n{}", response.text)
+        logger.debug(f"ValidateCaptcha Raw Response:\n{response.text}")
         return response.json()
     except Exception:
         logger.exception("ValidateCaptcha request failed.")
@@ -252,7 +250,7 @@ def initialize_mobile_app_registration(access_token_id: int, security_info_type)
                 response.status_code,
             )
             return False
-        logger.debug("InitializeMobileAppRegistration Raw Response:\n{}", response.text)
+        logger.debug(f"InitializeMobileAppRegistration Raw Response:\n{response.text}")
         return response.json()
     except Exception:
         logger.exception("InitializeMobileAppRegistration request failed.")
@@ -280,7 +278,7 @@ def add_security_info(access_token_id: int, security_info_type, data=None):
                 response.status_code,
             )
             return False
-        logger.debug("AddSecurityInfo Raw Response:\n{}", response.text)
+        logger.debug(f"AddSecurityInfo Raw Response:\n{response.text}")
         security_info_response = response.json()
         if (
             not security_info_response
@@ -301,7 +299,7 @@ def add_security_info(access_token_id: int, security_info_type, data=None):
                 "https://mysignins.microsoft.com/api/captcha/?challengeType=Visual&locale=en-US",
                 headers=headers,
             )
-            logger.debug("Captcha Raw Response:\n{}", captcha_response.text)
+            logger.debug(f"Captcha Raw Response:\n{captcha_response.text}")
             security_info_response["captcha"] = captcha_response.json()
         return security_info_response
     except Exception:
@@ -338,7 +336,7 @@ def verify_security_info(
                 "VerifySecurityInfo request failed. Received status code {}",
                 response.status_code,
             )
-        logger.debug("VerifySecurityInfo Raw Response:\n{}", response.text)
+        logger.debug(f"VerifySecurityInfo Raw Response:\n{response.text}")
         return response.json() if response.status_code == 200 else False
     except Exception:
         logger.exception("VerifySecurityInfo request failed.")
@@ -353,15 +351,14 @@ def delete_security_info(access_token_id: int, security_info_type, data):
     try:
         body_data = json.dumps(data) if isinstance(data, dict) else data
         logger.debug(
-            "DeleteSecurityInfo Raw Request Body:\n{}",
-            {"Type": security_info_type, "Data": body_data},
+            f"DeleteSecurityInfo Raw Request Body:\n{{'Type': {security_info_type}, 'Data': {body_data}}}"
         )
         response = requests.post(
             "https://mysignins.microsoft.com/api/authenticationmethods/delete",
             headers=headers,
             json={"Type": security_info_type, "Data": body_data},
         )
-        logger.debug("DeleteSecurityInfo Raw Response:\n{}", response.text)
+        logger.debug(f"DeleteSecurityInfo Raw Response:\n{response.text}")
         if response.status_code != 200:
             logger.error(
                 "DeleteSecurityInfo request failed. Received status code {}",
@@ -393,7 +390,7 @@ def add_phone_number(
         "altMobilePhone": 11,
     }
     if phone_type not in phone_type_dict:
-        logger.error("Invalid phone type provided: {}", phone_type)
+        logger.error(f"Invalid phone type provided: {phone_type}")
         return False
     security_info_response = add_security_info(
         access_token_id,

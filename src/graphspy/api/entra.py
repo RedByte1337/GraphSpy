@@ -35,14 +35,18 @@ def get_entra_users():
         ):
             response_json = json.loads(response["response_text"])
             users_list += response_json["value"]
-            logger.debug("Retrieved {} users. {} total users so far.", len(response_json['value']), len(users_list))
+            logger.debug(
+                f"Retrieved {len(response_json['value'])} users. {len(users_list)} total users so far."
+            )
             if "@odata.nextLink" in response_json:
                 uri = response_json["@odata.nextLink"]
             else:
                 logger.debug("All users retrieved.")
                 break
         else:
-            logger.error("Failed obtaining Entra ID Users. Status {}", response['response_status_code'])
+            logger.error(
+                f"Failed obtaining Entra ID Users. Status {response['response_status_code']}"
+            )
             return (
                 f"[Error] Failed obtaining Entra ID Users. Status {response['response_status_code']}",
                 400,
@@ -95,7 +99,9 @@ def get_entra_user_details(user_id):
     if not (
         response["response_status_code"] == 200 and response["response_type"] == "json"
     ):
-        logger.error("Something went wrong trying to obtain user details of '{}'.", user_id)
+        logger.error(
+            f"Something went wrong trying to obtain user details of '{user_id}'."
+        )
         return (
             f"[Error] Failed obtaining user details for '{user_id}'. Status {response['response_status_code']}",
             400,
@@ -107,7 +113,9 @@ def get_entra_user_details(user_id):
         if r["id"] == "userDetails" and r["status"] == 200
     ]
     if not user_details_list:
-        logger.error("Something went wrong trying to obtain user details of '{}'.", user_id)
+        logger.error(
+            f"Something went wrong trying to obtain user details of '{user_id}'."
+        )
         return f"[Error] Failed obtaining user details for '{user_id}'.", 400
     user_details = user_details_list[0]
     for r in batch_responses:

