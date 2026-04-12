@@ -6,10 +6,9 @@ import os
 from pathlib import Path
 
 # Local library imports
-from . import __version__, banner
+from . import __version__, banner, logbook
 from .app import create_app
 from .db import connection, migrations, schema
-from .utils import logbook
 
 # Third party library imports
 from loguru import logger
@@ -157,7 +156,7 @@ def main() -> int:
         schema.init_db(str(db_path))
         if not db_path.exists():
             logger.error(
-                "Failed creating database file at '{}'. Unable to proceed.", db_path
+                f"Failed creating database file at '{db_path}'. Unable to proceed."
             )
             return 1
 
