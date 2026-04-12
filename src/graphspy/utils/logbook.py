@@ -43,7 +43,9 @@ class _InterceptHandler(logging.Handler):
             frame = frame.f_back
             depth += 1
 
-        logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
+        logger.opt(depth=depth, exception=record.exc_info).log(
+            level, record.getMessage()
+        )
 
 
 def _format_message(record):
@@ -86,31 +88,13 @@ def _format_message(record):
     )
 
 
-def _xdg_state_dir(app_name: str = "graphspy") -> Path:
-    """Get platform-appropriate log directory following XDG standards."""
-    # Highest priority: explicit override
-    override = os.getenv("GRAPHSPY_LOG_DIR")
-    if override:
-        return Path(override).expanduser().resolve()
-
-    if os.name == "nt":
-        base = Path(os.getenv("LOCALAPPDATA", str(Path.home() / "AppData" / "Local")))
-        return (base / app_name / "logs").resolve()
-
-    # POSIX: follow XDG
-    base = os.getenv("XDG_STATE_HOME")
-    if base:
-        return Path(base).expanduser().resolve() / app_name / "logs"
-
-    return Path.home() / ".local" / "state" / app_name / "logs"
-
-
-def setup_logging(level: str = "INFO"):
+def setup_logging(level: str = "INFO", log_dir: Path | None = None):
     """
     Setup logging with compact, visually intuitive output.
 
     Args:
         level: Log level (TRACE, DEBUG, INFO, SUCCESS, WARNING, ERROR, CRITICAL)
+        log_dir: Directory to write log files to. If None, logs only to stderr.
     """
     level = level.upper()
 
@@ -135,7 +119,8 @@ def setup_logging(level: str = "INFO"):
     )
 
     # --- File handler (rotating, UTC timestamps)
-    log_dir = _xdg_state_dir()
+    if log_dir is None:
+        return
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / "graphspy.log"
 

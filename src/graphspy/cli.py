@@ -79,13 +79,15 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def get_data_dir() -> Path:
+def get_app_dir() -> Path:
     """Return the data directory, preferring XDG/platform paths, falling back to legacy ~/.gspy/."""
     # New XDG-compliant / platform-appropriate path
     if os.name == "nt":
         base = Path(os.environ.get("APPDATA", str(Path.home())))
     else:
-        base = Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share")))
+        base = Path(
+            os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))
+        )
     xdg_dir = (base / "graphspy").resolve()
     if xdg_dir.is_dir():
         return xdg_dir
@@ -101,7 +103,7 @@ def get_data_dir() -> Path:
 
 def resolve_paths(database: str) -> tuple[Path, Path]:
     """Resolve and create required directories, return (db_folder, db_path)."""
-    data_dir = get_data_dir()
+    data_dir = get_app_dir()
     db_folder = data_dir / "databases"
 
     for directory in (data_dir, db_folder):
@@ -137,7 +139,9 @@ def main() -> int:
     else:
         log_level = "INFO"
 
-    logbook.setup_logging(level=log_level)
+    data_dir = get_app_dir()
+    log_dir = data_dir / "logs"
+    logbook.setup_logging(level=log_level, log_dir=log_dir)
 
     is_reloader = os.environ.get("WERKZEUG_RUN_MAIN") == "true"
 
@@ -152,7 +156,9 @@ def main() -> int:
             logger.info("Database '{}' not found. Initializing new database.", db_path)
         schema.init_db(str(db_path))
         if not db_path.exists():
-            logger.error("Failed creating database file at '{}'. Unable to proceed.", db_path)
+            logger.error(
+                "Failed creating database file at '{}'. Unable to proceed.", db_path
+            )
             return 1
 
     if not is_reloader:
@@ -164,7 +170,9 @@ def main() -> int:
         migrations.update_db()
 
     if not is_reloader:
-        logger.info("Starting GraphSpy. Open in your browser by going to the url displayed below.\n")
+        logger.info(
+            "Starting GraphSpy. Open in your browser by going to the url displayed below.\n"
+        )
 
     if args.dev:
         logger.warning("Running in development mode. Do not use in production.")
