@@ -11,7 +11,13 @@ from flask import current_app
 import requests
 import pyotp
 from fido2.hid import CtapHidDevice
-from fido2.client import Fido2Client, DefaultClientDataCollector, UserInteraction
+from fido2.client import (
+    ClientError,
+    Fido2Client,
+    DefaultClientDataCollector,
+    UserInteraction,
+)
+from fido2.webauthn import PublicKeyCredentialCreationOptions
 from loguru import logger
 
 # Local library imports
@@ -427,7 +433,7 @@ def add_mfa_app(
     access_token_id: int,
     security_info_type,
     secret_key: str,
-    affinity_region: str = None,
+    affinity_region: str | None = None,
 ):
     security_info_response = add_security_info(
         access_token_id,
@@ -456,7 +462,7 @@ def add_graphspy_otp(access_token_id: int, description: str = "") -> str | None:
         init_response = initialize_mobile_app_registration(access_token_id, 3)
         if not init_response:
             logger.error("Failed to initialize mobile app registration.")
-            return False
+            return None
         secret_key = init_response["SecretKey"]
         account_name = init_response.get("AccountName", "Unknown")
         security_info_response = add_security_info(
@@ -470,26 +476,31 @@ def add_graphspy_otp(access_token_id: int, description: str = "") -> str | None:
         )
         if not security_info_response:
             logger.error("No valid security info response received.")
-            return False
+            return None
         if "captcha" in security_info_response:
             logger.error("A captcha was requested. Aborting.")
-            return False
+            return None
         if not security_info_response.get("VerificationContext"):
             logger.error(
                 "No VerificationContext in the security info response. Received response:\n{}",
                 security_info_response,
             )
-            return False
+            return None
         otp_code = pyotp.TOTP(secret_key).now()
         verify_response = verify_security_info(
             access_token_id, 3, security_info_response["VerificationContext"], otp_code
         )
+        if not verify_response:
+            logger.error(
+                "An error occurred when trying to validate the provided info.",
+            )
+            return None
         if verify_response.get("ErrorCode"):
             logger.error(
                 "An error occurred when trying to validate the provided info. Error Code {}",
                 verify_response.get("ErrorCode"),
             )
-            return False
+            return None
         connection.execute_db(
             "INSERT INTO mfa_otp (stored_at, secret_key, account_name, description) VALUES (?,?,?,?)",
             (f"{datetime.now()}".split(".")[0], secret_key, account_name, description),
@@ -497,14 +508,14 @@ def add_graphspy_otp(access_token_id: int, description: str = "") -> str | None:
         return secret_key
     except Exception:
         logger.exception("An error occurred when trying to add GraphSpy OTP.")
-        return False
+        return None
 
 
 def add_security_key(
     access_token_id: int,
     key_description: str = "GraphSpy Key",
     client_type: str = "Windows",
-    device_pin: str = None,
+    device_pin: str | None = None,
 ):
 
     current_app.config["add_security_key_status"] = "INIT"
@@ -541,7 +552,7 @@ def add_security_key(
         ),
         "rp": {"name": "Microsoft", "id": "login.microsoft.com"},
         "user": {
-            "id": __import__("base64").urlsafe_b64decode(
+            "id": base64.urlsafe_b64decode(
                 security_info_data["requestData"]["userId"] + "=="
             ),
             "name": security_info_data["requestData"]["memberName"],
@@ -558,7 +569,7 @@ def add_security_key(
             "authenticatorAttachment": security_info_data["requestData"][
                 "authenticator"
             ],
-            "requireResidentKey": True,
+            "residentKey": "required",
             "userVerification": "required",
         },
         "attestation": "direct",
@@ -619,11 +630,11 @@ def add_security_key(
                 current_app.config["add_security_key_status"] = "TOUCH"
                 logger.debug("Touch your authenticator device now.")
 
-            def request_pin(self, permissions, rd_id):
+            def request_pin(self, permissions, rp_id):
                 current_app.config["add_security_key_status"] = "PIN"
                 return device_pin
 
-            def request_uv(self, permissions, rd_id):
+            def request_uv(self, permissions, rp_id):
                 logger.debug("User Verification required.")
                 return True
 
@@ -636,15 +647,24 @@ def add_security_key(
         )
 
     current_app.config["add_security_key_status"] = "CREDENTIAL_REGISTRATION"
-    credential = client.make_credential(public_key_options)
-    if not credential or not "response" in credential:
-        logger.error("Credential registration with the authenticator device failed.")
+    try:
+        credential = client.make_credential(
+            PublicKeyCredentialCreationOptions.from_dict(public_key_options)
+        )
+    except ClientError as e:
+        logger.error(
+            "Credential registration with the authenticator device failed: {}", e
+        )
         return create_response(400, "Credential registration failed.")
 
     credential_response = credential.response
     current_app.config["add_security_key_status"] = "VERIFY_DATA"
 
     client_data_json = json.loads(credential_response.client_data)
+    credential_data = credential_response.attestation_object.auth_data.credential_data
+    if not credential_data:
+        logger.error("No credential data in attestation object.")
+        return create_response(400, "Credential registration failed.")
     verification_data = {
         "Name": key_description,
         "Canary": security_info_data["requestData"]["canary"],
@@ -655,7 +675,7 @@ def add_security_key(
             json.dumps(client_data_json, separators=(",", ":")).encode("utf-8")
         ).decode(),
         "CredentialId": base64.urlsafe_b64encode(
-            credential_response.attestation_object.auth_data.credential_data.credential_id
+            credential_data.credential_id
         ).decode(),
         "ClientExtensionResults": base64.urlsafe_b64encode(
             str(credential.client_extension_results).encode("utf-8")
@@ -667,6 +687,9 @@ def add_security_key(
     response = verify_security_info(
         access_token_id, 12, None, json.dumps(verification_data, separators=(",", ":"))
     )
+    if not response:
+        logger.error("Failed to add the security key. No response from verification.")
+        return create_response(400, "Failed to add security key.")
     if response["ErrorCode"] != 0:
         error_message = _get_security_info_error(response["ErrorCode"])
         logger.error(
