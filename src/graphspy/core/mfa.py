@@ -132,8 +132,7 @@ def get_session_ctx(access_token_id: int):
     )
     if not row:
         logger.error(
-            "No access token with ID {} and resource containing '19db86c3-b2b9-44cc-b339-36da233a3be2'!",
-            access_token_id,
+            f"No access token with ID {access_token_id} and resource containing '19db86c3-b2b9-44cc-b339-36da233a3be2'!"
         )
         return False
     try:
@@ -144,8 +143,7 @@ def get_session_ctx(access_token_id: int):
         )
         if response.status_code != 200:
             logger.error(
-                "Failed to obtain sessionCtxV2 value. Received status code {}",
-                response.status_code,
+                f"Failed to obtain sessionCtxV2 value. Received status code {response.status_code}"
             )
             return False
         session_ctx = response.json()["sessionCtxV2"]
@@ -246,8 +244,7 @@ def initialize_mobile_app_registration(access_token_id: int, security_info_type)
         )
         if response.status_code != 200:
             logger.error(
-                "InitializeMobileAppRegistration request failed. Received status code {}",
-                response.status_code,
+                f"InitializeMobileAppRegistration request failed. Received status code {response.status_code}"
             )
             return False
         logger.debug(f"InitializeMobileAppRegistration Raw Response:\n{response.text}")
@@ -274,8 +271,7 @@ def add_security_info(access_token_id: int, security_info_type, data=None):
         )
         if response.status_code != 200:
             logger.error(
-                "AddSecurityInfo request failed. Received status code {}",
-                response.status_code,
+                f"AddSecurityInfo request failed. Received status code {response.status_code}"
             )
             return False
         logger.debug(f"AddSecurityInfo Raw Response:\n{response.text}")
@@ -285,8 +281,7 @@ def add_security_info(access_token_id: int, security_info_type, data=None):
             or "VerificationContext" not in security_info_response
         ):
             logger.error(
-                "AddSecurityInfo request failed. Received response:\n{}",
-                security_info_response,
+                f"AddSecurityInfo request failed. Received response:\n{security_info_response}"
             )
             return False
         if (
@@ -333,8 +328,7 @@ def verify_security_info(
         )
         if response.status_code != 200:
             logger.error(
-                "VerifySecurityInfo request failed. Received status code {}",
-                response.status_code,
+                f"VerifySecurityInfo request failed. Received status code {response.status_code}"
             )
         logger.debug(f"VerifySecurityInfo Raw Response:\n{response.text}")
         return response.json() if response.status_code == 200 else False
@@ -361,14 +355,13 @@ def delete_security_info(access_token_id: int, security_info_type, data):
         logger.debug(f"DeleteSecurityInfo Raw Response:\n{response.text}")
         if response.status_code != 200:
             logger.error(
-                "DeleteSecurityInfo request failed. Received status code {}",
-                response.status_code,
+                f"DeleteSecurityInfo request failed. Received status code {response.status_code}"
             )
             return False
         result = response.json()
         if not result or not result.get("Deleted"):
             logger.error(
-                "DeleteSecurityInfo request failed. Received response:\n{}", result
+                f"DeleteSecurityInfo request failed. Received response:\n{result}"
             )
             return False
         return result
@@ -404,7 +397,7 @@ def add_phone_number(
         return security_info_response
     if not security_info_response.get("VerificationContext"):
         logger.error(
-            "Adding phone number failed. Received response:\n{}", security_info_response
+            f"Adding phone number failed. Received response:\n{security_info_response}"
         )
         return False
     return security_info_response
@@ -419,8 +412,7 @@ def add_email(access_token_id: int, email: str):
         return security_info_response
     if not security_info_response.get("VerificationContext"):
         logger.error(
-            "Adding email address failed. Received response:\n{}",
-            security_info_response,
+            f"Adding email address failed. Received response:\n{security_info_response}"
         )
         return False
     return security_info_response
@@ -448,7 +440,7 @@ def add_mfa_app(
         return security_info_response
     if not security_info_response.get("VerificationContext"):
         logger.error(
-            "Adding MFA app failed. Received response:\n{}", security_info_response
+            f"Adding MFA app failed. Received response:\n{security_info_response}"
         )
         return False
     return security_info_response
@@ -479,8 +471,7 @@ def add_graphspy_otp(access_token_id: int, description: str = "") -> str | None:
             return None
         if not security_info_response.get("VerificationContext"):
             logger.error(
-                "No VerificationContext in the security info response. Received response:\n{}",
-                security_info_response,
+                f"No VerificationContext in the security info response. Received response:\n{security_info_response}"
             )
             return None
         otp_code = pyotp.TOTP(secret_key).now()
@@ -494,8 +485,7 @@ def add_graphspy_otp(access_token_id: int, description: str = "") -> str | None:
             return None
         if verify_response.get("ErrorCode"):
             logger.error(
-                "An error occurred when trying to validate the provided info. Error Code {}",
-                verify_response.get("ErrorCode"),
+                f"An error occurred when trying to validate the provided info. Error Code {verify_response.get('ErrorCode')}"
             )
             return None
         connection.execute_db(
@@ -519,8 +509,7 @@ def add_security_key(
     access_token = _get_access_token_for_mfa(access_token_id)
     if not access_token:
         logger.error(
-            "No access token with ID {} and resource containing '19db86c3-b2b9-44cc-b339-36da233a3be2'!",
-            access_token_id,
+            f"No access token with ID {access_token_id} and resource containing '19db86c3-b2b9-44cc-b339-36da233a3be2'!"
         )
         return create_response(
             400,
@@ -535,8 +524,7 @@ def add_security_key(
             else "Unknown"
         )
         logger.error(
-            "Something went wrong trying to add the security key. Microsoft Error Message: {}",
-            error_message,
+            f"Something went wrong trying to add the security key. Microsoft Error Message: {error_message}"
         )
         return create_response(
             400, "Something went wrong trying to add the security key."
@@ -650,7 +638,7 @@ def add_security_key(
         )
     except ClientError as e:
         logger.error(
-            "Credential registration with the authenticator device failed: {}", e
+            f"Credential registration with the authenticator device failed: {e}"
         )
         return create_response(400, "Credential registration failed.")
 
@@ -690,7 +678,7 @@ def add_security_key(
     if response["ErrorCode"] != 0:
         error_message = _get_security_info_error(response["ErrorCode"])
         logger.error(
-            "Failed to add the security key. Microsoft error message: {}", error_message
+            f"Failed to add the security key. Microsoft error message: {error_message}"
         )
         return create_response(400, f"Failed to add security key.")
     current_app.config["add_security_key_status"] = "SUCCESS"
