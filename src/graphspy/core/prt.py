@@ -265,6 +265,10 @@ def refresh_to_access_token(
                 decrypted_json.get("refresh_token"),
             ),
         )
+    else:
+        logger.debug(
+            "No refresh token or PRT found in decrypted response. Only stored access token."
+        )
     return access_token_row_id
 
 

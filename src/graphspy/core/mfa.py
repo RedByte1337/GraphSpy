@@ -42,9 +42,14 @@ def _get_security_info_type(type_id):
         16: "password",
         18: "passkey",
         19: "passkeyFromAuthenticator",
-        100: "unsupportedAuthMethods"
+        100: "unsupportedAuthMethods",
     }
-    return security_info_types_dict[type_id] if type_id in security_info_types_dict else security_info_types_dict[0]
+    return (
+        security_info_types_dict[type_id]
+        if type_id in security_info_types_dict
+        else security_info_types_dict[0]
+    )
+
 
 def _get_verification_state(verification_state_id):
     verification_state_dict = {
@@ -58,9 +63,14 @@ def _get_verification_state(verification_state_id):
         7: "activationSucceeded",
         8: "challengeExpired",
         9: "activationThrottled",
-        10: "captchaRequired"
+        10: "captchaRequired",
     }
-    return verification_state_dict[verification_state_id] if verification_state_id in verification_state_dict else verification_state_dict[0]
+    return (
+        verification_state_dict[verification_state_id]
+        if verification_state_id in verification_state_dict
+        else verification_state_dict[0]
+    )
+
 
 def _get_security_info_error(error_id):
     add_security_info_error_dict = {
@@ -70,7 +80,7 @@ def _get_security_info_error(error_id):
         3: "invalidCanary",
         4: "badRequest",
         5: "dataNotFound",
-        6: "ngcMfaRequired", # Access token requires the "ngcmfa" value in the "amr" claim
+        6: "ngcMfaRequired",  # Access token requires the "ngcmfa" value in the "amr" claim
         7: "keyDisallowedByPolicy",
         8: "challengeExpired",
         9: "authorizationRequestDenied",
@@ -92,16 +102,21 @@ def _get_security_info_error(error_id):
         25: "appSessionTimedOut",
         26: "activationThrottled",
         27: "appRequestTimedOut",
-        28: "captchaRequired", # Trigger captcha. Usually after multiple failed SMS codes
+        28: "captchaRequired",  # Trigger captcha. Usually after multiple failed SMS codes
         29: "badPhoneNumber",
         30: "deviceNotFound",
         31: "phoneAppNotificationDenied",
         32: "KeyNotFound",
         33: "InvalidSession",
         34: "OtherDefaultAvailable",
-        35: "HardwareTokenAssigned"
+        35: "HardwareTokenAssigned",
     }
-    return add_security_info_error_dict[error_id] if error_id in add_security_info_error_dict else add_security_info_error_dict[0]
+    return (
+        add_security_info_error_dict[error_id]
+        if error_id in add_security_info_error_dict
+        else add_security_info_error_dict[0]
+    )
+
 
 def get_session_ctx(access_token_id: int):
     row = connection.query_db(
@@ -110,7 +125,10 @@ def get_session_ctx(access_token_id: int):
         one=True,
     )
     if not row:
-        logger.error("No access token with ID {} and resource containing '19db86c3-b2b9-44cc-b339-36da233a3be2'!", access_token_id)
+        logger.error(
+            "No access token with ID {} and resource containing '19db86c3-b2b9-44cc-b339-36da233a3be2'!",
+            access_token_id,
+        )
         return False
     try:
         response = requests.post(
@@ -119,7 +137,10 @@ def get_session_ctx(access_token_id: int):
             json={},
         )
         if response.status_code != 200:
-            logger.error("Failed to obtain sessionCtxV2 value. Received status code {}", response.status_code)
+            logger.error(
+                "Failed to obtain sessionCtxV2 value. Received status code {}",
+                response.status_code,
+            )
             return False
         session_ctx = response.json()["sessionCtxV2"]
         logger.debug("Received sessionCtxV2: '{}'", session_ctx)
@@ -162,7 +183,10 @@ def get_available_authentication_info(access_token_id: int):
             headers=headers,
         )
         if response.status_code != 200:
-            logger.error("Failed to obtain AvailableAuthenticationInfo. Received status code {}", response.status_code)
+            logger.error(
+                "Failed to obtain AvailableAuthenticationInfo. Received status code {}",
+                response.status_code,
+            )
             return False
         logger.debug("AvailableAuthenticationInfo Raw Response:\n{}", response.text)
         info = response.json()
@@ -193,7 +217,14 @@ def validate_captcha(
                 "AzureRegion": azure_region,
             },
         )
-        return response.json() if response.status_code == 200 else False
+        if response.status_code != 200:
+            logger.error(
+                "Failed to validate captcha. Received status code {}",
+                response.status_code,
+            )
+            return False
+        logger.debug("ValidateCaptcha Raw Response:\n{}", response.text)
+        return response.json()
     except Exception:
         logger.exception("ValidateCaptcha request failed.")
         return False
@@ -209,7 +240,14 @@ def initialize_mobile_app_registration(access_token_id: int, security_info_type)
             headers=headers,
             json={"securityInfoType": security_info_type},
         )
-        return response.json() if response.status_code == 200 else False
+        if response.status_code != 200:
+            logger.error(
+                "InitializeMobileAppRegistration request failed. Received status code {}",
+                response.status_code,
+            )
+            return False
+        logger.debug("InitializeMobileAppRegistration Raw Response:\n{}", response.text)
+        return response.json()
     except Exception:
         logger.exception("InitializeMobileAppRegistration request failed.")
         return False
@@ -231,7 +269,10 @@ def add_security_info(access_token_id: int, security_info_type, data=None):
             json=body,
         )
         if response.status_code != 200:
-            logger.error("AddSecurityInfo request failed. Received status code {}", response.status_code)
+            logger.error(
+                "AddSecurityInfo request failed. Received status code {}",
+                response.status_code,
+            )
             return False
         logger.debug("AddSecurityInfo Raw Response:\n{}", response.text)
         security_info_response = response.json()
@@ -239,7 +280,10 @@ def add_security_info(access_token_id: int, security_info_type, data=None):
             not security_info_response
             or "VerificationContext" not in security_info_response
         ):
-            logger.error("AddSecurityInfo request failed. Received response:\n{}", security_info_response)
+            logger.error(
+                "AddSecurityInfo request failed. Received response:\n{}",
+                security_info_response,
+            )
             return False
         if (
             not security_info_response["VerificationContext"]
@@ -251,6 +295,7 @@ def add_security_info(access_token_id: int, security_info_type, data=None):
                 "https://mysignins.microsoft.com/api/captcha/?challengeType=Visual&locale=en-US",
                 headers=headers,
             )
+            logger.debug("Captcha Raw Response:\n{}", captcha_response.text)
             security_info_response["captcha"] = captcha_response.json()
         return security_info_response
     except Exception:
@@ -283,7 +328,10 @@ def verify_security_info(
             },
         )
         if response.status_code != 200:
-            logger.error("VerifySecurityInfo request failed. Received status code {}", response.status_code)
+            logger.error(
+                "VerifySecurityInfo request failed. Received status code {}",
+                response.status_code,
+            )
         logger.debug("VerifySecurityInfo Raw Response:\n{}", response.text)
         return response.json() if response.status_code == 200 else False
     except Exception:
@@ -298,7 +346,10 @@ def delete_security_info(access_token_id: int, security_info_type, data):
     headers["X-Ms-Client-Session-Id"] = str(uuid.uuid4())
     try:
         body_data = json.dumps(data) if isinstance(data, dict) else data
-        logger.debug("DeleteSecurityInfo Raw Request Body:\n{}", {"Type": security_info_type, "Data": body_data})
+        logger.debug(
+            "DeleteSecurityInfo Raw Request Body:\n{}",
+            {"Type": security_info_type, "Data": body_data},
+        )
         response = requests.post(
             "https://mysignins.microsoft.com/api/authenticationmethods/delete",
             headers=headers,
@@ -306,11 +357,16 @@ def delete_security_info(access_token_id: int, security_info_type, data):
         )
         logger.debug("DeleteSecurityInfo Raw Response:\n{}", response.text)
         if response.status_code != 200:
-            logger.error("DeleteSecurityInfo request failed. Received status code {}", response.status_code)
+            logger.error(
+                "DeleteSecurityInfo request failed. Received status code {}",
+                response.status_code,
+            )
             return False
         result = response.json()
         if not result or not result.get("Deleted"):
-            logger.error("DeleteSecurityInfo request failed. Received response:\n{}", result)
+            logger.error(
+                "DeleteSecurityInfo request failed. Received response:\n{}", result
+            )
             return False
         return result
     except Exception:
@@ -333,19 +389,47 @@ def add_phone_number(
     if phone_type not in phone_type_dict:
         logger.error("Invalid phone type provided: {}", phone_type)
         return False
-    return add_security_info(
+    security_info_response = add_security_info(
         access_token_id,
         phone_type_dict[phone_type],
         {"phoneNumber": phone_number, "countryCode": country_code},
     )
+    if not security_info_response:
+        logger.error("Adding phone number failed.")
+        return False
+    if "captcha" in security_info_response:
+        return security_info_response
+    if not security_info_response.get("VerificationContext"):
+        logger.error(
+            "Adding phone number failed. Received response:\n{}", security_info_response
+        )
+        return False
+    return security_info_response
 
 
 def add_email(access_token_id: int, email: str):
-    return add_security_info(access_token_id, 8, email)
+    security_info_response = add_security_info(access_token_id, 8, email)
+    if not security_info_response:
+        logger.error("Failed adding email address.")
+        return False
+    if "captcha" in security_info_response:
+        return security_info_response
+    if not security_info_response.get("VerificationContext"):
+        logger.error(
+            "Adding email address failed. Received response:\n{}",
+            security_info_response,
+        )
+        return False
+    return security_info_response
 
 
-def add_mfa_app(access_token_id: int, security_info_type, secret_key: str, affinity_region: str = None):
-    return add_security_info(
+def add_mfa_app(
+    access_token_id: int,
+    security_info_type,
+    secret_key: str,
+    affinity_region: str = None,
+):
+    security_info_response = add_security_info(
         access_token_id,
         security_info_type,
         {
@@ -354,6 +438,17 @@ def add_mfa_app(access_token_id: int, security_info_type, secret_key: str, affin
             "isResendNotificationChallenge": False,
         },
     )
+    if not security_info_response:
+        logger.error("Adding MFA app failed.")
+        return False
+    if "captcha" in security_info_response:
+        return security_info_response
+    if not security_info_response.get("VerificationContext"):
+        logger.error(
+            "Adding MFA app failed. Received response:\n{}", security_info_response
+        )
+        return False
+    return security_info_response
 
 
 def add_graphspy_otp(access_token_id: int, description: str = "") -> str | None:
@@ -373,18 +468,27 @@ def add_graphspy_otp(access_token_id: int, description: str = "") -> str | None:
                 "isResendNotificationChallenge": False,
             },
         )
-        if not security_info_response or "captcha" in security_info_response:
-            logger.error("No valid security info response received (or captcha requested).")
+        if not security_info_response:
+            logger.error("No valid security info response received.")
+            return False
+        if "captcha" in security_info_response:
+            logger.error("A captcha was requested. Aborting.")
             return False
         if not security_info_response.get("VerificationContext"):
-            logger.error("No VerificationContext in the security info response. Received response:\n{}", security_info_response)
+            logger.error(
+                "No VerificationContext in the security info response. Received response:\n{}",
+                security_info_response,
+            )
             return False
         otp_code = pyotp.TOTP(secret_key).now()
         verify_response = verify_security_info(
             access_token_id, 3, security_info_response["VerificationContext"], otp_code
         )
         if verify_response.get("ErrorCode"):
-            logger.error("An error occurred when trying to validate the provided info. Error Code {}", verify_response.get('ErrorCode'))
+            logger.error(
+                "An error occurred when trying to validate the provided info. Error Code {}",
+                verify_response.get("ErrorCode"),
+            )
             return False
         connection.execute_db(
             "INSERT INTO mfa_otp (stored_at, secret_key, account_name, description) VALUES (?,?,?,?)",
@@ -406,15 +510,26 @@ def add_security_key(
     current_app.config["add_security_key_status"] = "INIT"
     access_token = _get_access_token_for_mfa(access_token_id)
     if not access_token:
-        logger.error("No access token with ID {} and resource containing '19db86c3-b2b9-44cc-b339-36da233a3be2'!", access_token_id)
+        logger.error(
+            "No access token with ID {} and resource containing '19db86c3-b2b9-44cc-b339-36da233a3be2'!",
+            access_token_id,
+        )
         return create_response(
-            400, f"No access token with ID {access_token_id} and resource containing '19db86c3-b2b9-44cc-b339-36da233a3be2'!"
+            400,
+            f"No access token with ID {access_token_id} and resource containing '19db86c3-b2b9-44cc-b339-36da233a3be2'!",
         )
 
     security_info_response = add_security_info(access_token_id, 12)
     if not security_info_response or security_info_response.get("ErrorCode", 0) != 0:
-        error_message = _get_security_info_error(security_info_response["ErrorCode"]) if security_info_response and "ErrorCode" in security_info_response else "Unknown"
-        logger.error("Something went wrong trying to add the security key. Microsoft Error Message: {}", error_message)
+        error_message = (
+            _get_security_info_error(security_info_response["ErrorCode"])
+            if security_info_response and "ErrorCode" in security_info_response
+            else "Unknown"
+        )
+        logger.error(
+            "Something went wrong trying to add the security key. Microsoft Error Message: {}",
+            error_message,
+        )
         return create_response(
             400, "Something went wrong trying to add the security key."
         )
@@ -440,7 +555,9 @@ def add_security_key(
         "timeout": 600000,
         "excludeCredentials": [],
         "authenticatorSelection": {
-            "authenticatorAttachment": security_info_data["requestData"]["authenticator"],
+            "authenticatorAttachment": security_info_data["requestData"][
+                "authenticator"
+            ],
             "requireResidentKey": True,
             "userVerification": "required",
         },
@@ -450,19 +567,52 @@ def add_security_key(
     current_app.config["add_security_key_status"] = "CLIENT_SETUP"
     if client_type == "Windows":
         try:
-            from fido2.client.windows import WindowsClient # Only importable on Windows!
+            from fido2.client.windows import (
+                WindowsClient,
+            )  # Only importable on Windows!
+
             if not WindowsClient.is_available():
-                logger.error("Windows client requested, but WindowsClient is not available! Are you sure the GraphSpy server is running on a compatible Windows device?")
-                return create_response(400, "Windows client requested, but WindowsClient is not available! Are you sure the GraphSpy server is running on a compatible Windows device?")
-            client = WindowsClient(client_data_collector=DefaultClientDataCollector("https://login.microsoft.com"))
+                logger.error(
+                    "Windows client requested, but WindowsClient is not available! Are you sure the GraphSpy server is running on a compatible Windows device?"
+                )
+                return create_response(
+                    400,
+                    "Windows client requested, but WindowsClient is not available! Are you sure the GraphSpy server is running on a compatible Windows device?",
+                )
+            client = WindowsClient(
+                client_data_collector=DefaultClientDataCollector(
+                    "https://login.microsoft.com"
+                )
+            )
         except Exception:
-            logger.exception("Windows client requested, but WindowsClient is not available!")
-            return create_response(400, "Windows client requested, but WindowsClient is not available! Are you sure the GraphSpy server is running on a compatible Windows device?")
+            logger.exception(
+                "Windows client requested, but WindowsClient is not available!"
+            )
+            return create_response(
+                400,
+                "Windows client requested, but WindowsClient is not available! Are you sure the GraphSpy server is running on a compatible Windows device?",
+            )
     else:
         dev = next(CtapHidDevice.list_devices(), None)
+        if dev is None:
+            logger.debug(
+                "No USB FIDO authenticator device found! Trying to use NFC instead."
+            )
+            try:
+                from fido2.pcsc import CtapPcscDevice
+
+                dev = next(CtapPcscDevice.list_devices(), None)
+                logger.debug("Using NFC channel.")
+            except Exception:
+                logger.error("An error occurred when searching for an NFC channel")
         if not dev:
-            logger.error("No valid FIDO authenticator device found. Admin/root privileges might be required.")
-            return create_response(400, "No valid FIDO authenticator device found. Admin/root privileges might be required to discover your Authenticator device when not using the Windows WebAuthn API.")
+            logger.error(
+                "No valid FIDO authenticator device found. Admin/root privileges might be required to discover your Authenticator device when not using the Windows WebAuthn API."
+            )
+            return create_response(
+                400,
+                "No valid FIDO authenticator device found. Admin/root privileges might be required to discover your Authenticator device when not using the Windows WebAuthn API.",
+            )
 
         class CliInteraction(UserInteraction):
             def prompt_up(self):
@@ -478,7 +628,11 @@ def add_security_key(
                 return True
 
         client = Fido2Client(
-            dev, client_data_collector=DefaultClientDataCollector("https://login.microsoft.com"), user_interaction=CliInteraction()
+            dev,
+            client_data_collector=DefaultClientDataCollector(
+                "https://login.microsoft.com"
+            ),
+            user_interaction=CliInteraction(),
         )
 
     current_app.config["add_security_key_status"] = "CREDENTIAL_REGISTRATION"
@@ -515,7 +669,9 @@ def add_security_key(
     )
     if response["ErrorCode"] != 0:
         error_message = _get_security_info_error(response["ErrorCode"])
-        logger.error("Failed to add the security key. Microsoft error message: {}", error_message)
+        logger.error(
+            "Failed to add the security key. Microsoft error message: {}", error_message
+        )
         return create_response(400, f"Failed to add security key.")
     current_app.config["add_security_key_status"] = "SUCCESS"
     return create_response(

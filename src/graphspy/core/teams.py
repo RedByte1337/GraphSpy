@@ -35,16 +35,25 @@ def get_settings(access_token_id: int):
         one=True,
     )
     if not row:
-        logger.error("No access token with ID {} and resource containing 'api.spaces.skype.com'!", access_token_id)
+        logger.error(
+            "No access token with ID {} and resource containing 'api.spaces.skype.com'!",
+            access_token_id,
+        )
         return False
-    logger.debug("No teams settings found in database for access token with ID {}. Requesting new teams settings.", access_token_id)
+    logger.debug(
+        "No teams settings found in database for access token with ID {}. Requesting new teams settings.",
+        access_token_id,
+    )
     access_token = row[0]
     response = requests.post(
         "https://teams.microsoft.com/api/authsvc/v1.0/authz",
         headers={"Authorization": f"Bearer {access_token}", "User-Agent": ua.get()},
     )
     if response.status_code != 200:
-        logger.error("Failed obtaining teams settings. Received status code {}", response.status_code)
+        logger.error(
+            "Failed obtaining teams settings. Received status code {}",
+            response.status_code,
+        )
         return False
     try:
         teams_json = response.json()
@@ -129,7 +138,11 @@ def send_message(access_token_id: int, conversation_link: str, message_content: 
     )
     if response.status_code >= 200 and response.status_code < 300:
         return f"{response.json().get('OriginalArrivalTime', 'Unknown')}"
-    logger.error("Failed sending teams message. Received response status {}. Response body:\n{}", response.status_code, response.content)
+    logger.error(
+        "Failed sending teams message. Received response status {}. Response body:\n{}",
+        response.status_code,
+        response.content,
+    )
     return f"[Error] Failed to send Teams message. Status {response.status_code}", 400
 
 
@@ -150,11 +163,19 @@ def get_conversation_members(access_token_id: int, conversation_id: str):
     )
     if response["response_status_code"] == 200 and response["response_type"] == "json":
         members = json.loads(response["response_text"])
-        logger.debug("Found {} members in conversation '{}'", len(members), conversation_id)
+        logger.debug(
+            "Found {} members in conversation '{}'", len(members), conversation_id
+        )
         return [
             {**m, "isCurrentUser": m["mri"].endswith(settings["skype_id"])}
             for m in members
         ]
+    logger.error(
+        "Failed listing members in conversation '{}'. Received response status {}. Response body:\n{}",
+        conversation_id,
+        response["response_status_code"],
+        response["response_text"],
+    )
     return "[Error] Failed to obtain Teams members.", 400
 
 
@@ -267,11 +288,23 @@ def create_conversation(
                 )
                 if match:
                     created.append(match.group(1))
-                    logger.debug("Created conversation with member {}. Conversation ID: {}", member, match.group(1))
+                    logger.debug(
+                        "Created conversation with member {}. Conversation ID: {}",
+                        member,
+                        match.group(1),
+                    )
                 else:
-                    logger.error("Failed creating direct message conversation with user {}. Received response status {}.", member, response.status_code)
+                    logger.error(
+                        "Failed creating direct message conversation with user {}. Received response status {}.",
+                        member,
+                        response.status_code,
+                    )
             else:
-                logger.error("Failed creating direct message conversation with user {}. Received response status {}.", member, response.status_code)
+                logger.error(
+                    "Failed creating direct message conversation with user {}. Received response status {}.",
+                    member,
+                    response.status_code,
+                )
     elif conversation_type == "group_chat":
         body = {
             "members": base_members + [{"id": m, "role": "Admin"} for m in members],
@@ -284,20 +317,44 @@ def create_conversation(
             )
             if match:
                 created.append(match.group(1))
-                logger.debug("Created conversation with {} members. Conversation ID: {}", len(members), match.group(1))
+                logger.debug(
+                    "Created conversation with {} members. Conversation ID: {}",
+                    len(members),
+                    match.group(1),
+                )
             else:
-                logger.error("Failed creating group chat conversation. Received response status {}", response.status_code)
+                logger.error(
+                    "Failed creating group chat conversation. Received response status {}",
+                    response.status_code,
+                )
         else:
-            logger.error("Failed creating group chat conversation. Received response status {}", response.status_code)
+            logger.error(
+                "Failed creating group chat conversation. Received response status {}",
+                response.status_code,
+            )
     logger.debug("Created {} conversations.", len(created))
     if not created:
         return "[Error] Failed to create conversation(s).", 400
     if message_content:
         for conversation_id in created:
             conversation_link = f"{chat_service_uri}/v1/users/ME/conversations/{conversation_id}/messages"
-            requests.post(
+            response = requests.post(
                 conversation_link,
                 headers=headers,
                 json={"messagetype": "RichText/Html", "content": message_content},
             )
+            if response.status_code >= 200 and response.status_code < 300:
+                message_id = response.json().get("OriginalArrivalTime", "Unknown")
+                logger.debug(
+                    "Sent message to conversation {}. Message ID: {}",
+                    conversation_id,
+                    message_id,
+                )
+            else:
+                logger.error(
+                    "Failed sending message to {}. Received response status {}.\n{}",
+                    conversation_id,
+                    response.status_code,
+                    response.content,
+                )
     return created
