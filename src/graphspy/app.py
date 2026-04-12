@@ -1,7 +1,10 @@
 # graphspy/app.py
 
+# Built-in imports
+import logging
+
 # External library imports
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from loguru import logger
 
 # Local library imports
@@ -44,11 +47,22 @@ def create_app(db_path: str, db_folder: str) -> Flask:
     ]:
         app.register_blueprint(module.bp)
 
+    @app.after_request
+    def log_request(response):
+        logger.info(
+            f"{response.status_code} {request.method} {request.path} — {request.remote_addr}"
+        )
+        return response
+
     @app.errorhandler(AppError)
     def handle_app_error(e):
         logger.error(f"AppError in {e.func_name}():{e.line_number} - {e.message}")
         return jsonify({"message": e.message}), e.status_code
 
     app.teardown_appcontext(connection.close)
+
+    # Suppress Werkzeug's request logging (duplicate timestamps);
+    # requests are logged via after_request above.
+    logging.getLogger("werkzeug").setLevel(logging.WARNING)
 
     return app

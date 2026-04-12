@@ -154,7 +154,13 @@ def setup_logging(level: str = "INFO", log_dir: Path | None = None):
     # Intercept stdlib logging (Flask, Werkzeug, etc.) → route through loguru
     intercept = _InterceptHandler()
     logging.basicConfig(handlers=[intercept], level=0, force=True)
-    for name in ("werkzeug", "flask", "flask.app"):
+    for name in ("flask", "flask.app"):
         stdlib_logger = logging.getLogger(name)
         stdlib_logger.handlers = [intercept]
         stdlib_logger.propagate = False
+
+    # Werkzeug request logging is suppressed in create_app();
+    # errors/warnings still route through loguru.
+    werkzeug_logger = logging.getLogger("werkzeug")
+    werkzeug_logger.handlers = [intercept]
+    werkzeug_logger.propagate = False
