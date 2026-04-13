@@ -40,9 +40,7 @@ def device_certificates():
 
 @bp.route("/primary_refresh_tokens")
 def primary_refresh_tokens():
-    return render_template(
-        "primary_refresh_tokens.html", title="Primary Refresh Tokens"
-    )
+    return render_template("primary_refresh_tokens.html", title="Primary Refresh Tokens")
 
 
 @bp.route("/winhello_keys")
