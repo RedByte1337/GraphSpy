@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "graphspy"
-version = "1.6.1"
+version = "1.7.0"
 description = "Initial Access and Post-Exploitation Tool for Entra ID and M365 with a browser-based GUI."
 authors = [
     {name = "RedByte1337"}

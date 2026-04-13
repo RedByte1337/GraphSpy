@@ -308,7 +308,7 @@ wheels = [
 
 [[package]]
 name = "graphspy"
-version = "1.6.1"
+version = "1.7.0"
 source = { editable = "." }
 dependencies = [
     { name = "fido2" },
