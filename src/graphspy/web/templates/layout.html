@@ -10,10 +10,8 @@
         integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
         crossorigin="anonymous"></script>
     <!-- UIcons by Flaticon (https://www.flaticon.com/uicons) -->
-    <link rel='stylesheet'
-        href='https://cdn-uicons.flaticon.com/3.0.0/uicons-regular-rounded/css/uicons-regular-rounded.css'>
-    <link rel='stylesheet'
-        href='https://cdn-uicons.flaticon.com/3.0.0/uicons-solid-rounded/css/uicons-solid-rounded.css'>
+    <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/3.0.0/uicons-regular-rounded/css/uicons-regular-rounded.css'>
+    <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/3.0.0/uicons-solid-rounded/css/uicons-solid-rounded.css'>
     <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/3.0.0/uicons-bold-rounded/css/uicons-bold-rounded.css'>
     <!-- DataTables & jQuery -->
     <link href="https://cdn.datatables.net/2.1.8/css/dataTables.bootstrap5.min.css" rel="stylesheet">
@@ -46,8 +44,7 @@
         src="{{url_for('static', filename='js/purify.min.js')}}"></script>
     <!-- Static JS & CSS -->
     <script type="text/javascript" language="javascript" src="{{url_for('static', filename='js/theme.js')}}"></script>
-    <script type="text/javascript" language="javascript"
-        src="{{url_for('static', filename='js/functions.js')}}"></script>
+    <script type="text/javascript" language="javascript" src="{{url_for('static', filename='js/functions.js')}}"></script>
     <link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/style.css')}}">
 
     <title>{{title}}</title>
@@ -68,26 +65,19 @@
                         <a class="nav-link" href="/">Settings</a>
                     </li>
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"
-                            aria-expanded="false">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             Tokens
                         </a>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{{url_for('pages.access_tokens')}}">Access Tokens</a>
-                            </li>
-                            <li><a class="dropdown-item" href="{{url_for('pages.refresh_tokens')}}">Refresh Tokens</a>
-                            </li>
-                            <li><a class="dropdown-item" href="{{url_for('pages.device_certificates')}}">Device
-                                    Certificates</a></li>
-                            <li><a class="dropdown-item" href="{{url_for('pages.primary_refresh_tokens')}}">Primary
-                                    Refresh Tokens</a></li>
-                            <li><a class="dropdown-item" href="{{url_for('pages.winhello_keys')}}">WinHello Keys</a>
-                            </li>
+                            <li><a class="dropdown-item" href="{{url_for('pages.access_tokens')}}">Access Tokens</a></li>
+                            <li><a class="dropdown-item" href="{{url_for('pages.refresh_tokens')}}">Refresh Tokens</a></li>
+                            <li><a class="dropdown-item" href="{{url_for('pages.device_certificates')}}">Device Certificates</a></li>
+                            <li><a class="dropdown-item" href="{{url_for('pages.primary_refresh_tokens')}}">Primary Refresh Tokens</a></li>
+                            <li><a class="dropdown-item" href="{{url_for('pages.winhello_keys')}}">WinHello Keys</a></li>
                         </ul>
                     </li>
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"
-                            aria-expanded="false">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             Authentication
                         </a>
                         <ul class="dropdown-menu">
@@ -96,15 +86,12 @@
                         </ul>
                     </li>
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"
-                            aria-expanded="false">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             Custom
                         </a>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{{url_for('pages.custom_requests')}}">Custom Requests</a>
-                            </li>
-                            <li><a class="dropdown-item" href="{{url_for('pages.generic_search')}}">Generic MSGraph
-                                    Search</a></li>
+                            <li><a class="dropdown-item" href="{{url_for('pages.custom_requests')}}">Custom Requests</a></li>
+                            <li><a class="dropdown-item" href="{{url_for('pages.generic_search')}}">Generic MSGraph Search</a></li>
                         </ul>
                     </li>
                     <li class="nav-item dropdown">
@@ -114,42 +101,34 @@
                         </a>
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="{{url_for('pages.recent_files')}}">Recent Files</a></li>
-                            <li><a class="dropdown-item" href="{{url_for('pages.shared_with_me')}}">Files Shared With
-                                    Me</a></li>
+                            <li><a class="dropdown-item" href="{{url_for('pages.shared_with_me')}}">Files Shared With Me</a></li>
                             <li><a class="dropdown-item" href="{{url_for('pages.onedrive')}}">OneDrive</a></li>
                         </ul>
                     </li>
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"
-                            aria-expanded="false">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             SharePoint
                         </a>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{{url_for('pages.sharepoint_sites')}}">SharePoint
-                                    Sites</a></li>
-                            <li><a class="dropdown-item" href="{{url_for('pages.sharepoint_drives')}}">SharePoint
-                                    Drives</a></li>
-                            <li><a class="dropdown-item" href="{{url_for('pages.sharepoint')}}">SharePoint Files</a>
-                            </li>
+                            <li><a class="dropdown-item" href="{{url_for('pages.sharepoint_sites')}}">SharePoint Sites</a></li>
+                            <li><a class="dropdown-item" href="{{url_for('pages.sharepoint_drives')}}">SharePoint Drives</a></li>
+                            <li><a class="dropdown-item" href="{{url_for('pages.sharepoint')}}">SharePoint Files</a></li>
                         </ul>
                     </li>
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"
-                            aria-expanded="false">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             Outlook
                         </a>
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="{{url_for('pages.outlook')}}">Outlook Web</a></li>
-                            <li><a class="dropdown-item" href="{{url_for('pages.outlook_graph')}}">Outlook Graph</a>
-                            </li>
+                            <li><a class="dropdown-item" href="{{url_for('pages.outlook_graph')}}">Outlook Graph</a></li>
                         </ul>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{{url_for('pages.teams')}}">Teams</a>
                     </li>
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"
-                            aria-expanded="false">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             Entra ID
                         </a>
                         <ul class="dropdown-menu">
@@ -175,8 +154,7 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" data-bs-toggle="offcanvas" href="#offcanvas-side-menu" role="button">Token
-                            Options</a>
+                        <a class="nav-link" data-bs-toggle="offcanvas" href="#offcanvas-side-menu" role="button">Token Options</a>
                     </li>
                 </ul>
             </div>
@@ -226,10 +204,8 @@
                             <option value="00b41c95-dab0-4487-9791-b9d2c32c80f2">Office 365 Management</option>
                             <option value="04b07795-8ddb-461a-bbee-02f9e1bf7b46">Microsoft Azure CLI</option>
                             <option value="1950a258-227b-4e31-a9cf-717495945fc2">Microsoft Azure PowerShell</option>
-                            <option value="29d9ed98-a469-4536-ade2-f981bc1d605e">Microsoft Authentication Broker
-                            </option>
-                            <option value="dd762716-544d-4aeb-a526-687b73838a22">Microsoft Device Registration Client
-                            </option>
+                            <option value="29d9ed98-a469-4536-ade2-f981bc1d605e">Microsoft Authentication Broker</option>
+                            <option value="dd762716-544d-4aeb-a526-687b73838a22">Microsoft Device Registration Client</option>
                         </datalist>
                     </div>
                     <div class="col-12">
