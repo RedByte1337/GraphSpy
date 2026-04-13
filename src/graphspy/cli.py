@@ -128,13 +128,13 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
 
-    # Determine log level: --log-level takes precedence, then --debug, then --trace, then default INFO
+    # Determine log level: --log-level takes precedence, then --trace, then --debug, then default INFO
     if args.log_level:
         log_level = args.log_level
-    elif args.debug:
-        log_level = "DEBUG"
     elif args.trace:
         log_level = "TRACE"
+    elif args.debug:
+        log_level = "DEBUG"
     else:
         log_level = "INFO"
 
