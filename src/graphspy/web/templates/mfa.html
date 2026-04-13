@@ -434,6 +434,7 @@
                             <div class="pt-3">
                                 <input type="text" id="registration_type" class="form-control" hidden>
                                 <input type="text" id="secret_key" class="form-control" hidden>
+                                <input type="text" id="affinity_region" class="form-control" hidden>
                                 <button type="Button" class="btn btn-outline-primary" onclick="scannedQrButton()">Next</button>
                             </div>
                         </div>
@@ -628,6 +629,7 @@
         $("#add_mfa_form #qr_code_container #registration_type").val(initialize_mobile_app_registration_json.RegistrationType);
         let secret_key = (initialize_mobile_app_registration_json.RegistrationType == 2 ? initialize_mobile_app_registration_json.ActivationCode : initialize_mobile_app_registration_json.SecretKey);
         $("#add_mfa_form #qr_code_container #secret_key").val(secret_key);
+        $("#add_mfa_form #qr_code_container #affinity_region").val(initialize_mobile_app_registration_json.AffinityRegion);
         $("#add_mfa_form #qr_code_container").show();
     }
 
@@ -720,6 +722,7 @@
         let access_token_id = $("#mfa_form #access_token_id").val();
         let registration_type = $("#add_mfa_form #qr_code_container #registration_type").val();
         let secret_key = $("#add_mfa_form #qr_code_container #secret_key").val();
+        let affinity_region = $("#add_mfa_form #qr_code_container #affinity_region").val();
 
         let response = $.ajax({
             type: "POST",
@@ -728,7 +731,8 @@
             data: {
                 "access_token_id": access_token_id,
                 "security_info_type": registration_type,
-                "secret_key": secret_key
+                "secret_key": secret_key,
+                "affinity_region": affinity_region
             },
             error: function (xhr, status, error) {
                 bootstrapToast("Add MFA App", xhr.responseText, "danger");
@@ -748,15 +752,10 @@
             $("#add_mfa_form #captcha_container").show();
             return false;
         }
-        if (response_json.Type == 1) {
+        if (response_json.Type == 1 || response_json.Type == 2) {
             bootstrapToast("Add MFA App", "Fill in the code in your Microsoft Authenticator app.", "primary");
             let verificationCode = response_json.Data.EntropyNumber;
             $("#add_mfa_form #verification_container #verification_description").text(`Submit the code '${verificationCode}' in the notification on your Microsoft Authenticator App and click on Validate.`);
-            $("#add_mfa_form #verification_container #user_input").hide();
-        } else if (response_json.Type == 2) {
-            // Not sure if this type is correct? Not tested yet
-            bootstrapToast("Add MFA App", "Approve the notification send to your Microsoft Authenticator app.", "primary");
-            $("#add_mfa_form #verification_container #verification_description").text("Approve the notification send to your Microsoft Authenticator app and click on Validate.");
             $("#add_mfa_form #verification_container #user_input").hide();
         } else if (response_json.Type == 3) {
             bootstrapToast("Add MFA App", "Fill in the code displayed on your app.", "primary");
