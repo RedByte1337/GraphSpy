@@ -70,6 +70,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     advanced_group.add_argument(
+        "--utc",
+        action="store_true",
+        help="Display log timestamps in UTC instead of local time.",
+    )
+
+    advanced_group.add_argument(
         "--dev",
         action="store_true",
         help="Run with Flask development server (auto-reload, debugger). Do not use in production.",
@@ -140,7 +146,7 @@ def main() -> int:
 
     data_dir = get_app_dir()
     log_dir = data_dir / "logs"
-    logbook.setup_logging(level=log_level, log_dir=log_dir)
+    logbook.setup_logging(level=log_level, log_dir=log_dir, utc=args.utc)
 
     is_reloader = os.environ.get("WERKZEUG_RUN_MAIN") == "true"
 
