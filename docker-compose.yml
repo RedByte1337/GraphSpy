@@ -1,0 +1,9 @@
+services:
+  graphspy:
+    build: .
+    ports:
+      - 8080:8080
+    volumes:
+      - ~/.gspy/databases:/root/.gspy/databases
+    # Overwrite default entrypoint if needed
+    # entrypoint: "python -m graphspy -i 0.0.0.0 -p 8080"
