@@ -6,12 +6,12 @@ from datetime import datetime
 
 # External library imports
 import jwt
-import requests
 from loguru import logger
 
 # Local library imports
 from ..db import connection
 from ..core import user_agent as ua
+from ..core import requests_ as gspy_requests
 
 
 def parse_token_endpoint_error(response) -> str:
@@ -33,7 +33,7 @@ def is_valid_uuid(val) -> bool:
 
 def get_tenant_id(tenant_domain: str) -> str:
     headers = {"User-Agent": ua.get()}
-    response = requests.get(
+    response = gspy_requests.get(
         f"https://login.microsoftonline.com/{tenant_domain}/.well-known/openid-configuration",
         headers=headers,
     )
@@ -155,7 +155,7 @@ def refresh_to_access_token(
         body["scope"] = scope
         url += "/oauth2/v2.0/token"
 
-    response = requests.post(url, data=body, headers={"User-Agent": ua.get()})
+    response = gspy_requests.post(url, data=body, headers={"User-Agent": ua.get()})
     if response.status_code != 200:
         return {parse_token_endpoint_error(response)}
 

@@ -7,13 +7,13 @@ from datetime import datetime
 
 # External library imports
 import jwt
-import requests
 from cryptography.hazmat.primitives import hashes, serialization
 from loguru import logger
 
 # Local library imports
 from ..db import connection
 from ..core import user_agent as ua
+from ..core import requests_ as gspy_requests
 from .device import generate_key_pair, generate_public_key_rsa_blob
 from .errors import AppError
 from .prt import decrypt_session_key, get_srv_challenge_nonce
@@ -36,7 +36,7 @@ def register(access_token_id: int) -> int:
     private_key, private_key_bytes, public_key = generate_key_pair()
     private_key_base64 = base64.b64encode(private_key_bytes).decode("utf-8")
     pubkeycngblob = generate_public_key_rsa_blob(public_key)
-    response = requests.post(
+    response = gspy_requests.post(
         "https://enterpriseregistration.windows.net/EnrollmentServer/key/?api-version=1.0",
         headers={
             "Authorization": f"Bearer {access_token}",
@@ -115,7 +115,7 @@ def to_prt(
         algorithm="RS256",
         headers={"x5c": device_cert_row["certificate"], "kdf_ver": 2},
     )
-    response = requests.post(
+    response = gspy_requests.post(
         "https://login.microsoftonline.com/common/oauth2/token",
         data={
             "windows_api_version": "2.2",

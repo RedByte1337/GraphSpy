@@ -44,6 +44,11 @@ def build_parser() -> argparse.ArgumentParser:
         default="database.db",
         help="Database file to utilize. (Default: database.db)",
     )
+    parser.add_argument(
+        "--proxy",
+        type=str,
+        help="Proxy URL to use for all backend HTTP(S) requests. Disables certificate verification if proxy is in use. (e.g.: http://127.0.0.1:8080)"
+    )
 
     advanced_group = parser.add_argument_group(
         "Advanced Options", "Additional advanced or debugging options."
@@ -167,9 +172,12 @@ def main() -> int:
             return 1
 
     if not is_reloader:
-        logger.info(f"Utilizing database '{db_path}'.")
+        logger.info(f"Utilizing database '{db_path}'")
 
-    app = create_app(db_path=str(db_path), db_folder=str(db_folder))
+    if args.proxy:
+        logger.info(f"Utilizing proxy '{args.proxy}'")
+
+    app = create_app(db_path=str(db_path), db_folder=str(db_folder), proxy=args.proxy)
 
     with app.app_context():
         migrations.update_db()

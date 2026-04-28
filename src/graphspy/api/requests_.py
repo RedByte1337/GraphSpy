@@ -8,7 +8,7 @@ from flask import Blueprint, request
 from loguru import logger
 
 # Local library imports
-from ..core import requests_ as generic
+from ..core import requests_ as gspy_requests
 from ..db import connection
 
 bp = Blueprint("requests_", __name__)
@@ -20,7 +20,7 @@ def generic_graph():
     access_token_id = request.form["access_token_id"]
     method = request.form.get("method", "GET")
     body = json.loads(request.form.get("body") or "{}")
-    return generic.graph_request(graph_uri, access_token_id, method, body)
+    return gspy_requests.graph_request(graph_uri, access_token_id, method, body)
 
 
 @bp.post("/api/generic_graph_upload")
@@ -31,7 +31,7 @@ def generic_graph_upload():
         file = request.files["file"]
         if not upload_uri or not access_token_id or not file:
             return json.dumps({"error": "Missing required parameters"}), 400
-        return generic.graph_upload_request(upload_uri, access_token_id, file)
+        return gspy_requests.graph_upload_request(upload_uri, access_token_id, file)
     except Exception as e:
         logger.exception("Error in generic_graph_upload")
         return json.dumps({"error": "Internal server error.", "details": str(e)}), 500
@@ -65,7 +65,7 @@ def custom_api_request():
             for k, v in headers.items()
         }
     try:
-        return generic.make_request(
+        return gspy_requests.generic_request(
             uri, access_token_id, method, request_type, body, headers
         )
     except Exception as e:

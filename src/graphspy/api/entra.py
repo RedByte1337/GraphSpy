@@ -9,7 +9,7 @@ from flask import Blueprint, request
 from loguru import logger
 
 # Local library imports
-from ..core import requests_ as generic
+from ..core import requests_ as gspy_requests
 
 bp = Blueprint("entra", __name__)
 
@@ -28,7 +28,7 @@ def get_entra_users():
         uri += "&$expand=transitiveMemberOf"
     users_list = []
     for _ in range(5000):
-        response = generic.make_request(uri, access_token_id, "GET", "text", "")
+        response = gspy_requests.generic_request(uri, access_token_id, "GET", "text", "")
         if (
             response["response_status_code"] == 200
             and response["response_type"] == "json"
@@ -89,7 +89,7 @@ def get_entra_user_details(user_id):
             },
         ]
     }
-    response = generic.make_request(
+    response = gspy_requests.generic_request(
         "https://graph.microsoft.com/v1.0/$batch",
         access_token_id,
         "POST",

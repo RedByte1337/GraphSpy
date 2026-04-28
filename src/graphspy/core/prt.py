@@ -10,7 +10,6 @@ from datetime import datetime
 
 # External library imports
 import jwt
-import requests
 from cryptography.hazmat.primitives import hashes, padding, serialization
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -21,12 +20,13 @@ from loguru import logger
 # Local library imports
 from ..db import connection
 from ..core import user_agent as ua
+from ..core import requests_ as gspy_requests
 from .errors import AppError
 from .tokens import parse_token_endpoint_error, save_access_token, save_refresh_token
 
 
 def get_srv_challenge_nonce() -> str:
-    response = requests.post(
+    response = gspy_requests.post(
         "https://login.microsoftonline.com/common/oauth2/token",
         data={"grant_type": "srv_challenge"},
     )
@@ -114,7 +114,7 @@ def request_for_device(
         algorithm="RS256",
         headers={"x5c": certificate_base64, "kdf_ver": 2},
     )
-    response = requests.post(
+    response = gspy_requests.post(
         "https://login.microsoftonline.com/common/oauth2/token",
         data={
             "windows_api_version": "2.2",
@@ -193,7 +193,7 @@ def refresh_to_access_token(
     request_jwt = jwt.encode(
         jwt_payload, derived_key, algorithm="HS256", headers=jwt_headers
     )
-    response = requests.post(
+    response = gspy_requests.post(
         "https://login.microsoftonline.com/common/oauth2/token",
         data={
             "windows_api_version": "2.2",

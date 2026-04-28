@@ -7,13 +7,13 @@ from threading import Thread
 
 # External library imports
 import jwt
-import requests
 from flask import current_app
 from loguru import logger
 
 # Local library imports
 from ..db import connection
 from ..core import user_agent as ua
+from ..core import requests_ as gspy_requests
 from .device import register
 from .errors import AppError
 from .prt import (
@@ -56,7 +56,7 @@ def generate(
     else:
         raise AppError(f"Unsupported token endpoint version: '{version}'")
 
-    response = requests.post(url, data=body, headers={"User-Agent": ua.get()})
+    response = gspy_requests.post(url, data=body, headers={"User-Agent": ua.get()})
     if response.status_code != 200:
         raise AppError(
             f"Failed to generate device code.\n{parse_token_endpoint_error(response)}"
@@ -110,7 +110,7 @@ def poll(app) -> None:
                         "UPDATE devicecodes SET status = ? WHERE device_code = ?",
                         ("POLLING", row["device_code"]),
                     )
-                response = requests.post(
+                response = gspy_requests.post(
                     "https://login.microsoftonline.com/Common/oauth2/token?api-version=1.0",
                     data={
                         "client_id": row["client_id"],

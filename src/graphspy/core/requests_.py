@@ -11,7 +11,54 @@ from loguru import logger
 # Local library imports
 from ..db import connection
 from ..core import user_agent as ua
+from flask import current_app
 
+
+def _prepare_kwargs(**kwargs):
+    """Prepare kwargs with global proxy applied if not explicitly set"""
+    kwargs = kwargs.copy()
+    if 'proxies' not in kwargs and current_app.config["proxy"]:
+        proxies = {
+            "http": current_app.config["proxy"],
+            "https": current_app.config["proxy"],
+        }
+        kwargs['proxies'] = proxies
+    # Bypass certificate verification if proxy is in use (unless explicitly set)
+    if 'proxies' in kwargs and 'verify' not in kwargs:
+        kwargs['verify'] = False
+    return kwargs
+
+def get(url, **kwargs):
+    kwargs = _prepare_kwargs(**kwargs)
+    return requests.get(url, **kwargs)
+
+def post(url, **kwargs):
+    kwargs = _prepare_kwargs(**kwargs)
+    return requests.post(url, **kwargs)
+
+def put(url, **kwargs):
+    kwargs = _prepare_kwargs(**kwargs)
+    return requests.put(url, **kwargs)
+
+def delete(url, **kwargs):
+    kwargs = _prepare_kwargs(**kwargs)
+    return requests.delete(url, **kwargs)
+
+def patch(url, **kwargs):
+    kwargs = _prepare_kwargs(**kwargs)
+    return requests.patch(url, **kwargs)
+
+def head(url, **kwargs):
+    kwargs = _prepare_kwargs(**kwargs)
+    return requests.head(url, **kwargs)
+
+def options(url, **kwargs):
+    kwargs = _prepare_kwargs(**kwargs)
+    return requests.options(url, **kwargs)
+
+def request(method, url, **kwargs):
+    kwargs = _prepare_kwargs(**kwargs)
+    return requests.request(method, url, **kwargs)
 
 def graph_request(
     graph_uri: str, access_token_id: int, method: str = "GET", body: dict = {}
@@ -25,7 +72,7 @@ def graph_request(
         "Authorization": f"Bearer {row[0]}",
         "User-Agent": ua.get(),
     }
-    response = requests.request(
+    response = request(
         method, graph_uri, headers=headers, **({"json": body} if body else {})
     )
     try:
@@ -45,7 +92,7 @@ def graph_upload_request(upload_uri: str, access_token_id: int, file) -> tuple:
         "Content-Type": file.content_type,
         "User-Agent": ua.get(),
     }
-    response = requests.put(upload_uri, headers=headers, data=file.read())
+    response = put(upload_uri, headers=headers, data=file.read())
     if response.status_code in [200, 201, 202]:
         return (
             json.dumps({"message": "File uploaded successfully."}),
@@ -57,7 +104,7 @@ def graph_upload_request(upload_uri: str, access_token_id: int, file) -> tuple:
     )
 
 
-def make_request(
+def generic_request(
     uri: str,
     access_token_id: int,
     method: str,
@@ -87,20 +134,20 @@ def make_request(
     retry_count = 3
     while retry_count > 0:
         if not body:
-            response = requests.request(method, uri, headers=headers, cookies=cookies)
+            response = request(method, uri, headers=headers, cookies=cookies)
         elif request_type in ["text", "urlencoded", "xml"]:
             if request_type == "urlencoded" and "Content-Type" not in headers:
                 headers["Content-Type"] = "application/x-www-form-urlencoded"
             if request_type == "xml" and "Content-Type" not in headers:
                 headers["Content-Type"] = "application/xml"
-            response = requests.request(
+            response = request(
                 method, uri, headers=headers, data=body, cookies=cookies
             )
         elif request_type == "json":
             try:
                 if isinstance(body, str):
                     body = json.loads(body)
-                response = requests.request(
+                response = request(
                     method, uri, headers=headers, json=body, cookies=cookies
                 )
             except ValueError:

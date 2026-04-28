@@ -8,7 +8,6 @@ from datetime import datetime
 
 # External library imports
 from flask import current_app
-import requests
 import pyotp
 from fido2.hid import CtapHidDevice
 from fido2.client import (
@@ -24,6 +23,7 @@ from loguru import logger
 from ..api.helpers import create_response
 from ..db import connection
 from ..core import user_agent as ua
+from ..core import requests_ as gspy_requests
 
 
 def _get_security_info_type(type_id):
@@ -136,7 +136,7 @@ def get_session_ctx(access_token_id: int):
         )
         return False
     try:
-        response = requests.post(
+        response = gspy_requests.post(
             "https://mysignins.microsoft.com/api/session/authorize",
             headers={"Authorization": f"Bearer {row[0]}", "User-Agent": ua.get()},
             json={},
@@ -182,7 +182,7 @@ def get_available_authentication_info(access_token_id: int):
     if not headers:
         return False
     try:
-        response = requests.get(
+        response = gspy_requests.get(
             "https://mysignins.microsoft.com/api/authenticationmethods/availablemethods",
             headers=headers,
         )
@@ -210,7 +210,7 @@ def validate_captcha(
     if not headers:
         return False
     try:
-        response = requests.post(
+        response = gspy_requests.post(
             "https://mysignins.microsoft.com/api/captcha/validation",
             headers=headers,
             json={
@@ -237,7 +237,7 @@ def initialize_mobile_app_registration(access_token_id: int, security_info_type)
     if not headers:
         return False
     try:
-        response = requests.post(
+        response = gspy_requests.post(
             "https://mysignins.microsoft.com/api/authenticationmethods/initializemobileapp",
             headers=headers,
             json={"securityInfoType": security_info_type},
@@ -264,7 +264,7 @@ def add_security_info(access_token_id: int, security_info_type, data=None):
         body_data = json.dumps(data) if isinstance(data, dict) else data
         if body_data:
             body["Data"] = body_data
-        response = requests.post(
+        response = gspy_requests.post(
             "https://mysignins.microsoft.com/api/authenticationmethods/new",
             headers=headers,
             json=body,
@@ -290,7 +290,7 @@ def add_security_info(access_token_id: int, security_info_type, data=None):
         ):
             # ErrorCode 28 indicates that a Captcha needs to be solved (happens after a couple of failed attempts in a short timeframe)
             logger.debug("We need to solve a captcha...")
-            captcha_response = requests.get(
+            captcha_response = gspy_requests.get(
                 "https://mysignins.microsoft.com/api/captcha/?challengeType=Visual&locale=en-US",
                 headers=headers,
             )
@@ -317,7 +317,7 @@ def verify_security_info(
     if not headers:
         return False
     try:
-        response = requests.post(
+        response = gspy_requests.post(
             "https://mysignins.microsoft.com/api/authenticationmethods/verify",
             headers=headers,
             json={
@@ -347,7 +347,7 @@ def delete_security_info(access_token_id: int, security_info_type, data):
         logger.debug(
             f"DeleteSecurityInfo Raw Request Body:\n{{'Type': {security_info_type}, 'Data': {body_data}}}"
         )
-        response = requests.post(
+        response = gspy_requests.post(
             "https://mysignins.microsoft.com/api/authenticationmethods/delete",
             headers=headers,
             json={"Type": security_info_type, "Data": body_data},

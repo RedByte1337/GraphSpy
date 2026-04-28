@@ -12,7 +12,7 @@ from loguru import logger
 
 # Local library imports
 from ..core import user_agent as ua
-from ..core.requests_ import make_request
+from ..core import requests_ as gspy_requests
 from ..db import connection
 
 
@@ -45,7 +45,7 @@ def get_settings(access_token_id: int):
         access_token_id,
     )
     access_token = row[0]
-    response = requests.post(
+    response = gspy_requests.post(
         "https://teams.microsoft.com/api/authsvc/v1.0/authz",
         headers={"Authorization": f"Bearer {access_token}", "User-Agent": ua.get()},
     )
@@ -88,7 +88,7 @@ def get_conversations(access_token_id: int):
         "chatService"
     ]
     uri = f"{chat_service_uri}/v1/users/ME/conversations?view=msnp24Equivalent&pageSize=500"
-    response = make_request(
+    response = gspy_requests.generic_request(
         uri,
         access_token_id,
         "GET",
@@ -106,7 +106,7 @@ def get_conversation_messages(access_token_id: int, conversation_link: str):
     if not settings:
         return "[Error] Unable to obtain teams settings.", 400
     uri = f"{conversation_link}?startTime=0&view=msnp24Equivalent&pageSize=200"
-    response = make_request(
+    response = gspy_requests.generic_request(
         uri,
         access_token_id,
         "GET",
@@ -128,7 +128,7 @@ def send_message(access_token_id: int, conversation_link: str, message_content: 
     settings = get_settings(access_token_id)
     if not settings:
         return "[Error] Unable to obtain teams settings.", 400
-    response = requests.post(
+    response = gspy_requests.post(
         conversation_link,
         headers={
             "Authentication": f"skypetoken={settings['skypeToken']}",
@@ -153,7 +153,7 @@ def get_conversation_members(access_token_id: int, conversation_id: str):
     service_uri = json.loads(settings["teams_settings_raw"])["regionGtms"][
         "teamsAndChannelsService"
     ]
-    response = make_request(
+    response = gspy_requests.generic_request(
         f"{service_uri}/beta/teams/{conversation_id}/members",
         access_token_id,
         "GET",
@@ -183,7 +183,7 @@ def get_image(access_token_id: int, image_uri: str):
     settings = get_settings(access_token_id)
     if not settings:
         return "[Error] Unable to obtain teams settings.", 400
-    response = requests.get(
+    response = gspy_requests.get(
         image_uri,
         cookies={"skypetoken_asm": settings["skypeToken"]},
         headers={"User-Agent": ua.get()},
@@ -205,7 +205,7 @@ def list_users(access_token_id: int):
     next_skiptoken = ""
     while True:
         uri = f"{base_uri}&skipToken={next_skiptoken}" if next_skiptoken else base_uri
-        response = make_request(uri, access_token_id, "GET", "text", "")
+        response = gspy_requests.generic_request(uri, access_token_id, "GET", "text", "")
         if not (
             response["response_status_code"] == 200
             and response["response_type"] == "json"
@@ -230,7 +230,7 @@ def get_user_details(access_token_id: int, user_id: str, external: bool = False)
     uri = f"{service_uri}/beta/users/{user_id}"
     if external:
         uri += "/externalsearchv3"
-    response = make_request(
+    response = gspy_requests.generic_request(
         uri,
         access_token_id,
         "GET",
@@ -281,7 +281,7 @@ def create_conversation(
                 "members": base_members + [{"id": member, "role": "Admin"}],
                 "properties": properties,
             }
-            response = requests.post(uri, headers=headers, json=body)
+            response = gspy_requests.post(uri, headers=headers, json=body)
             if response.status_code < 300 and "Location" in response.headers:
                 match = re.search(
                     r"https://.*?/v1/threads/(.*)$", response.headers["Location"]
@@ -310,7 +310,7 @@ def create_conversation(
             "members": base_members + [{"id": m, "role": "Admin"} for m in members],
             "properties": properties,
         }
-        response = requests.post(uri, headers=headers, json=body)
+        response = gspy_requests.post(uri, headers=headers, json=body)
         if response.status_code < 300 and "Location" in response.headers:
             match = re.search(
                 r"https://.*?/v1/threads/(.*)$", response.headers["Location"]
@@ -338,7 +338,7 @@ def create_conversation(
     if message_content:
         for conversation_id in created:
             conversation_link = f"{chat_service_uri}/v1/users/ME/conversations/{conversation_id}/messages"
-            response = requests.post(
+            response = gspy_requests.post(
                 conversation_link,
                 headers=headers,
                 json={"messagetype": "RichText/Html", "content": message_content},

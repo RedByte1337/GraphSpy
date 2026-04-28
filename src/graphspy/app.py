@@ -12,11 +12,12 @@ from .core.errors import AppError
 from .db import connection
 
 
-def create_app(db_path: str, db_folder: str) -> Flask:
+def create_app(db_path: str, db_folder: str, proxy: str | None = None) -> Flask:
     app = Flask(__name__, template_folder="web/templates", static_folder="web/static")
     app.config["graph_spy_db_path"] = db_path
     app.config["graph_spy_db_folder"] = db_folder
     app.config["table_error_messages"] = "disabled"
+    app.config["proxy"] = proxy
 
     from .api import (
         access_tokens,

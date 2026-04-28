@@ -5,7 +5,6 @@ import base64
 from datetime import datetime
 
 # External library imports
-import requests
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -15,6 +14,7 @@ from loguru import logger
 # Local library imports
 from ..db import connection
 from ..core import user_agent as ua
+from ..core import requests_ as gspy_requests
 from .errors import AppError
 
 
@@ -85,7 +85,7 @@ def register(
     )[0]
     if not access_token:
         raise AppError(f"No access token with ID {access_token_id}!")
-    response = requests.post(
+    response = gspy_requests.post(
         "https://enterpriseregistration.windows.net/EnrollmentServer/device/?api-version=2.0",
         headers={"User-Agent": ua.get(), "Authorization": f"Bearer {access_token}"},
         json=request_body,
