@@ -4,70 +4,87 @@
 
 <br>
 <div class="row">
-    <h1>Entra ID Users</h1>
-    <form id="entra_users_form">
-        <div class="row align-items-center">
-            <div class="col-auto">
-                <div class="input-group">
-                    <label for="access_token_id" class="input-group-text">Access token id</label>
-                    <input type="text" id="access_token_id" name="access_token_id" class="form-control" required>
-                    <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#access_token_modal" onclick="$('#access_token_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
-                    <button type="Button" class="btn btn-outline-primary" onclick="generateEntraUsersTable()">Reload</button>
-                </div>
-            </div>
-            <div class="col-auto gy-3">
-                <div class="row g-3">
-                    <div class="col-auto mt-0">
-                        <div class="form-check form-switch">
-                            <input type="checkbox" id="membership_count" class="form-check-input" role="switch">
-                            <label for="membership_count" class="form-check-label" id="membership_count_tooltip" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Also request the group and role memberships for every user. Note: This will expand the transitiveMemberOf attribute for each user, reducing the maximum amount of users retruned per request from 1000 to 100, which will take significantly more time in larger environments!">Include membership count</label>
-                        </div>
-                        <div class="form-check form-switch">
-                            <input type="checkbox" id="customize_properties" class="form-check-input" role="switch">
-                            <label for="customize_properties" class="form-check-label" id="customize_properties_tooltip" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Customize which properties to request.">Customize Properties</label>
-                        </div>
-                    </div>
-                    <div class="col-auto mt-0" style="display:none">
-                        <div class="form-check form-switch">
-                            <input type="checkbox" id="show_all" class="form-check-input" role="switch">
-                            <label for="show_all" class="form-check-label" id="show_all_tooltip" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Placeholder Second Row.">Placeholder Second Row</label>
-                        </div>
+    <div class="col-md">
+        <h1>Entra ID Users</h1>
+        <form id="entra_users_form">
+            <div class="row align-items-center">
+                <div class="col-auto">
+                    <div class="input-group">
+                        <label for="access_token_id" class="input-group-text">Access token id</label>
+                        <input type="text" id="access_token_id" name="access_token_id" class="form-control" required>
+                        <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#access_token_modal" onclick="$('#access_token_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
+                        <button type="Button" class="btn btn-outline-primary" onclick="generateEntraUsersTable()">Reload</button>
                     </div>
                 </div>
+                <div class="col-auto gy-3">
+                    <div class="row g-3">
+                        <div class="col-auto mt-0">
+                            <div class="form-check form-switch">
+                                <input type="checkbox" id="membership_count" class="form-check-input" role="switch">
+                                <label for="membership_count" class="form-check-label" id="membership_count_tooltip" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Also request the group and role memberships for every user. Note: This will expand the transitiveMemberOf attribute for each user, reducing the maximum amount of users retruned per request from 1000 to 100, which will take significantly more time in larger environments!">Include membership count</label>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input type="checkbox" id="customize_properties" class="form-check-input" role="switch">
+                                <label for="customize_properties" class="form-check-label" id="customize_properties_tooltip" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Customize which properties to request.">Customize Properties</label>
+                            </div>
+                        </div>
+                        <div class="col-auto mt-0" style="display:none">
+                            <div class="form-check form-switch">
+                                <input type="checkbox" id="show_all" class="form-check-input" role="switch">
+                                <label for="show_all" class="form-check-label" id="show_all_tooltip" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Placeholder Second Row.">Placeholder Second Row</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12">
+                </div>
+                <div class="col-lg-6 gy-2">
+                    <div class="input-group" style="display: none;">
+                        <label for="entra_user_properties" class="input-group-text">Properties</label>
+                        <datalist id="entra_user_properties_list">
+                            <option value=" ">Default Microsoft</option>
+                            <option value="id,displayName,userPrincipalName,mail,mobilePhone,accountEnabled,userType,onPremisesSyncEnabled">GraphSpy Table Only</option>
+                            <option value="displayName,givenName,surname,userPrincipalName,mail,otherMails,proxyAddresses,mobilePhone,businessPhones,faxNumber,createdDateTime,lastPasswordChangeDateTime,refreshTokensValidFromDateTime,userType,companyName,jobTitle,department,officeLocation,streetAddress,city,state,country,preferredLanguage,surname,userPrincipalName,id,accountEnabled,passwordPolicies,licenseAssignmentStates,creationType,customSecurityAttributes,onPremisesSyncEnabled,onPremisesDistinguishedName,onPremisesSamAccountName,onPremisesUserPrincipalName,onPremisesDomainName,onPremisesImmutableId,onPremisesLastSyncDateTime,onPremisesSecurityIdentifier,securityIdentifier">Detailed</option>
+                        </datalist>
+                        <input list="entra_user_properties_list" id="entra_user_properties" class="form-control" placeholder="id,displayName,userPrincipalName,...">
+                    </div>
+                </div>
             </div>
-            <div class="col-12">
+        </form>
+        <script>
+            $(document).ready(function () {
+                getActiveAccessToken(document.getElementById("entra_users_form").access_token_id);
+                new bootstrap.Tooltip(document.getElementById('membership_count_tooltip'));
+                new bootstrap.Tooltip(document.getElementById('customize_properties_tooltip'));
+                function toggleUserPropertiesInput() {
+                    if ($('#customize_properties').is(':checked')) {
+                        $('#entra_user_properties').parent().show();
+                    } else {
+                        $('#entra_user_properties').parent().hide();
+                    }
+                }
+                toggleUserPropertiesInput();
+                $('#customize_properties').change(function () {
+                    toggleUserPropertiesInput();
+                });
+            });
+        </script>
+    </div>
+    <div class="col-auto">
+        <div class="card" style="width: 300px;">
+            <div class="card-header">
+                <h6 class="card-title mb-0">Import Entra ID Users</h6>
             </div>
-            <div class="col-lg-6 gy-2">
-                <div class="input-group" style="display: none;">
-                    <label for="entra_user_properties" class="input-group-text">Properties</label>
-                    <datalist id="entra_user_properties_list">
-                        <option value=" ">Default Microsoft</option>
-                        <option value="id,displayName,userPrincipalName,mail,mobilePhone,accountEnabled,userType,onPremisesSyncEnabled">GraphSpy Table Only</option>
-                        <option value="displayName,givenName,surname,userPrincipalName,mail,otherMails,proxyAddresses,mobilePhone,businessPhones,faxNumber,createdDateTime,lastPasswordChangeDateTime,refreshTokensValidFromDateTime,userType,companyName,jobTitle,department,officeLocation,streetAddress,city,state,country,preferredLanguage,surname,userPrincipalName,id,accountEnabled,passwordPolicies,licenseAssignmentStates,creationType,customSecurityAttributes,onPremisesSyncEnabled,onPremisesDistinguishedName,onPremisesSamAccountName,onPremisesUserPrincipalName,onPremisesDomainName,onPremisesImmutableId,onPremisesLastSyncDateTime,onPremisesSecurityIdentifier,securityIdentifier">Detailed</option>
-                    </datalist>
-                    <input list="entra_user_properties_list" id="entra_user_properties" class="form-control" placeholder="id,displayName,userPrincipalName,...">
+            <div class="card-body">
+                <p class="card-text small text-muted">Import previously exported user data from JSON file</p>
+                <div class="d-grid">
+                    <button type="button" class="btn btn-outline-success btn-sm" onclick="importUserData()">
+                        <i class="fi fi-rr-upload"></i> Import JSON
+                    </button>
                 </div>
             </div>
         </div>
-    </form>
-    <script>
-        $(document).ready(function () {
-            getActiveAccessToken(document.getElementById("entra_users_form").access_token_id);
-            new bootstrap.Tooltip(document.getElementById('membership_count_tooltip'));
-            new bootstrap.Tooltip(document.getElementById('customize_properties_tooltip'));
-            function toggleUserPropertiesInput() {
-                if ($('#customize_properties').is(':checked')) {
-                    $('#entra_user_properties').parent().show();
-                } else {
-                    $('#entra_user_properties').parent().hide();
-                }
-            }
-            toggleUserPropertiesInput();
-            $('#customize_properties').change(function () {
-                toggleUserPropertiesInput();
-            });
-        });
-    </script>
+    </div>
 </div>
 <br>
 <div>
@@ -78,7 +95,7 @@
 
 <script>
     // Populate the entra_id_users_table table
-    function generateEntraUsersTable() {
+    function generateEntraUsersTable(userData = null) {
         if ($.fn.dataTable.isDataTable("#entra_id_users_table")) {
             // If the DataTable already exists, destroy it first and remove all event handlers
             $('#entra_id_users_table').off();
@@ -121,6 +138,7 @@
                 name: "groups",
                 data: null,
                 render: function (d, t, r) {
+                    // Show "/" only if membership_count is not checked
                     if (!$('#membership_count').is(':checked')) {
                         return "/";
                     }
@@ -137,6 +155,7 @@
                 name: "roles",
                 data: null,
                 render: function (d, t, r) {
+                    // Show "/" only if membership_count is not checked
                     if (!$('#membership_count').is(':checked')) {
                         return "/";
                     }
@@ -186,27 +205,7 @@
         };
 
         // Initialize datatable
-        let entraUsersTable = new DataTable('#entra_id_users_table', {
-            ajax: {
-                type: "GET",
-                url: `/api/get_entra_users`,
-                data: function (d) {
-                    d.access_token_id = $("#entra_users_form #access_token_id").val()
-                    if ($('#membership_count').is(':checked')) {
-                        d.expand_memberships = true;
-                    }
-                    if ($('#customize_properties').is(':checked')) {
-                        d.customize_properties = $('#entra_user_properties').val();
-                    } else {
-                        d.customize_properties = "id,displayName,userPrincipalName,mail,mobilePhone,accountEnabled,userType,onPremisesSyncEnabled";
-                    }
-                },
-                dataSrc: "",
-                error: function (xhr, status, error) {
-                    bootstrapToast("Entra ID Users Table", xhr.responseText, "danger");
-                    entraUsersTable.clear().draw();
-                }
-            },
+        let tableConfig = {
             columns: entraUsersColumns,
             order: [[2, 'asc']],
             buttons: [
@@ -237,9 +236,63 @@
                             exportOptions: {
                                 columns: ':visible'
                             }
+                        },
+                        {
+                            // download JSON file
+                            text: 'JSON',
+                            action: async function (e, dt, node, config) {
+                                let data = dt.rows().data().toArray();
+                                
+                                // Create export object with config and data
+                                let exportObject = {
+                                    config: {
+                                        membership_count: $('#membership_count').is(':checked'),
+                                        customize_properties: $('#customize_properties').is(':checked'),
+                                        custom_properties: $('#customize_properties').is(':checked') ? $('#entra_user_properties').val() : null
+                                    },
+                                    data: data
+                                };
+                                
+                                let json = JSON.stringify(exportObject, null, 2);
+                                let blob = new Blob([json], { type: 'application/json' });
+                                
+                                // Try to use File System Access API for Save As dialog
+                                if (window.showSaveFilePicker) {
+                                    try {
+                                        const fileHandle = await window.showSaveFilePicker({
+                                            suggestedName: 'entra_users.json',
+                                            types: [{
+                                                description: 'JSON files',
+                                                accept: { 'application/json': ['.json'] }
+                                            }]
+                                        });
+                                        const writable = await fileHandle.createWritable();
+                                        await writable.write(blob);
+                                        await writable.close();
+                                    } catch (err) {
+                                        // User cancelled the dialog or error occurred, fall back to download
+                                        if (err.name !== 'AbortError') {
+                                            // Only fall back if it's not a user cancellation
+                                            let url = URL.createObjectURL(blob);
+                                            let a = document.createElement('a');
+                                            a.href = url;
+                                            a.download = 'entra_users.json';
+                                            a.click();
+                                            URL.revokeObjectURL(url);
+                                        }
+                                    }
+                                } else {
+                                    // Fallback for browsers that don't support File System Access API
+                                    let url = URL.createObjectURL(blob);
+                                    let a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = 'entra_users.json';
+                                    a.click();
+                                    URL.revokeObjectURL(url);
+                                }
+                            }
                         }
                     ]
-
                 }
             ],
             layout: {
@@ -250,8 +303,36 @@
             fixedColumns: {
                 start: 3
             },
-            processing: true
-        })
+            processing: userData ? false : true
+        };
+
+        // Add data source based on whether we have userData or need to fetch it
+        if (userData) {
+            tableConfig.data = userData;
+        } else {
+            tableConfig.ajax = {
+                type: "GET",
+                url: `/api/get_entra_users`,
+                data: function (d) {
+                    d.access_token_id = $("#entra_users_form #access_token_id").val()
+                    if ($('#membership_count').is(':checked')) {
+                        d.expand_memberships = true;
+                    }
+                    if ($('#customize_properties').is(':checked')) {
+                        d.customize_properties = $('#entra_user_properties').val();
+                    } else {
+                        d.customize_properties = "id,displayName,userPrincipalName,mail,mobilePhone,accountEnabled,userType,onPremisesSyncEnabled";
+                    }
+                },
+                dataSrc: "",
+                error: function (xhr, status, error) {
+                    bootstrapToast("Entra ID Users Table", xhr.responseText, "danger");
+                    entraUsersTable.clear().draw();
+                }
+            };
+        }
+
+        let entraUsersTable = new DataTable('#entra_id_users_table', tableConfig)
 
         entraUsersTable.on('click', 'td.dt-control', function (e) {
             let tr = e.target.closest('tr');
@@ -282,5 +363,76 @@
         return false;
     }
 
+    // Import user data from JSON file
+    function importUserData() {
+        let fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = '.json,application/json';
+        fileInput.style.display = 'none';
+        
+        fileInput.onchange = function(event) {
+            let file = event.target.files[0];
+            if (!file) return;
+            
+            let reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    let importedJson = JSON.parse(e.target.result);
+                    
+                    let importedData, importedConfig;
+                    
+                    // Check if it's the new format with config section
+                    if (importedJson.config && importedJson.data) {
+                        importedConfig = importedJson.config;
+                        importedData = importedJson.data;
+                    } else if (Array.isArray(importedJson)) {
+                        // Legacy format - just an array
+                        importedData = importedJson;
+                        importedConfig = null;
+                    } else {
+                        bootstrapToast("Import Error", "Invalid JSON file format. Expected an object with 'config' and 'data' properties, or an array of user objects.", "danger");
+                        return;
+                    }
+                    
+                    // Validate that data is an array
+                    if (!Array.isArray(importedData)) {
+                        bootstrapToast("Import Error", "Invalid JSON file format. Data must be an array of user objects.", "danger");
+                        return;
+                    }
+                    
+                    // Apply config settings if available
+                    if (importedConfig) {
+                        // Set membership_count checkbox
+                        $('#membership_count').prop('checked', importedConfig.membership_count || false);
+                        
+                        // Set customize_properties checkbox and value
+                        if (importedConfig.customize_properties && importedConfig.custom_properties) {
+                            $('#customize_properties').prop('checked', true);
+                            $('#entra_user_properties').val(importedConfig.custom_properties);
+                            // Show the input field
+                            $('#entra_user_properties').parent().show();
+                        } else {
+                            $('#customize_properties').prop('checked', false);
+                            $('#entra_user_properties').parent().hide();
+                        }
+                    }
+                    
+                    // Generate table with imported data
+                    generateEntraUsersTable(importedData);
+                    bootstrapToast("Import Success", `Successfully imported ${importedData.length} user records.`, "success");
+                    
+                } catch (error) {
+                    bootstrapToast("Import Error", "Error parsing JSON file: " + error.message, "danger");
+                }
+            };
+            
+            reader.readAsText(file);
+        };
+        
+        // Trigger file picker
+        document.body.appendChild(fileInput);
+        fileInput.click();
+        document.body.removeChild(fileInput);
+    }
 </script>
 {%endblock content%}
