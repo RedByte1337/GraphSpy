@@ -1,5 +1,5 @@
 [![PyPi Version](https://img.shields.io/pypi/v/GraphSpy.svg)](https://pypi.org/project/GraphSpy/)
-![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)
+![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/RedByte1337?style=flat&logo=githubsponsors)](https://github.com/sponsors/RedByte1337)
 [![Twitter](https://img.shields.io/twitter/follow/RedByte1337?label=RedByte1337&style=social)](https://twitter.com/intent/follow?screen_name=RedByte1337)
 [![LinkedIn](https://img.shields.io/badge/in-Keanu_Nys-white?style=flat&logoColor=blue&labelColor=blue)](https://www.linkedin.com/in/keanunys/)
@@ -77,6 +77,13 @@ For detailed instructions and other command line arguments, please refer to the 
 Please refer to the [GitHub Wiki](https://github.com/RedByte1337/GraphSpy/wiki) for full usage details.
 
 For a quick feature overview, check out the [official release blog post](https://insights.spotit.be/2024/04/05/graphspy-the-swiss-army-knife-for-attacking-m365-entra/).
+
+## Development
+
+If you are contributing to GraphSpy or modifying internals, start here:
+
+- [DEVELOPMENT.md](DEVELOPMENT.md) - architecture, request lifecycle, schema model, and extension rules
+- [AI.md](AI.md) - canonical coding and review guardrails for humans and coding agents
 
 # Features
 
