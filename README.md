@@ -83,6 +83,7 @@ For a quick feature overview, check out the [official release blog post](https:/
 If you are contributing to GraphSpy or modifying internals, start here:
 
 - [DEVELOPMENT.md](DEVELOPMENT.md) - architecture, request lifecycle, schema model, and extension rules
+- [AI_POLICY.md](AI_POLICY.md) - **Important:** Read the policy describing acceptable use of AI for this project if you have any intention of using AI 
 - [AI.md](AI.md) - canonical coding and review guardrails for humans and coding agents
 
 # Features
