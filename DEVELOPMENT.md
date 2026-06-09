@@ -243,6 +243,10 @@ When service semantics matter, check Microsoft docs before changing behavior.
 * Microsoft Graph authentication methods overview: https://learn.microsoft.com/graph/api/resources/authenticationmethods-overview?view=graph-rest-1.0
 * Microsoft Teams API overview: https://learn.microsoft.com/graph/api/resources/teams-api-overview?view=graph-rest-1.0
 
+## AI Usage
+
+When using AI in any shape or form during development, please make sure to adhere to the [AI policy](AI_POLICY.md)!
+
 ## Definition of Done
 
 A change is not complete until all are true:
