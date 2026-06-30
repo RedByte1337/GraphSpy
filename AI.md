@@ -1,6 +1,8 @@
 # GraphSpy: AI Engineering Guide
 
-This file is the canonical AI guidance for this repository. For what GraphSpy is and what it does, see [README.md](README.md).
+This file is the canonical AI guidance for this repository. 
+
+GraphSpy is a browser-based tool for security researchers to interact with Microsoft Cloud APIs (such as Entra ID, Azure, M365, O365) using OAuth2 access and refresh tokens via direct HTTP calls, without using Microsoft SDKs. For detailed info about what GraphSpy is and what it does, see [README.md](README.md).
 
 ## Runtime and Tooling
 
@@ -26,7 +28,15 @@ GraphSpy has four main layers:
 3. **API layer** — modules under [src/graphspy/api](src/graphspy/api) stay thin: parse input, delegate to core/DB helpers, return responses.
 4. **Core and data layer** — modules under [src/graphspy/core](src/graphspy/core) implement the product workflows (see [README.md](README.md)). [src/graphspy/db](src/graphspy/db) handles SQLite access, schema, and migrations through [src/graphspy/db/connection.py](src/graphspy/db/connection.py).
 
+Send Microsoft API requests from the GraphSpy backend whenever possible. The frontend should call GraphSpy API endpoints; outbound calls to Microsoft services belong in the API/core layer, not in browser JavaScript.
+
 See [DEVELOPMENT.md](DEVELOPMENT.md) for full design principles, feature boundaries, and request lifecycle details.
+
+## Stack Constraints
+
+* **Dependencies** — avoid adding or changing imports and requirements unless the task explicitly requires it. Prefer solutions within the existing stack. When a dependency change is necessary, update [pyproject.toml](pyproject.toml) and [uv.lock](uv.lock) together.
+* **No Microsoft SDKs** — GraphSpy calls Microsoft APIs via direct HTTP from the backend. Do not import Microsoft SDKs (for example, the MsGraph Python SDK); use the project's existing HTTP helpers instead.
+* **Cross-platform** — code must run on Windows, Linux, and macOS under Python 3.10+. Avoid OS-specific paths, shell commands, or APIs without portable fallbacks.
 
 ## Python Rules
 
@@ -64,6 +74,6 @@ A change is complete only if all are true:
 1. The change respects the existing CLI/app/API/core/DB layering.
 2. Any schema change includes migration handling.
 3. Proxy, logging, and error-handling behavior remain intentional.
-4. Python 3.10+ compatibility is preserved.
+4. Python 3.10+ compatibility and cross-platform behavior (Windows, Linux, macOS) are preserved.
 5. Relevant Microsoft API semantics were checked when behavior depends on them.
 6. [pyproject.toml](pyproject.toml) and [uv.lock](uv.lock) remain consistent when dependencies change.

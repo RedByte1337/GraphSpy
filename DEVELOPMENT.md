@@ -2,6 +2,28 @@
 
 This guide covers the technical architecture, request lifecycle, schema model, and extension rules for GraphSpy.
 
+## Technology stack
+
+GraphSpy is mainly built on the following technologies:
+* GraphSpy Backend
+  - Python3
+  - Python Flask (dev mode) / Waitress (normal mode)
+  - SQLite3 database
+* GraphSpy Frontend
+  - HTML, JavaScript and CSS
+  - Bootstrap
+      - Utilize bootstrap functionality wherever possible, and only consider using custom CSS when really needed
+  - JQuery
+      - Prefer using JQuery syntax instead of regular JavaScript where possible
+  - DataTables
+      - Used extensively to create dynamic tables
+  - Flaticon
+      - Used for all UI Icons
+  - DOMPurify
+      - For safely sanitizing user input placed in HTML
+  - Prism
+      - For syntax highlighting 
+
 ## Design Principles
 
 GraphSpy should continue to follow these rules:
