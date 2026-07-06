@@ -597,90 +597,158 @@
         
         // Get the mailbox path based on shared mailbox setting
         const mailboxPath = getMailboxPath();
-        
-        // Make API request to get folders with counts
-        $.ajax({
-            type: "POST",
-            url: "/api/generic_graph",
-            data: {
-                access_token_id: accessTokenId,
-                graph_uri: `https://graph.microsoft.com/v1.0/${mailboxPath}/mailFolders?$top=100&$select=id,displayName,totalItemCount,unreadItemCount`
-            },
-            success: function(response) {
-                const data = JSON.parse(response);
-                
-                if (data.hasOwnProperty("error")) {
-                    // Handle permission errors specifically
-                    if (data.error.code === "ErrorAccessDenied" || data.error.code === "MailboxNotEnabledForRESTAPI" || 
-                        data.error.message.includes("Access is denied") || data.error.message.includes("unauthorized")) {
-                        bootstrapAlert(`Access denied to this mailbox. Make sure your token has the "Mail.Read.Shared" scope, which is available in Outlook Mobile FOCI tokens.`, "danger");
-                        $("#email_list_group").html('<center class="p-5">Access denied to mailbox</center>');
-                    } else if (data.error.code === "ErrorItemNotFound") {
-                        bootstrapAlert(`This mailbox might exist, but you don't seem to have access to it.`, "danger");
-                        $("#email_list_group").html('<center class="p-5">No access to mailbox</center>');
-                    }
-                    else {
-                        bootstrapAlert(`[${data.error.code}] ${data.error.message}`, "danger");
-                        $("#email_list_group").html('<center class="p-5">Error loading folders</center>');
-                    }
-                    resetButtonState(loadButton, '<i class="fi fi-rr-refresh" style="vertical-align: -0.15em"></i>');
-                    return;
+        const graphBase = `https://graph.microsoft.com/v1.0/${mailboxPath}`;
+        const priorityFolders = ['inbox', 'sent items', 'deleted items'];
+        const wellKnownFolders = [
+            { id: 'recoverableitemsdeletions', displayName: 'Recoverable Items Deletions', recoverableChildName: 'Deletions' },
+            { id: 'recoverableitemspurges', displayName: 'Recoverable Items Purges', recoverableChildName: 'Purges' },
+            { id: 'notes', displayName: 'Notes' }
+        ];
+        const wellKnownDisplayNames = wellKnownFolders.map(f => f.displayName.toLowerCase());
+
+        function graphGet(uri) {
+            return $.ajax({
+                type: "POST",
+                url: "/api/generic_graph",
+                data: { access_token_id: accessTokenId, graph_uri: uri }
+            }).then(response => JSON.parse(response));
+        }
+
+        function graphGetWithCount(uri) {
+            return $.ajax({
+                type: "POST",
+                url: "/api/custom_api_request",
+                contentType: "application/json; charset=utf-8",
+                data: JSON.stringify({
+                    uri: uri,
+                    access_token_id: parseInt(accessTokenId),
+                    method: "GET",
+                    headers: { "ConsistencyLevel": "eventual" }
+                })
+            }).then(response => {
+                if (response.response_status_code !== 200) {
+                    return null;
                 }
-                                
-                // Clear all folder options
-                $('#email_folder').empty();
-                
-                // Define priority folders to be shown at the top
-                const priorityFolders = ['inbox', 'sent items', 'deleted items'];
-                const allFolders = [...data.value];
-                
-                // Sort folders: priority folders first, then alphabetically
-                allFolders.sort((a, b) => {
-                    const aNameLower = a.displayName.toLowerCase();
-                    const bNameLower = b.displayName.toLowerCase();
-                    
-                    // Check if either folder is a priority folder
-                    const aIsPriority = priorityFolders.includes(aNameLower);
-                    const bIsPriority = priorityFolders.includes(bNameLower);
-                    
-                    if (aIsPriority && bIsPriority) {
-                        // Both are priority, sort by the order in priorityFolders
-                        return priorityFolders.indexOf(aNameLower) - priorityFolders.indexOf(bNameLower);
-                    } else if (aIsPriority) {
-                        return -1; // a is priority, b is not
-                    } else if (bIsPriority) {
-                        return 1; // b is priority, a is not
-                    }
-                    
-                    // Neither is priority, sort alphabetically
-                    return a.displayName.localeCompare(b.displayName);
-                });
-                
-                // Add sorted folders to the dropdown
-                allFolders.forEach(folder => {
-                    // Format the display name to include counts
-                    let displayText = folder.displayName;
-                    
-                    // Add counts if available
-                    if (folder.hasOwnProperty('unreadItemCount') && folder.hasOwnProperty('totalItemCount')) {
-                        displayText += ` (${folder.unreadItemCount}/${folder.totalItemCount})`;
-                    }
-                    
-                    const option = $('<option>').val(folder.id).text(displayText);
-                    $('#email_folder').append(option);
-                });
-                
-                bootstrapToast("Folders", `Loaded ${data.value.length} mail folders`, "success");
-            },
-            error: function(xhr, status, error) {
-                bootstrapAlert(`Failed to load folders: ${error}`, "danger");
-            },
-            complete: function() {
-                // Reset button state
-                loadButton.prop('disabled', false);
-                loadButton.html('<i class="fi fi-rr-refresh" style="vertical-align: -0.15em"></i>');
+                return JSON.parse(response.response_text);
+            });
+        }
+
+        function handleFolderError(error) {
+            if (error.code === "ErrorAccessDenied" || error.code === "MailboxNotEnabledForRESTAPI" ||
+                error.message.includes("Access is denied") || error.message.includes("unauthorized")) {
+                bootstrapAlert(`Access denied to this mailbox. Make sure your token has the "Mail.Read.Shared" scope, which is available in Outlook Mobile FOCI tokens.`, "danger");
+                $("#email_list_group").html('<center class="p-5">Access denied to mailbox</center>');
+            } else if (error.code === "ErrorItemNotFound") {
+                bootstrapAlert(`This mailbox might exist, but you don't seem to have access to it.`, "danger");
+                $("#email_list_group").html('<center class="p-5">No access to mailbox</center>');
+            } else {
+                bootstrapAlert(`[${error.code}] ${error.message}`, "danger");
+                $("#email_list_group").html('<center class="p-5">Error loading folders</center>');
             }
-        });
+        }
+
+        function formatFolderLabel(folder) {
+            if (folder.countOnly && folder.totalItemCount !== undefined) {
+                return `${folder.displayName} (${folder.totalItemCount})`;
+            }
+            if (folder.unreadItemCount !== undefined && folder.totalItemCount !== undefined) {
+                return `${folder.displayName} (${folder.unreadItemCount}/${folder.totalItemCount})`;
+            }
+            return folder.displayName;
+        }
+
+        function sortFolders(folders) {
+            return folders.sort((a, b) => {
+                const aNameLower = a.displayName.toLowerCase();
+                const bNameLower = b.displayName.toLowerCase();
+                const aIsPriority = priorityFolders.includes(aNameLower);
+                const bIsPriority = priorityFolders.includes(bNameLower);
+
+                if (aIsPriority && bIsPriority) {
+                    return priorityFolders.indexOf(aNameLower) - priorityFolders.indexOf(bNameLower);
+                } else if (aIsPriority) {
+                    return -1;
+                } else if (bIsPriority) {
+                    return 1;
+                }
+                return a.displayName.localeCompare(b.displayName);
+            });
+        }
+
+        function buildWellKnownFolderEntries(recoverableData, notesData) {
+            const childFolders = recoverableData && recoverableData.value ? recoverableData.value : [];
+            return wellKnownFolders.map(wk => {
+                if (wk.recoverableChildName) {
+                    const match = childFolders.find(f => f.displayName === wk.recoverableChildName);
+                    return {
+                        id: wk.id,
+                        displayName: wk.displayName,
+                        unreadItemCount: match ? match.unreadItemCount : undefined,
+                        totalItemCount: match ? match.totalItemCount : undefined
+                    };
+                }
+                return {
+                    id: wk.id,
+                    displayName: wk.displayName,
+                    totalItemCount: notesData ? notesData['@odata.count'] : undefined,
+                    countOnly: true
+                };
+            });
+        }
+
+        function renderFolderDropdown(folders) {
+            $('#email_folder').empty();
+            folders.forEach(folder => {
+                $('#email_folder').append(
+                    $('<option>').val(folder.id).text(formatFolderLabel(folder))
+                );
+            });
+            bootstrapToast("Folders", `Loaded ${folders.length} mail folders`, "success");
+        }
+
+        function finishLoading() {
+            loadButton.prop('disabled', false);
+            loadButton.html('<i class="fi fi-rr-refresh" style="vertical-align: -0.15em"></i>');
+        }
+
+        function graphGetOrNull(uri) {
+            return graphGet(uri).then(
+                data => data,
+                () => null
+            );
+        }
+
+        graphGet(`${graphBase}/mailFolders?$top=100&$select=id,displayName,totalItemCount,unreadItemCount`)
+            .then(foldersData => {
+                if (foldersData.error) {
+                    handleFolderError(foldersData.error);
+                    return $.Deferred().reject('handled').promise();
+                }
+                return $.when(
+                    $.Deferred().resolve(foldersData).promise(),
+                    graphGetOrNull(`${graphBase}/mailFolders/recoverableitemsroot/childFolders?includeHiddenFolders=true`),
+                    graphGetWithCount(`${graphBase}/mailFolders/notes/messages?$count=true&$top=1`).then(
+                        data => data,
+                        () => null
+                    )
+                );
+            })
+            .then((foldersData, recoverableData, notesData) => {
+                const regularFolders = foldersData.value.filter(folder =>
+                    !wellKnownDisplayNames.includes(folder.displayName.toLowerCase())
+                );
+                const folders = [
+                    ...sortFolders(regularFolders),
+                    ...buildWellKnownFolderEntries(recoverableData, notesData)
+                ];
+                renderFolderDropdown(folders);
+            })
+            .fail(err => {
+                if (err !== 'handled') {
+                    bootstrapAlert("Failed to load folders", "danger");
+                }
+            })
+            .always(finishLoading);
     }
     
     // Function to get current user's email
