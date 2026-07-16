@@ -793,6 +793,15 @@
     
     // Function to open compose modal
     function openComposeModal(mode = 'new', messageId = null) {
+        // Remove any previous compose modals so click handlers don't stack
+        // (createModal leaves old modals in the DOM with duplicate #send_email_btn IDs)
+        $('div.modal[id^="email_compose_modal"]').each(function() {
+            const $body = $(this).find('#email_body_input');
+            if ($body.length && $body.next('.note-editor').length) {
+                $body.summernote('destroy');
+            }
+            $(this).remove();
+        });
 
         // Create Email Compose Modal with custom form content
         const emailComposeModalBody = `
@@ -849,13 +858,13 @@
                 <span class="spinner-border spinner-border-sm" style="display: none;" aria-hidden="true"></span>
             </button>
         `);
-            
-        $('#send_email_btn').on('click', function() {
+
+        composeModal.find('#send_email_btn').on('click', function() {
             sendEmail();
         });
         
         // Handle attachment input change
-        $('#email_attachments_input').on('change', function() {
+        composeModal.find('#email_attachments_input').on('change', function() {
             updateAttachmentPreview();
         });
 
