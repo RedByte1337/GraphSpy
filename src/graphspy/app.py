@@ -21,6 +21,7 @@ def create_app(db_path: str, db_folder: str, proxy: str | None = None) -> Flask:
 
     from .api import (
         access_tokens,
+        azure_devops,
         database,
         device_codes,
         devices,
@@ -35,6 +36,7 @@ def create_app(db_path: str, db_folder: str, proxy: str | None = None) -> Flask:
 
     for module in [
         access_tokens,
+        azure_devops,
         database,
         device_codes,
         devices,

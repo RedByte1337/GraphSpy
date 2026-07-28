@@ -113,6 +113,11 @@ def teams():
     return render_template("teams.html", title="Microsoft Teams")
 
 
+@bp.route("/azure_devops")
+def azure_devops():
+    return render_template("azure_devops.html", title="Azure DevOps")
+
+
 @bp.route("/entra_users")
 def entra_users():
     return render_template("entra_users.html", title="Entra ID Users")
