@@ -617,6 +617,9 @@
                 $('#azdevops-profile-email').text(email);
                 $('#azdevops-profile-id').text('ID: ' + (profile.id || ''));
                 $('#azdevops-profile-banner').removeClass('d-none');
+                // Token authenticated successfully → always show Active status immediately
+                $('#azdevops-entitlement-status').text('Status: Active')
+                    .removeClass('d-none bg-warning text-dark bg-danger').addClass('bg-success');
 
                 // Fetch orgs
                 fetchOrganizations(tokenId, profile.id);
@@ -648,13 +651,16 @@
                             const status = ent.accessLevel && ent.accessLevel.status;
                             const level = ent.accessLevel && ent.accessLevel.licenseDisplayName;
                             if (status) {
-                                const cls = status.toLowerCase() === 'active' ? 'bg-success' : 'bg-danger';
-                                $('#azdevops-entitlement-status').text('Status: ' + status).removeClass('d-none').addClass(cls);
+                                const cls = ent._restricted ? 'bg-warning text-dark'
+                                    : (status.toLowerCase() === 'active' ? 'bg-success' : 'bg-danger');
+                                $('#azdevops-entitlement-status').text('Status: ' + status)
+                                    .removeClass('bg-success bg-danger bg-warning text-dark').addClass(cls);
                             }
                             if (level) {
                                 $('#azdevops-entitlement-level').text('Access Level: ' + level).removeClass('d-none');
                             }
-                        }
+                        },
+                        error: function () { /* entitlement not accessible — status badge already shown */ }
                     });
                 }
             },

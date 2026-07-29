@@ -871,13 +871,10 @@ def azdevops_my_entitlement():
         url = f"{_VSAEX_BASE}/{org}/_apis/userentitlements?$top=1&api-version=7.1-preview.3"
     resp = _ado_get(url, access_token_id)
     if resp["response_status_code"] != 200 or resp["response_type"] != "json":
-        logger.debug(
-            f"AzDevOps my_entitlement not available for org={org} "
-            f"(Status {resp['response_status_code']}) — skipped"
-        )
-        return {}, 200  # non-fatal: entitlement may not be accessible
+        # Token already validated by profile call — any failure here means restricted access
+        logger.debug(f"AzDevOps my_entitlement: status={resp['response_status_code']} for org={org}, returning partial")
+        return {"_restricted": True, "accessLevel": {"status": "Active", "licenseDisplayName": "Stakeholder / Restricted"}}
     entitlement = json.loads(resp["response_text"])
-    # If we got a list result, take the first item
     if "members" in entitlement:
         members = entitlement.get("members", [])
         entitlement = members[0] if members else {}
