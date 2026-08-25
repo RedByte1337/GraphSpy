@@ -70,3 +70,10 @@ def update_db() -> None:
         execute_db("ALTER TABLE devicecodes ADD COLUMN auto_target_domain TEXT")
         execute_db("UPDATE settings SET value = '6' WHERE setting = 'schema_version'")
         logger.info("Updated database to schema version 6")
+        current_version = _current_version()
+
+    if current_version == "6":
+        logger.info("Updating database schema version 6 -> 7")
+        execute_db("ALTER TABLE devicecodes ADD COLUMN api_version INTEGER DEFAULT 1")
+        execute_db("UPDATE settings SET value = '7' WHERE setting = 'schema_version'")
+        logger.info("Updated database to schema version 7")

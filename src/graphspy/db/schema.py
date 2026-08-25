@@ -14,7 +14,7 @@ def init_db(db_path: str) -> None:
     )
     con.execute(
         "CREATE TABLE devicecodes (id INTEGER PRIMARY KEY AUTOINCREMENT, generated_at INTEGER, expires_at INTEGER, user_code TEXT, device_code TEXT, interval INTEGER, client_id TEXT, status TEXT"
-        + ", last_poll INTEGER, auto_action TEXT, auto_device_name TEXT, auto_join_type INTEGER, auto_device_type TEXT, auto_os_version TEXT, auto_target_domain TEXT)"
+        + ", last_poll INTEGER, auto_action TEXT, auto_device_name TEXT, auto_join_type INTEGER, auto_device_type TEXT, auto_os_version TEXT, auto_target_domain TEXT, api_version INTEGER)"
     )
     con.execute(
         "CREATE TABLE request_templates (id INTEGER PRIMARY KEY AUTOINCREMENT, template_name TEXT, uri TEXT, method TEXT, request_type TEXT, body TEXT, headers TEXT, variables TEXT)"
@@ -35,6 +35,6 @@ def init_db(db_path: str) -> None:
         "CREATE TABLE winhello_keys (id INTEGER PRIMARY KEY AUTOINCREMENT, stored_at INTEGER, key_id TEXT, device_id TEXT, user TEXT, priv_key TEXT)"
     )
     con.execute("CREATE TABLE settings (setting TEXT UNIQUE, value TEXT)")
-    con.execute("INSERT INTO settings (setting, value) VALUES ('schema_version', '6')")
+    con.execute("INSERT INTO settings (setting, value) VALUES ('schema_version', '7')")
     con.commit()
     con.close()
