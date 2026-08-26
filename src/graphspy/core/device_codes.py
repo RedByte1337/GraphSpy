@@ -63,7 +63,7 @@ def generate(
         )
 
     connection.execute_db(
-        "INSERT INTO devicecodes (generated_at, expires_at, user_code, device_code, interval, client_id, status, last_poll, auto_action, auto_device_name, auto_join_type, auto_device_type, auto_os_version, auto_target_domain) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO devicecodes (generated_at, expires_at, user_code, device_code, interval, client_id, status, last_poll, auto_action, auto_device_name, auto_join_type, auto_device_type, auto_os_version, auto_target_domain, api_version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             int(datetime.now().timestamp()),
             int(datetime.now().timestamp()) + int(response.json()["expires_in"]),
@@ -79,6 +79,7 @@ def generate(
             auto_device_type,
             auto_os_version,
             auto_target_domain,
+            version,
         ),
     )
     return response.json()["device_code"]
@@ -110,8 +111,15 @@ def poll(app) -> None:
                         "UPDATE devicecodes SET status = ? WHERE device_code = ?",
                         ("POLLING", row["device_code"]),
                     )
+                api_version = row.get("api_version") or 1
+                if api_version == 2:
+                    token_url = (
+                        "https://login.microsoftonline.com/common/oauth2/v2.0/token"
+                    )
+                else:
+                    token_url = "https://login.microsoftonline.com/Common/oauth2/token?api-version=1.0"
                 response = gspy_requests.post(
-                    "https://login.microsoftonline.com/Common/oauth2/token?api-version=1.0",
+                    token_url,
                     data={
                         "client_id": row["client_id"],
                         "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
