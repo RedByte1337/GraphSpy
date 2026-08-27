@@ -1,0 +1,1739 @@
+{% extends 'layout.html'%}
+
+
+{%block content%}
+
+<br>
+<div class="row align-items-center mb-2">
+    <div class="col-md">
+        <h1>Azure DevOps</h1>
+        <form id="azdevops_form">
+            <div class="row align-items-center g-2">
+                <div class="col-auto">
+                    <div class="input-group">
+                        <label for="access_token_id" class="input-group-text">Access token id</label>
+                        <input type="text" id="access_token_id" name="access_token_id" class="form-control" required>
+                        <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal"
+                            data-bs-target="#access_token_modal"
+                            onclick="$('#access_token_modal_table').DataTable().ajax.reload(null, false)">Select...</button>
+                        <button type="button" class="btn btn-outline-primary" onclick="initAzDevOps()">Reload</button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Profile Banner -->
+<div id="azdevops-profile-banner" class="d-none mb-3">
+    <div class="card border-0"
+        style="background: linear-gradient(135deg, #0078d4 0%, #106ebe 50%, #005a9e 100%); border-radius: 12px;">
+        <div class="card-body py-3 px-4">
+            <div class="d-flex align-items-center gap-3">
+                <div id="azdevops-avatar"
+                    class="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white"
+                    style="width:52px;height:52px;font-size:1.4rem;background:rgba(255,255,255,0.2);flex-shrink:0;">
+                </div>
+                <div class="text-white">
+                    <div id="azdevops-profile-name" class="fw-semibold fs-5 mb-0"></div>
+                    <div id="azdevops-profile-email" class="small opacity-75"></div>
+                    <div id="azdevops-profile-id" class="small opacity-50 font-monospace"></div>
+                    <div class="d-flex gap-2 mt-1 flex-wrap">
+                        <span id="azdevops-entitlement-status" class="badge d-none"></span>
+                        <span id="azdevops-entitlement-level" class="badge bg-light text-dark d-none"></span>
+                    </div>
+                </div>
+                <div class="ms-auto text-white text-end">
+                    <div class="small opacity-75">Organizations</div>
+                    <div id="azdevops-org-count" class="fw-bold fs-4">—</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Org Selector -->
+<div id="azdevops-org-row" class="d-none mb-3">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="fw-semibold text-muted small">ORGANIZATION:</span>
+        <div id="azdevops-org-badges" class="d-flex gap-2 flex-wrap"></div>
+        <div class="input-group ms-2" style="max-width:280px;">
+            <label class="input-group-text small fw-semibold" for="azdevops-project-select" style="font-family:inherit;">Project</label>
+            <select id="azdevops-project-select" class="form-select form-select-sm" style="font-family:inherit;font-size:.9rem;" onchange="$('#azdevops-load-btn').prop('disabled', !this.value);">
+                <option value="">&#8212; select org first &#8212;</option>
+            </select>
+        </div>
+        <button class="btn btn-sm btn-primary" onclick="loadProjectData()" id="azdevops-load-btn" disabled style="min-width:100px;">
+            Enumerate
+        </button>
+    </div>
+</div>
+
+<!-- Main Tabs -->
+<div id="azdevops-main-content" class="d-none">
+    <ul class="nav nav-tabs mb-3" id="azdevops-tabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="tab-repos-btn" data-bs-toggle="tab" data-bs-target="#tab-repos"
+                type="button" role="tab">
+                <i class="fi fi-rr-repository me-1"></i> Repositories
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-pipelines-btn" data-bs-toggle="tab" data-bs-target="#tab-pipelines"
+                type="button" role="tab">
+                <i class="fi fi-rr-settings me-1"></i> Pipelines
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-teams-btn" data-bs-toggle="tab" data-bs-target="#tab-teams" type="button"
+                role="tab">
+                <i class="fi fi-rr-users me-1"></i> Teams
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-users-btn" data-bs-toggle="tab" data-bs-target="#tab-users" type="button"
+                role="tab">
+                <i class="fi fi-rr-user me-1"></i> Users
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-groups-btn" data-bs-toggle="tab" data-bs-target="#tab-groups" type="button"
+                role="tab">
+                <i class="fi fi-rr-lock me-1"></i> Groups
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-svc-btn" data-bs-toggle="tab" data-bs-target="#tab-svc" type="button"
+                role="tab">
+                <i class="fi fi-rr-link me-1"></i> Service Connections
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-vargroups-btn" data-bs-toggle="tab" data-bs-target="#tab-vargroups"
+                type="button" role="tab">
+                <i class="fi fi-rr-key me-1"></i> Variable Groups
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-secfiles-btn" data-bs-toggle="tab" data-bs-target="#tab-secfiles"
+                type="button" role="tab">
+                <i class="fi fi-rr-shield me-1"></i> Secure Files
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-envs-btn" data-bs-toggle="tab" data-bs-target="#tab-envs" type="button"
+                role="tab">
+                <i class="fi fi-rr-cloud me-1"></i> Environments
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-pools-btn" data-bs-toggle="tab" data-bs-target="#tab-pools" type="button"
+                role="tab">
+                <i class="fi fi-rr-computer me-1"></i> Agent Pools
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-audit-btn" data-bs-toggle="tab" data-bs-target="#tab-audit" type="button"
+                role="tab">
+                <i class="fi fi-rr-document me-1"></i> Audit Log
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-pats-btn" data-bs-toggle="tab" data-bs-target="#tab-pats" type="button"
+                role="tab">
+                <i class="fi fi-rr-key me-1"></i> PATs
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-perms-btn" data-bs-toggle="tab" data-bs-target="#tab-perms" type="button"
+                role="tab">
+                <i class="fi fi-rr-lock me-1"></i> Permissions
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="azdevops-tab-content">
+
+        <!-- Repositories Tab -->
+        <div class="tab-pane fade show active" id="tab-repos" role="tabpanel">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">Repositories</h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="loadRepos()"><i class="fi fi-rr-refresh"></i> Refresh</button>
+            </div>
+            <table id="ado-repos-table" class="table table-striped nowrap" style="width:100%"></table>
+        </div>
+
+        <!-- Repo Browser Modal -->
+        <div class="modal fade" id="ado-repo-browser-modal" tabindex="-1">
+            <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div class="d-flex flex-column w-100">
+                            <h5 class="modal-title mb-1" id="ado-repo-browser-title">Repository Files</h5>
+                            <nav aria-label="breadcrumb"><ol class="breadcrumb mb-0 small" id="ado-repo-breadcrumb"></ol></nav>
+                        </div>
+                        <div class="ms-2 d-flex gap-2">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="repoBrowserBack()">&#8592; Back</button>
+                            <a id="ado-repo-download-btn" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1" href="#" onclick="downloadRepo(); return false;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg> Zip</a>
+                        </div>
+                        <button type="button" class="btn-close ms-2" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body p-0">
+                        <div id="ado-repo-file-list">
+                            <table class="table table-hover table-sm mb-0" id="ado-repo-items-table">
+                                <thead class="table-dark">
+                                    <tr><th>Name</th><th>Type</th><th style="width:100px">Size</th><th>Last Modified</th><th style="width:90px">Actions</th></tr>
+                                </thead>
+                                <tbody id="ado-repo-items-body"></tbody>
+                            </table>
+                        </div>
+                        <div id="ado-repo-file-view" class="d-none p-3">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span id="ado-repo-file-path" class="font-monospace small"></span>
+                    <button class="btn btn-sm btn-primary fw-semibold px-3" onclick="openEditFile()">Edit</button>
+                            </div>
+                            <pre class="border rounded p-3" style="max-height:60vh;overflow:auto;font-size:.82rem;white-space:pre-wrap;word-break:break-all;"><code id="ado-repo-file-content"></code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit File Modal -->
+        <div class="modal fade" id="ado-edit-file-modal" tabindex="-1">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="ado-edit-file-title">Edit File</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <textarea id="ado-edit-file-textarea" class="form-control font-monospace" style="min-height:55vh;font-size:.82rem;"></textarea>
+                        <div class="mt-2">
+                            <input type="text" id="ado-edit-commit-msg" class="form-control form-control-sm" placeholder="Commit message (optional)">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                        <button class="btn btn-primary btn-sm" onclick="saveEditedFile()">Save &amp; Push</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Commits Modal -->
+        <div class="modal fade" id="ado-repo-commits-modal" tabindex="-1">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="ado-repo-commits-title">Commits</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <table id="ado-repo-commits-table" class="table table-striped nowrap" style="width:100%"></table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Branches Modal -->
+        <div class="modal fade" id="ado-repo-branches-modal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="ado-repo-branches-title">Branches</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <table id="ado-repo-branches-table" class="table table-striped nowrap" style="width:100%"></table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pipelines Tab -->
+        <div class="tab-pane fade" id="tab-pipelines" role="tabpanel">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">Pipelines</h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="loadPipelines()"><i
+                        class="fi fi-rr-refresh"></i> Refresh</button>
+            </div>
+            <table id="ado-pipelines-table" class="table table-striped nowrap" style="width:100%"></table>
+
+            <!-- Pipeline run detail modal -->
+            <div class="modal fade" id="ado-pipeline-runs-modal" tabindex="-1">
+                <div class="modal-dialog modal-xl">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="ado-pipeline-runs-title">Pipeline Runs</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <table id="ado-pipeline-runs-table" class="table table-striped nowrap" style="width:100%">
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Build log modal -->
+            <div class="modal fade" id="ado-build-log-modal" tabindex="-1">
+                <div class="modal-dialog modal-xl modal-fullscreen-lg-down">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Build Logs</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <pre id="ado-build-log-pre" class="language-json"
+                                style="max-height:65vh;overflow:auto;font-size:0.78rem;"><code id="ado-build-log-content"></code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Teams Tab -->
+        <div class="tab-pane fade" id="tab-teams" role="tabpanel">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">Teams</h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="loadTeams()"><i class="fi fi-rr-refresh"></i>
+                    Refresh</button>
+            </div>
+            <table id="ado-teams-table" class="table table-striped nowrap" style="width:100%"></table>
+
+            <!-- Team members modal -->
+            <div class="modal fade" id="ado-team-members-modal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="ado-team-members-title">Team Members</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <table id="ado-team-members-table" class="table table-striped" style="width:100%"></table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Users Tab -->
+        <div class="tab-pane fade" id="tab-users" role="tabpanel">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">Organization Users</h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="loadOrgUsers()"><i class="fi fi-rr-refresh"></i>
+                    Refresh</button>
+            </div>
+            <table id="ado-users-table" class="table table-striped nowrap" style="width:100%"></table>
+        </div>
+
+        <!-- Groups Tab -->
+        <div class="tab-pane fade" id="tab-groups" role="tabpanel">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">Security Groups</h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="loadGroups()"><i class="fi fi-rr-refresh"></i>
+                    Refresh</button>
+            </div>
+            <table id="ado-groups-table" class="table table-striped nowrap" style="width:100%"></table>
+
+            <!-- Group members modal -->
+            <div class="modal fade" id="ado-group-members-modal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="ado-group-members-title">Group Members</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <table id="ado-group-members-table" class="table table-striped" style="width:100%"></table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Service Connections Tab -->
+        <div class="tab-pane fade" id="tab-svc" role="tabpanel">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">Service Connections</h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="loadServiceConnections()"><i
+                        class="fi fi-rr-refresh"></i> Refresh</button>
+            </div>
+            <table id="ado-svc-table" class="table table-striped nowrap" style="width:100%"></table>
+        </div>
+
+        <!-- Variable Groups Tab -->
+        <div class="tab-pane fade" id="tab-vargroups" role="tabpanel">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">Variable Groups <span class="badge bg-warning text-dark ms-1">May contain
+                        secrets</span></h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="loadVariableGroups()"><i
+                        class="fi fi-rr-refresh"></i> Refresh</button>
+            </div>
+            <table id="ado-vargroups-table" class="table table-striped nowrap" style="width:100%"></table>
+        </div>
+
+        <!-- Secure Files Tab -->
+        <div class="tab-pane fade" id="tab-secfiles" role="tabpanel">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">Secure Files</h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="loadSecureFiles()"><i
+                        class="fi fi-rr-refresh"></i> Refresh</button>
+            </div>
+            <table id="ado-secfiles-table" class="table table-striped nowrap" style="width:100%"></table>
+        </div>
+
+        <!-- Environments Tab -->
+        <div class="tab-pane fade" id="tab-envs" role="tabpanel">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">Deployment Environments</h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="loadEnvironments()"><i
+                        class="fi fi-rr-refresh"></i> Refresh</button>
+            </div>
+            <table id="ado-envs-table" class="table table-striped nowrap" style="width:100%"></table>
+        </div>
+
+        <!-- Agent Pools Tab -->
+        <div class="tab-pane fade" id="tab-pools" role="tabpanel">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">Agent Pools</h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="loadAgentPools()"><i
+                        class="fi fi-rr-refresh"></i> Refresh</button>
+            </div>
+            <table id="ado-pools-table" class="table table-striped nowrap" style="width:100%"></table>
+        </div>
+
+        <!-- Audit Log Tab -->
+        <div class="tab-pane fade" id="tab-audit" role="tabpanel">
+            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                <h5 class="mb-0">Audit Log</h5>
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <div class="input-group input-group-sm" style="max-width:220px;">
+                        <label class="input-group-text" for="ado-audit-start">From</label>
+                        <input type="datetime-local" id="ado-audit-start" class="form-control">
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary" onclick="loadAuditLog()"><i
+                            class="fi fi-rr-refresh"></i> Refresh</button>
+                </div>
+            </div>
+            <table id="ado-audit-table" class="table table-striped nowrap" style="width:100%"></table>
+        </div>
+
+        <!-- PATs Tab -->
+        <div class="tab-pane fade" id="tab-pats" role="tabpanel">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">Personal Access Tokens</h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="loadPATs()"><i class="fi fi-rr-refresh"></i>
+                    Refresh</button>
+            </div>
+            <table id="ado-pats-table" class="table table-striped nowrap" style="width:100%"></table>
+        </div>
+
+        <!-- Permissions Tab -->
+        <div class="tab-pane fade" id="tab-perms" role="tabpanel">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">Security Namespaces (Org Permissions)</h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="loadPermissions()"><i class="fi fi-rr-refresh"></i>
+                    Refresh</button>
+            </div>
+            <table id="ado-perms-table" class="table table-striped nowrap" style="width:100%"></table>
+        </div>
+
+    </div><!-- /tab-content -->
+</div><!-- /main content -->
+
+<style>
+    .ado-org-badge {
+        cursor: pointer;
+        transition: all 0.15s ease;
+        border: 2px solid transparent;
+    }
+
+    .ado-org-badge.active-org {
+        border-color: #0d6efd;
+        background-color: #0d6efd !important;
+        color: #fff !important;
+    }
+
+    .ado-org-badge:hover:not(.active-org) {
+        border-color: #0d6efd;
+    }
+
+    #azdevops-profile-banner .card {
+        box-shadow: 0 2px 12px rgba(0, 120, 212, 0.3);
+    }
+
+    .ado-var-secret {
+        font-family: monospace;
+        letter-spacing: 0.1em;
+        color: #e67e22;
+    }
+</style>
+
+<script>
+    // =========================================================
+    // State
+    // =========================================================
+    let adoState = {
+        tokenId: null,
+        memberId: null,
+        orgs: [],
+        activeOrg: null,
+        activeProject: null,
+        projects: []
+    };
+
+    // =========================================================
+    // Error helper: convert raw xhr to a human-readable message
+    // =========================================================
+    function adoParseError(xhr) {
+        const sc = xhr.status;
+        const txt = xhr.responseText || '';
+        // Backend wraps ADO errors as "[Error] Status 203: <!DOCTYPE..." — catch by status code OR string
+        if (sc === 203 || txt.indexOf('[Error] Status 203') !== -1
+                || txt.indexOf('Sign In') !== -1 || txt.indexOf('DOCTYPE html') !== -1
+                || txt.indexOf('DOCTYPE HTML') !== -1) {
+            return '[Error] Access token is expired or invalid. Please select a valid token with the Azure DevOps resource audience.';
+        }
+        if (sc === 401 || txt.indexOf('[Error] Status 401') !== -1)
+            return '[Error] Unauthorized (401). Token is invalid or lacks permission for this resource.';
+        if (sc === 403 || txt.indexOf('[Error] Status 403') !== -1)
+            return '[Error] Forbidden (403). Token lacks the required scope for this operation.';
+        return txt || '[Error] Unexpected error (Status ' + sc + ').';
+    }
+
+    // Global handler: catch expired-token 203s mid-session across all ADO AJAX calls
+    $(document).ajaxError(function (event, xhr, settings) {
+        if (!settings.url || settings.url.indexOf('/api/azdevops/') === -1) return;
+        const sc = xhr.status;
+        const txt = xhr.responseText || '';
+        if (sc === 203 || (txt.indexOf('Sign In') !== -1 && txt.indexOf('DOCTYPE') !== -1)) {
+            // Only fire once per 5 s to avoid toast spam
+            if (!adoState._expiredNotified) {
+                adoState._expiredNotified = true;
+                bootstrapToast('Azure DevOps — Session Expired',
+                    'The access token has expired or been revoked. Please select a fresh token and reload.',
+                    'danger');
+                setTimeout(function () { adoState._expiredNotified = false; }, 5000);
+            }
+        }
+    });
+
+    // =========================================================
+    // Utility: make standard export buttons for a DataTable
+    // =========================================================
+    function adoExportButtons(filename) {
+        return [
+            {
+                extend: 'colvis',
+                text: 'Columns',
+                columns: 'th:nth-child(n+2)'
+            },
+            {
+                extend: 'collection',
+                text: 'Export',
+                autoClose: true,
+                buttons: [
+                    { extend: 'copy', exportOptions: { columns: ':visible' } },
+                    { extend: 'csv', filename: filename, exportOptions: { columns: ':visible' } },
+                    { extend: 'excel', filename: filename, exportOptions: { columns: ':visible' } },
+                    {
+                        text: 'JSON',
+                        action: async function (e, dt) {
+                            const data = dt.rows().data().toArray();
+                            const json = JSON.stringify(data, null, 2);
+                            const blob = new Blob([json], { type: 'application/json' });
+                            if (window.showSaveFilePicker) {
+                                try {
+                                    const fh = await window.showSaveFilePicker({
+                                        suggestedName: filename + '.json',
+                                        types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
+                                    });
+                                    const w = await fh.createWritable();
+                                    await w.write(blob);
+                                    await w.close();
+                                } catch (err) {
+                                    if (err.name !== 'AbortError') { fallbackDownload(blob, filename + '.json'); }
+                                }
+                            } else {
+                                fallbackDownload(blob, filename + '.json');
+                            }
+                        }
+                    }
+                ]
+            }
+        ];
+    }
+
+    function fallbackDownload(blob, name) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = name; a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function adoTableBase(tableId, columns, filename) {
+        if ($.fn.dataTable.isDataTable('#' + tableId)) {
+            $('#' + tableId).off();
+            $('#' + tableId).DataTable().clear().destroy();
+            $('#' + tableId).empty();
+        }
+        return {
+            columns: columns,
+            buttons: adoExportButtons(filename),
+            layout: { top2Start: 'buttons' },
+            scrollX: true,
+            responsive: true,
+            colReorder: true
+        };
+    }
+
+    // =========================================================
+    // Init: fetch profile + orgs
+    // =========================================================
+    function initAzDevOps() {
+        const tokenId = document.getElementById('access_token_id').value;
+        if (!tokenId) {
+            bootstrapToast('Azure DevOps', '[Error] Please select an access token first.', 'danger');
+            return;
+        }
+        adoState.tokenId = tokenId;
+
+        // Fetch profile
+        $.ajax({
+            type: 'GET',
+            url: '/api/azdevops/profile',
+            data: { access_token_id: tokenId },
+            success: function (profile) {
+                adoState.memberId = profile.id;
+
+                // Render profile banner
+                const name = profile.displayName || profile.publicAlias || '—';
+                const email = profile.emailAddress || '';
+                const initial = (name[0] || '?').toUpperCase();
+                $('#azdevops-avatar').text(initial);
+                $('#azdevops-profile-name').text(name);
+                $('#azdevops-profile-email').text(email);
+                $('#azdevops-profile-id').text('ID: ' + (profile.id || ''));
+                $('#azdevops-profile-banner').removeClass('d-none');
+                // Token authenticated successfully → always show Active status immediately
+                $('#azdevops-entitlement-status').text('Status: Active')
+                    .removeClass('d-none bg-warning text-dark bg-danger').addClass('bg-success');
+
+                // Fetch orgs
+                fetchOrganizations(tokenId, profile.id);
+            },
+            error: function (xhr) {
+                bootstrapToast('Azure DevOps', adoParseError(xhr), 'danger');
+            }
+        });
+    }
+
+    function fetchOrganizations(tokenId, memberId) {
+        $.ajax({
+            type: 'GET',
+            url: '/api/azdevops/organizations',
+            data: { access_token_id: tokenId, member_id: memberId },
+            success: function (orgs) {
+                adoState.orgs = orgs;
+                $('#azdevops-org-count').text(orgs.length);
+                renderOrgBadges(orgs);
+                $('#azdevops-org-row').removeClass('d-none');
+                // Fetch entitlement from first available org
+                if (orgs.length > 0) {
+                    const firstOrg = orgs[0].accountName || orgs[0].name;
+                    $.ajax({
+                        type: 'GET',
+                        url: '/api/azdevops/my_entitlement',
+                        data: { access_token_id: tokenId, org: firstOrg, member_id: memberId },
+                        success: function (ent) {
+                            const status = ent.accessLevel && ent.accessLevel.status;
+                            const level = ent.accessLevel && ent.accessLevel.licenseDisplayName;
+                            if (status) {
+                                const cls = ent._restricted ? 'bg-warning text-dark'
+                                    : (status.toLowerCase() === 'active' ? 'bg-success' : 'bg-danger');
+                                $('#azdevops-entitlement-status').text('Status: ' + status)
+                                    .removeClass('bg-success bg-danger bg-warning text-dark').addClass(cls);
+                            }
+                            if (level) {
+                                $('#azdevops-entitlement-level').text('Access Level: ' + level).removeClass('d-none');
+                            }
+                        },
+                        error: function () { /* entitlement not accessible — status badge already shown */ }
+                    });
+                }
+            },
+            error: function (xhr) {
+                bootstrapToast('Azure DevOps Organizations', adoParseError(xhr), 'danger');
+            }
+        });
+    }
+
+    function renderOrgBadges(orgs) {
+        const container = $('#azdevops-org-badges');
+        container.empty();
+        orgs.forEach(function (org) {
+            const name = org.accountName || org.name || 'Unknown';
+            const badge = $('<span>')
+                .addClass('badge bg-secondary ado-org-badge px-3 py-2')
+                .text(name)
+                .attr('title', org.accountUri || '')
+                .on('click', function () {
+                    $('.ado-org-badge').removeClass('active-org');
+                    $(this).addClass('active-org');
+                    adoState.activeOrg = name;
+                    adoState.activeProject = null;
+                    loadProjects(name);
+                });
+            container.append(badge);
+        });
+        if (orgs.length === 1) {
+            container.find('.ado-org-badge').first().trigger('click');
+        }
+    }
+
+    function loadProjects(org) {
+        $('#azdevops-project-select').html('<option value="">Loading...</option>').prop('disabled', true);
+        $('#azdevops-load-btn').prop('disabled', true);
+
+        $.ajax({
+            type: 'GET',
+            url: '/api/azdevops/projects',
+            data: { access_token_id: adoState.tokenId, org: org },
+            success: function (projects) {
+                adoState.projects = projects;
+                const sel = $('#azdevops-project-select');
+                sel.html('<option value="">— select project —</option>');
+                projects.forEach(function (p) {
+                    sel.append($('<option>').val(p.name).text(p.name + (p.description ? ' — ' + p.description.substring(0, 60) : '')));
+                });
+                sel.prop('disabled', false);
+                $('#azdevops-load-btn').prop('disabled', false);
+            },
+            error: function (xhr) {
+                bootstrapToast('Azure DevOps Projects', adoParseError(xhr), 'danger');
+                $('#azdevops-project-select').html('<option value="">— failed —</option>');
+            }
+        });
+    }
+
+    // =========================================================
+    // Load project data (triggered by Enumerate button)
+    // =========================================================
+    function loadProjectData() {
+        const project = $('#azdevops-project-select').val();
+        if (!project) {
+            bootstrapToast('Azure DevOps', '[Error] Please select a project first.', 'warning');
+            return;
+        }
+        adoState.activeProject = project;
+        $('#azdevops-main-content').removeClass('d-none');
+
+        // Load the active tab
+        const activeTab = document.querySelector('#azdevops-tabs .nav-link.active');
+        if (activeTab) {
+            const target = activeTab.getAttribute('data-bs-target');
+            triggerTabLoad(target);
+        } else {
+            loadRepos();
+        }
+    }
+
+    // Listen to tab switches to lazy-load data
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('#azdevops-tabs .nav-link').forEach(function (btn) {
+            btn.addEventListener('shown.bs.tab', function (e) {
+                if (adoState.activeProject || adoState.activeOrg) {
+                    triggerTabLoad(e.target.getAttribute('data-bs-target'));
+                }
+            });
+        });
+        getActiveAccessToken(document.getElementById('azdevops_form').access_token_id);
+    });
+
+    function triggerTabLoad(target) {
+        switch (target) {
+            case '#tab-repos': if (adoState.activeProject) loadRepos(); break;
+            case '#tab-pipelines': if (adoState.activeProject) loadPipelines(); break;
+            case '#tab-teams': if (adoState.activeProject) loadTeams(); break;
+            case '#tab-users': if (adoState.activeOrg) loadOrgUsers(); break;
+            case '#tab-groups': if (adoState.activeOrg) loadGroups(); break;
+            case '#tab-svc': if (adoState.activeProject) loadServiceConnections(); break;
+            case '#tab-vargroups': if (adoState.activeProject) loadVariableGroups(); break;
+            case '#tab-secfiles': if (adoState.activeProject) loadSecureFiles(); break;
+            case '#tab-envs': if (adoState.activeProject) loadEnvironments(); break;
+            case '#tab-pools': if (adoState.activeOrg) loadAgentPools(); break;
+            case '#tab-audit': if (adoState.activeOrg) loadAuditLog(); break;
+            case '#tab-pats': loadPATs(); break;
+            case '#tab-perms': if (adoState.activeOrg) loadPermissions(); break;
+        }
+    }
+
+    // =========================================================
+    // Repositories
+    // =========================================================
+    function loadRepos() {
+        if (!adoState.activeOrg || !adoState.activeProject) return;
+        $.ajax({
+            type: 'GET',
+            url: '/api/azdevops/repos',
+            data: { access_token_id: adoState.tokenId, org: adoState.activeOrg, project: adoState.activeProject },
+            success: function (repos) {
+                const cfg = adoTableBase('ado-repos-table', [
+                    { title: 'Name', data: 'name' },
+                    {
+                        title: 'Default Branch', data: 'defaultBranch', defaultContent: '—',
+                        render: function (d) { return d ? d.replace('refs/heads/', '') : '—'; }
+                    },
+                    {
+                        title: 'Size (KB)', data: 'size', defaultContent: '—', width: '80px',
+                        render: function (d) { return d ? Math.round(d / 1024) : '—'; }
+                    },
+                    { title: 'SSH', data: 'sshUrl', defaultContent: '—', className: 'default-hide' },
+                    { title: 'ID', data: 'id', className: 'default-hide font-monospace small' },
+                    {
+                        title: 'Actions', orderable: false, data: null, width: '270px',
+                        render: function (d, t, r) {
+                            const branch = r.defaultBranch ? r.defaultBranch.replace('refs/heads/', '') : '';
+                            const rid = r.id;
+                            const rname = encodeURIComponent(r.name);
+                            const base = '/api/azdevops/repo_download?access_token_id=' + adoState.tokenId
+                                + '&org=' + encodeURIComponent(adoState.activeOrg)
+                                + '&project=' + encodeURIComponent(adoState.activeProject)
+                                + '&repo_id=' + rid + '&repo_name=' + rname
+                                + (branch ? '&branch=' + branch : '');
+                            return [
+                                '<button class="btn btn-xs btn-outline-light me-1 ado-repo-browse" data-id="' + rid + '" data-name="' + r.name + '" data-branch="' + branch + '">Browse</button>',
+                                '<button class="btn btn-xs btn-outline-light me-1 ado-repo-commits" data-id="' + rid + '" data-name="' + r.name + '" data-branch="' + branch + '">Commits</button>',
+                                '<button class="btn btn-xs btn-outline-light me-1 ado-repo-branches" data-id="' + rid + '" data-name="' + r.name + '">Branches</button>',
+                                '<a class="btn btn-xs btn-outline-light" href="' + base + '" target="_blank">Download</a>'
+                            ].join('');
+                        }
+                    }
+                ], 'ado_repos');
+                cfg.order = [[0, 'asc']];
+                const table = new DataTable('#ado-repos-table', cfg);
+                table.rows.add(repos).draw();
+
+                $('#ado-repos-table').on('click', '.ado-repo-browse', function () {
+                    openRepoBrowser($(this).data('id'), $(this).data('name'), $(this).data('branch'));
+                });
+                $('#ado-repos-table').on('click', '.ado-repo-commits', function () {
+                    openRepoCommits($(this).data('id'), $(this).data('name'), $(this).data('branch'));
+                });
+                $('#ado-repos-table').on('click', '.ado-repo-branches', function () {
+                    openRepoBranches($(this).data('id'), $(this).data('name'));
+                });
+            },
+            error: function (xhr) {
+                bootstrapToast('Azure DevOps Repos', adoParseError(xhr), 'danger');
+            }
+        });
+    }
+
+    // =========================================================
+    // Repo Browser
+    // =========================================================
+    let repoBrowserState = { repoId: null, repoName: '', branch: '', pathStack: ['/'] };
+
+    function openRepoBrowser(repoId, repoName, branch) {
+        repoBrowserState = { repoId: repoId, repoName: repoName, branch: branch || '', pathStack: ['/'] };
+        $('#ado-repo-browser-title').text('\uD83D\uDCC2 ' + repoName);
+        $('#ado-repo-file-view').addClass('d-none');
+        $('#ado-repo-file-list').removeClass('d-none');
+        loadRepoItems('/');
+        $('#ado-repo-browser-modal').modal('show');
+    }
+
+    function loadRepoItems(path) {
+        const s = repoBrowserState;
+        // Update breadcrumb
+        const crumbParts = path.split('/').filter(Boolean);
+        let crumbHtml = '<li class="breadcrumb-item"><a href="#" class="ado-crumb" data-path="/">root</a></li>';
+        let built = '';
+        crumbParts.forEach(function (p, i) {
+            built += '/' + p;
+            const bp = built;
+            if (i === crumbParts.length - 1) {
+                crumbHtml += '<li class="breadcrumb-item active">' + p + '</li>';
+            } else {
+                crumbHtml += '<li class="breadcrumb-item"><a href="#" class="ado-crumb" data-path="' + bp + '">' + p + '</a></li>';
+            }
+        });
+        $('#ado-repo-breadcrumb').html(crumbHtml);
+        $('#ado-repo-breadcrumb').off('click').on('click', '.ado-crumb', function (e) {
+            e.preventDefault();
+            const p = $(this).data('path');
+            repoBrowserState.pathStack = ['/'];
+            if (p !== '/') { repoBrowserState.pathStack.push(p); }
+            loadRepoItems(p);
+        });
+
+        const tbody = $('#ado-repo-items-body').html('<tr><td colspan="5" class="text-center text-muted">Loading...</td></tr>');
+        $('#ado-repo-file-view').addClass('d-none');
+        $('#ado-repo-file-list').removeClass('d-none');
+        $.ajax({
+            type: 'GET',
+            url: '/api/azdevops/repo_items',
+            data: { access_token_id: adoState.tokenId, org: adoState.activeOrg, project: adoState.activeProject, repo_id: s.repoId, path: path, branch: s.branch },
+            success: function (items) {
+                tbody.empty();
+                // Filter out the path itself (first item is usually the folder itself)
+                const children = items.filter(function (it) { return it.path !== path; });
+                if (!children.length) {
+                    tbody.html('<tr><td colspan="5" class="text-center text-muted">(empty)</td></tr>');
+                    return;
+                }
+                children.forEach(function (it) {
+                    const isFolder = it.gitObjectType === 'tree';
+                    const icon = isFolder ? '[dir]' : '[file]';
+                    const size = it.size != null ? it.size + ' B' : '—';
+                    const modified = it.lastModifiedDate ? new Date(it.lastModifiedDate).toLocaleDateString() : '—';
+                    const typeBadge = isFolder
+                        ? '<span class="badge bg-secondary">Folder</span>'
+                        : '<span class="badge bg-secondary">File</span>';
+                    let actions = '';
+                    if (!isFolder) {
+                        actions = '<button class="btn btn-xs btn-outline-secondary ado-view-file" data-path="' + it.path + '">View</button>';
+                    }
+                    const fname = it.path.split('/').pop();
+                    const nameCell = isFolder
+                        ? '<a href="#" class="ado-nav-folder" data-path="' + it.path + '">' + fname + '</a>'
+                        : fname;
+                    tbody.append('<tr><td>' + nameCell + '</td><td>' + typeBadge + '</td><td class="small text-muted">' + size + '</td><td class="small text-muted">' + modified + '</td><td>' + actions + '</td></tr>');
+                });
+                tbody.find('.ado-nav-folder').on('click', function (e) {
+                    e.preventDefault();
+                    const p = $(this).data('path');
+                    repoBrowserState.pathStack.push(p);
+                    loadRepoItems(p);
+                });
+                tbody.find('.ado-view-file').on('click', function () {
+                    viewFile($(this).data('path'));
+                });
+            },
+            error: function (xhr) {
+                // Parse VS4034xx JSON errors into plain English
+                let msg = adoParseError(xhr);
+                try {
+                    const j = JSON.parse(xhr.responseText);
+                    const raw = j.message || '';
+                    if (raw.indexOf('Cannot find any branches') !== -1 || raw.indexOf('does not exist') !== -1) {
+                        msg = 'This repository is empty — it has no branches or files yet.';
+                    } else if (raw) {
+                        msg = raw.replace(/^VS\d+:\s*/, '');
+                    }
+                } catch (e) {}
+                tbody.html('<tr><td colspan="5" class="text-warning small px-3 py-2">' + msg + '</td></tr>');
+            }
+        });
+    }
+
+    function viewFile(path) {
+        $('#ado-repo-file-content').text('Loading...');
+        $('#ado-repo-file-path').text(path);
+        $('#ado-repo-file-view').removeClass('d-none');
+        $('#ado-repo-file-list').addClass('d-none');
+        const s = repoBrowserState;
+        $.ajax({
+            type: 'GET',
+            url: '/api/azdevops/repo_file',
+            data: { access_token_id: adoState.tokenId, org: adoState.activeOrg, project: adoState.activeProject, repo_id: s.repoId, path: path, branch: s.branch },
+            success: function (res) {
+                repoBrowserState.currentFilePath = path;
+                repoBrowserState.currentFileContent = res.content;
+                $('#ado-repo-file-content').text(res.content);
+            },
+            error: function (xhr) {
+                $('#ado-repo-file-content').text(adoParseError(xhr));
+            }
+        });
+    }
+
+    function repoBrowserBack() {
+        if (repoBrowserState.pathStack.length > 1) {
+            repoBrowserState.pathStack.pop();
+        }
+        const prev = repoBrowserState.pathStack[repoBrowserState.pathStack.length - 1];
+        loadRepoItems(prev);
+    }
+
+    function openEditFile() {
+        const path = repoBrowserState.currentFilePath;
+        if (!path) return;
+        $('#ado-edit-file-title').text('Edit: ' + path.split('/').pop());
+        $('#ado-edit-file-textarea').val(repoBrowserState.currentFileContent || '');
+        $('#ado-edit-commit-msg').val('');
+        $('#ado-edit-file-modal').modal('show');
+    }
+
+    function saveEditedFile() {
+        const s = repoBrowserState;
+        const content = $('#ado-edit-file-textarea').val();
+        const msg = $('#ado-edit-commit-msg').val() || 'Updated via GraphSpy';
+        $.ajax({
+            type: 'POST',
+            url: '/api/azdevops/repo_push',
+            data: {
+                access_token_id: adoState.tokenId,
+                org: adoState.activeOrg,
+                project: adoState.activeProject,
+                repo_id: s.repoId,
+                path: s.currentFilePath,
+                content: content,
+                branch: s.branch || 'main',
+                commit_msg: msg
+            },
+            success: function () {
+                bootstrapToast('Repo', 'File saved successfully.', 'success');
+                $('#ado-edit-file-modal').modal('hide');
+                repoBrowserState.currentFileContent = content;
+                $('#ado-repo-file-content').text(content);
+            },
+            error: function (xhr) {
+                bootstrapToast('Repo Save', adoParseError(xhr), 'danger');
+            }
+        });
+    }
+
+    function downloadRepo() {
+        const s = repoBrowserState;
+        const url = '/api/azdevops/repo_download?access_token_id=' + encodeURIComponent(adoState.tokenId)
+            + '&org=' + encodeURIComponent(adoState.activeOrg)
+            + '&project=' + encodeURIComponent(adoState.activeProject)
+            + '&repo_id=' + encodeURIComponent(s.repoId)
+            + '&repo_name=' + encodeURIComponent(s.repoName)
+            + (s.branch ? '&branch=' + encodeURIComponent(s.branch) : '');
+        window.location.href = url;
+    }
+
+    function openRepoCommits(repoId, repoName, branch) {
+        $('#ado-repo-commits-title').text('Commits — ' + repoName);
+        if ($.fn.dataTable.isDataTable('#ado-repo-commits-table')) {
+            $('#ado-repo-commits-table').DataTable().clear().destroy();
+            $('#ado-repo-commits-table').empty();
+        }
+        $.ajax({
+            type: 'GET',
+            url: '/api/azdevops/repo_commits',
+            data: { access_token_id: adoState.tokenId, org: adoState.activeOrg, project: adoState.activeProject, repo_id: repoId, branch: branch || '' },
+            success: function (commits) {
+                new DataTable('#ado-repo-commits-table', {
+                    data: commits,
+                    columns: [
+                        { title: 'SHA', data: 'commitId', render: function(d){return '<span class="font-monospace small">'+d.substring(0,8)+'</span>';}, width:'80px' },
+                        { title: 'Author', data: 'author.name', defaultContent:'—' },
+                        { title: 'Date', data: 'author.date', defaultContent:'—', render: function(d){return d?new Date(d).toLocaleString():'—';} },
+                        { title: 'Comment', data: 'comment', defaultContent:'—' }
+                    ],
+                    order: [[2,'desc']], scrollX: true
+                });
+                $('#ado-repo-commits-modal').modal('show');
+            },
+            error: function (xhr) {
+                bootstrapToast('Commits', adoParseError(xhr), 'danger');
+            }
+        });
+    }
+
+    function openRepoBranches(repoId, repoName) {
+        $('#ado-repo-branches-title').text('Branches — ' + repoName);
+        if ($.fn.dataTable.isDataTable('#ado-repo-branches-table')) {
+            $('#ado-repo-branches-table').DataTable().clear().destroy();
+            $('#ado-repo-branches-table').empty();
+        }
+        $.ajax({
+            type: 'GET',
+            url: '/api/azdevops/repo_branches',
+            data: { access_token_id: adoState.tokenId, org: adoState.activeOrg, project: adoState.activeProject, repo_id: repoId },
+            success: function (branches) {
+                new DataTable('#ado-repo-branches-table', {
+                    data: branches,
+                    columns: [
+                        { title: 'Branch', data: 'name', render: function(d){return d.replace('refs/heads/','');} },
+                        { title: 'Commit SHA', data: 'objectId', render: function(d){return '<span class="font-monospace small">'+d.substring(0,8)+'</span>';}, width:'90px' },
+                        { title: 'Creator', data: 'creator.displayName', defaultContent:'—' }
+                    ],
+                    order: [[0,'asc']], scrollX: true
+                });
+                $('#ado-repo-branches-modal').modal('show');
+            },
+            error: function (xhr) {
+                bootstrapToast('Branches', adoParseError(xhr), 'danger');
+            }
+        });
+    }
+
+
+    // =========================================================
+    // Pipelines
+    // =========================================================
+    function loadPipelines() {
+        if (!adoState.activeOrg || !adoState.activeProject) return;
+        $.ajax({
+            type: 'GET',
+            url: '/api/azdevops/pipelines',
+            data: { access_token_id: adoState.tokenId, org: adoState.activeOrg, project: adoState.activeProject },
+            success: function (pipelines) {
+                const cfg = adoTableBase('ado-pipelines-table', [
+                    { className: 'dt-control', orderable: false, data: null, defaultContent: '', width: '30px' },
+                    { title: 'Name', data: 'name' },
+                    { title: 'ID', data: 'id', width: '70px' },
+                    { title: 'Folder', data: 'folder', defaultContent: '\\', width: '120px' },
+                    { title: 'Revision', data: 'revision', defaultContent: '—', width: '80px' },
+                    {
+                        title: 'Runs', orderable: false, data: null, width: '80px',
+                        render: function (d, t, r) {
+                            return '<button class="btn btn-xs btn-outline-secondary ado-show-runs" data-id="' + r.id + '" data-name="' + r.name + '">Runs</button>';
+                        }
+                    },
+                    {
+                        title: 'YAML', orderable: false, data: null, width: '80px',
+                        render: function (d, t, r) {
+                            return '<button class="btn btn-xs btn-outline-secondary ado-show-yaml" data-id="' + r.id + '">YAML</button>';
+                        }
+                    }
+                ], 'ado_pipelines');
+                cfg.order = [[1, 'asc']];
+                const table = new DataTable('#ado-pipelines-table', cfg);
+                table.rows.add(pipelines).draw();
+
+                table.on('click', 'td.dt-control', function (e) {
+                    const row = table.row(e.target.closest('tr'));
+                    if (row.child.isShown()) { row.child.hide(); }
+                    else { row.child(formatJsonCode(row.data())).show(); Prism.highlightAll(); }
+                });
+                $('#ado-pipelines-table').on('click', '.ado-show-runs', function () {
+                    const pid = $(this).data('id');
+                    const pname = $(this).data('name');
+                    openPipelineRuns(pid, pname);
+                });
+                $('#ado-pipelines-table').on('click', '.ado-show-yaml', function () {
+                    const pid = $(this).data('id');
+                    openPipelineYaml(pid);
+                });
+            },
+            error: function (xhr) {
+                bootstrapToast('Azure DevOps Pipelines', adoParseError(xhr), 'danger');
+            }
+        });
+    }
+
+    function openPipelineRuns(pipelineId, pipelineName) {
+        $('#ado-pipeline-runs-title').text('Runs — ' + pipelineName);
+        $.ajax({
+            type: 'GET',
+            url: '/api/azdevops/pipeline_runs',
+            data: { access_token_id: adoState.tokenId, org: adoState.activeOrg, project: adoState.activeProject, pipeline_id: pipelineId },
+            success: function (runs) {
+                if ($.fn.dataTable.isDataTable('#ado-pipeline-runs-table')) {
+                    $('#ado-pipeline-runs-table').DataTable().clear().destroy();
+                    $('#ado-pipeline-runs-table').empty();
+                }
+                const table = new DataTable('#ado-pipeline-runs-table', {
+                    data: runs,
+                    columns: [
+                        { title: 'Run ID', data: 'id', width: '70px' },
+                        { title: 'Name', data: 'name' },
+                        {
+                            title: 'State', data: 'state', width: '90px',
+                            render: function (d) {
+                                const cls = d === 'completed' ? 'success' : d === 'inProgress' ? 'primary' : 'secondary';
+                                return '<span class="badge bg-' + cls + '">' + d + '</span>';
+                            }
+                        },
+                        {
+                            title: 'Result', data: 'result', defaultContent: '—', width: '90px',
+                            render: function (d) {
+                                if (!d) return '—';
+                                const cls = d === 'succeeded' ? 'success' : d === 'failed' ? 'danger' : 'secondary';
+                                return '<span class="badge bg-' + cls + '">' + d + '</span>';
+                            }
+                        },
+                        {
+                            title: 'Created', data: 'createdDate', defaultContent: '—',
+                            render: function (d) { return d ? new Date(d).toLocaleString() : '—'; }
+                        },
+                        {
+                            title: 'Finished', data: 'finishedDate', defaultContent: '—',
+                            render: function (d) { return d ? new Date(d).toLocaleString() : '—'; }
+                        },
+                        {
+                            title: 'Logs', orderable: false, data: null, width: '70px',
+                            render: function (d, t, r) {
+                                return '<button class="btn btn-xs btn-outline-secondary ado-show-logs" data-build-id="' + r.id + '">Logs</button>';
+                            }
+                        }
+                    ],
+                    order: [[0, 'desc']],
+                    scrollX: true
+                });
+                $('#ado-pipeline-runs-modal').modal('show');
+                $('#ado-pipeline-runs-table').on('click', '.ado-show-logs', function () {
+                    const buildId = $(this).data('build-id');
+                    openBuildLogs(buildId);
+                });
+            },
+            error: function (xhr) {
+                bootstrapToast('Pipeline Runs', adoParseError(xhr), 'danger');
+            }
+        });
+    }
+
+    function openPipelineYaml(pipelineId) {
+        $.ajax({
+            type: 'GET',
+            url: '/api/azdevops/pipeline_yaml',
+            data: { access_token_id: adoState.tokenId, org: adoState.activeOrg, project: adoState.activeProject, pipeline_id: pipelineId },
+            success: function (data) {
+                const content = JSON.stringify(data, null, 2);
+                $('#ado-build-log-content').text(content);
+                Prism.highlightAll();
+                $('#ado-build-log-modal').modal('show');
+            },
+            error: function (xhr) {
+                bootstrapToast('Pipeline YAML', adoParseError(xhr), 'danger');
+            }
+        });
+    }
+
+    function openBuildLogs(buildId) {
+        $.ajax({
+            type: 'GET',
+            url: '/api/azdevops/build_logs',
+            data: { access_token_id: adoState.tokenId, org: adoState.activeOrg, project: adoState.activeProject, build_id: buildId },
+            success: function (logs) {
+                const content = JSON.stringify(logs, null, 2);
+                $('#ado-build-log-content').text(content);
+                Prism.highlightAll();
+                $('#ado-pipeline-runs-modal').modal('hide');
+                setTimeout(function () { $('#ado-build-log-modal').modal('show'); }, 400);
+            },
+            error: function (xhr) {
+                bootstrapToast('Build Logs', adoParseError(xhr), 'danger');
+            }
+        });
+    }
+
+    // =========================================================
+    // Teams
+    // =========================================================
+    function loadTeams() {
+        if (!adoState.activeOrg || !adoState.activeProject) return;
+        $.ajax({
+            type: 'GET',
+            url: '/api/azdevops/teams',
+            data: { access_token_id: adoState.tokenId, org: adoState.activeOrg, project: adoState.activeProject },
+            success: function (teams) {
+                const cfg = adoTableBase('ado-teams-table', [
+                    { title: 'Name', data: 'name' },
+                    { title: 'Description', data: 'description', defaultContent: '—' },
+                    { title: 'ID', data: 'id', className: 'default-hide' },
+                    {
+                        title: 'Members', orderable: false, data: null, width: '90px',
+                        render: function (d, t, r) {
+                            return '<button class="btn btn-xs btn-outline-secondary ado-show-team-members" data-id="' + r.id + '" data-name="' + r.name + '">Members</button>';
+                        }
+                    }
+                ], 'ado_teams');
+                cfg.order = [[0, 'asc']];
+                const table = new DataTable('#ado-teams-table', cfg);
+                table.rows.add(teams).draw();
+                $('#ado-teams-table').on('click', '.ado-show-team-members', function () {
+                    const tid = $(this).data('id');
+                    const tname = $(this).data('name');
+                    openTeamMembers(tid, tname);
+                });
+            },
+            error: function (xhr) {
+                bootstrapToast('Azure DevOps Teams', adoParseError(xhr), 'danger');
+            }
+        });
+    }
+
+    function openTeamMembers(teamId, teamName) {
+        $('#ado-team-members-title').text('Members — ' + teamName);
+        $.ajax({
+            type: 'GET',
+            url: '/api/azdevops/team_members',
+            data: { access_token_id: adoState.tokenId, org: adoState.activeOrg, project: adoState.activeProject, team_id: teamId },
+            success: function (members) {
+                if ($.fn.dataTable.isDataTable('#ado-team-members-table')) {
+                    $('#ado-team-members-table').DataTable().clear().destroy();
+                    $('#ado-team-members-table').empty();
+                }
+                const flat = members.map(function (m) { return m.identity || m; });
+                new DataTable('#ado-team-members-table', {
+                    data: flat,
+                    columns: [
+                        { title: 'Display Name', data: 'displayName', defaultContent: '—' },
+                        { title: 'Unique Name', data: 'uniqueName', defaultContent: '—' },
+                        { title: 'ID', data: 'id', defaultContent: '—' }
+                    ]
+                });
+                $('#ado-team-members-modal').modal('show');
+            },
+            error: function (xhr) {
+                bootstrapToast('Team Members', adoParseError(xhr), 'danger');
+            }
+        });
+    }
+
+    // =========================================================
+    // Users (org-level)
+    // =========================================================
+    function loadOrgUsers() {
+        if (!adoState.activeOrg) return;
+        $.ajax({
+            type: 'GET',
+            url: '/api/azdevops/users',
+            data: { access_token_id: adoState.tokenId, org: adoState.activeOrg },
+            success: function (users) {
+                const cfg = adoTableBase('ado-users-table', [
+                    { title: 'Display Name', data: 'user.displayName', defaultContent: '—' },
+                    { title: 'Principal Name', data: 'user.principalName', defaultContent: '—' },
+                    { title: 'Mail', data: 'user.mailAddress', defaultContent: '—' },
+                    { title: 'Account Type', data: 'user.subjectKind', defaultContent: '—', width: '110px' },
+                    { title: 'Access Level', data: 'accessLevel.licenseDisplayName', defaultContent: '—' },
+                    {
+                        title: 'Last Accessed', data: 'lastAccessedDate', defaultContent: '—',
+                        render: function (d) { return d ? new Date(d).toLocaleDateString() : '—'; }
+                    },
+                    { title: 'Status', data: 'accessLevel.status', defaultContent: '—', width: '90px' }
+                ], 'ado_users');
+                cfg.order = [[0, 'asc']];
+                const table = new DataTable('#ado-users-table', cfg);
+                table.rows.add(users).draw();
+            },
+            error: function (xhr) {
+                bootstrapToast('Azure DevOps Users', adoParseError(xhr), 'danger');
+            }
+        });
+    }
+
+    // =========================================================
+    // Groups
+    // =========================================================
+    function loadGroups() {
+        if (!adoState.activeOrg) return;
+        $.ajax({
+            type: 'GET',
+            url: '/api/azdevops/groups',
+            data: { access_token_id: adoState.tokenId, org: adoState.activeOrg },
+            success: function (groups) {
+                const cfg = adoTableBase('ado-groups-table', [
+                    { title: 'Display Name', data: 'displayName', defaultContent: '—' },
+                    { title: 'Description', data: 'description', defaultContent: '—' },
+                    {
+                        title: 'Category', data: 'domain', defaultContent: '—', width: '130px',
+                        render: function (d) {
+                            if (!d) return '—';
+                            if (d.indexOf('TeamProject') !== -1) return '<span class="badge bg-secondary">Team Project</span>';
+                            if (d.indexOf('IdentityDomain') !== -1) return '<span class="badge bg-dark">Identity Domain</span>';
+                            return '<span class="badge bg-secondary">' + d.split('/').pop().substring(0, 20) + '</span>';
+                        }
+                    },
+                    {
+                        title: 'Descriptor', data: 'descriptor', defaultContent: '—', className: 'default-hide font-monospace small',
+                        render: function (d) {
+                            if (!d) return '—';
+                            return '<span title="' + d + '">' + d.substring(0, 30) + '…</span>';
+                        }
+                    },
+                    {
+                        title: 'Members', orderable: false, data: null, width: '90px',
+                        render: function (d, t, r) {
+                            return '<button class="btn btn-xs btn-outline-secondary ado-show-group-members" data-descriptor="' + r.descriptor + '" data-name="' + r.displayName + '">Members</button>';
+                        }
+                    }
+                ], 'ado_groups');
+                cfg.order = [[0, 'asc']];
+                const table = new DataTable('#ado-groups-table', cfg);
+                table.rows.add(groups).draw();
+                $('#ado-groups-table').on('click', '.ado-show-group-members', function () {
+                    const desc = $(this).data('descriptor');
+                    const name = $(this).data('name');
+                    openGroupMembers(desc, name);
+                });
+            },
+            error: function (xhr) {
+                bootstrapToast('Azure DevOps Groups', adoParseError(xhr), 'danger');
+            }
+        });
+    }
+
+    function openGroupMembers(descriptor, groupName) {
+        $('#ado-group-members-title').text('Members — ' + groupName);
+        $.ajax({
+            type: 'GET',
+            url: '/api/azdevops/group_members',
+            data: { access_token_id: adoState.tokenId, org: adoState.activeOrg, group_descriptor: descriptor },
+            success: function (members) {
+                if ($.fn.dataTable.isDataTable('#ado-group-members-table')) {
+                    $('#ado-group-members-table').DataTable().clear().destroy();
+                    $('#ado-group-members-table').empty();
+                }
+                new DataTable('#ado-group-members-table', {
+                    data: members,
+                    columns: [
+                        {
+                            title: 'Name',
+                            data: '_displayName',
+                            defaultContent: '—',
+                            render: function (d, t, r) {
+                                if (d) return d;
+                                // fallback: parse prefix from descriptor
+                                const md = r.memberDescriptor || '';
+                                const parts = md.split('.');
+                                return parts.length > 1
+                                    ? '<span class="text-muted font-monospace small" title="' + md + '">' + md.substring(0, 30) + '…</span>'
+                                    : '—';
+                            }
+                        },
+                        {
+                            title: 'UPN / Principal',
+                            data: '_principalName',
+                            defaultContent: '—'
+                        },
+                        {
+                            title: 'Type', data: '_subjectKind', defaultContent: '—', width: '90px',
+                            render: function (d) {
+                                if (!d) return '—';
+                                const cls = d === 'user' ? 'bg-primary' : 'bg-secondary';
+                                return '<span class="badge ' + cls + '">' + d + '</span>';
+                            }
+                        },
+                        {
+                            title: 'Descriptor', data: 'memberDescriptor', defaultContent: '—',
+                            className: 'font-monospace small',
+                            render: function (d) {
+                                if (!d) return '—';
+                                return '<span title="' + d + '">' + d.substring(0, 35) + '…</span>';
+                            }
+                        }
+                    ],
+                    scrollX: true
+                });
+                $('#ado-group-members-modal').modal('show');
+            },
+            error: function (xhr) {
+                bootstrapToast('Group Members', adoParseError(xhr), 'danger');
+            }
+        });
+    }
+
+    // =========================================================
+    // Service Connections
+    // =========================================================
+    function loadServiceConnections() {
+        if (!adoState.activeOrg || !adoState.activeProject) return;
+        $.ajax({
+            type: 'GET',
+            url: '/api/azdevops/service_connections',
+            data: { access_token_id: adoState.tokenId, org: adoState.activeOrg, project: adoState.activeProject },
+            success: function (conns) {
+                const cfg = adoTableBase('ado-svc-table', [
+                    { className: 'dt-control', orderable: false, data: null, defaultContent: '', width: '30px' },
+                    { title: 'Name', data: 'name' },
+                    { title: 'Type', data: 'type', width: '140px' },
+                    { title: 'Scope', data: 'serviceEndpointProjectReferences[0].projectReference.name', defaultContent: '—' },
+                    {
+                        title: 'URL', data: 'url', defaultContent: '—',
+                        render: function (d) { return d ? '<span class="font-monospace small">' + d + '</span>' : '—'; }
+                    },
+                    { title: 'Owner', data: 'owner', defaultContent: '—', width: '90px' },
+                    {
+                        title: 'Is Ready', data: 'isReady', defaultContent: '—', width: '80px',
+                        render: function (d) { return d ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-secondary">No</span>'; }
+                    },
+                    { title: 'ID', data: 'id', className: 'default-hide' }
+                ], 'ado_service_connections');
+                cfg.order = [[1, 'asc']];
+                const table = new DataTable('#ado-svc-table', cfg);
+                table.rows.add(conns).draw();
+                table.on('click', 'td.dt-control', function (e) {
+                    const row = table.row(e.target.closest('tr'));
+                    if (row.child.isShown()) { row.child.hide(); }
+                    else { row.child(formatJsonCode(row.data())).show(); Prism.highlightAll(); }
+                });
+            },
+            error: function (xhr) {
+                bootstrapToast('Service Connections', adoParseError(xhr), 'danger');
+            }
+        });
+    }
+
+    // =========================================================
+    // Variable Groups
+    // =========================================================
+    function loadVariableGroups() {
+        if (!adoState.activeOrg || !adoState.activeProject) return;
+        $.ajax({
+            type: 'GET',
+            url: '/api/azdevops/variable_groups',
+            data: { access_token_id: adoState.tokenId, org: adoState.activeOrg, project: adoState.activeProject },
+            success: function (vgroups) {
+                const cfg = adoTableBase('ado-vargroups-table', [
+                    { className: 'dt-control', orderable: false, data: null, defaultContent: '', width: '30px' },
+                    { title: 'Group Name', data: 'name' },
+                    { title: 'Type', data: 'type', defaultContent: '—', width: '120px' },
+                    {
+                        title: 'Variables', data: null, width: '80px',
+                        render: function (d, t, r) {
+                            return r.variables ? Object.keys(r.variables).length : '0';
+                        }
+                    },
+                    {
+                        title: 'Secret Count', data: null, width: '100px',
+                        render: function (d, t, r) {
+                            if (!r.variables) return '0';
+                            const secrets = Object.values(r.variables).filter(function (v) { return v.isSecret; });
+                            return secrets.length > 0 ? '<span class="badge bg-warning text-dark">' + secrets.length + ' secrets</span>' : '0';
+                        }
+                    },
+                    {
+                        title: 'Variable Keys', data: null,
+                        render: function (d, t, r) {
+                            if (!r.variables) return '—';
+                            return Object.entries(r.variables).map(function (e) {
+                                const isSecret = e[1].isSecret;
+                                const val = isSecret ? '<span class="ado-var-secret">••••••••</span>' : (e[1].value || '(empty)');
+                                return '<code class="small">' + e[0] + '</code>: ' + val;
+                            }).join('<br>');
+                        }
+                    }
+                ], 'ado_variable_groups');
+                cfg.order = [[1, 'asc']];
+                const table = new DataTable('#ado-vargroups-table', cfg);
+                table.rows.add(vgroups).draw();
+                table.on('click', 'td.dt-control', function (e) {
+                    const row = table.row(e.target.closest('tr'));
+                    if (row.child.isShown()) { row.child.hide(); }
+                    else { row.child(formatJsonCode(row.data())).show(); Prism.highlightAll(); }
+                });
+            },
+            error: function (xhr) {
+                bootstrapToast('Variable Groups', adoParseError(xhr), 'danger');
+            }
+        });
+    }
+
+    // =========================================================
+    // Secure Files
+    // =========================================================
+    function loadSecureFiles() {
+        if (!adoState.activeOrg || !adoState.activeProject) return;
+        $.ajax({
+            type: 'GET',
+            url: '/api/azdevops/secure_files',
+            data: { access_token_id: adoState.tokenId, org: adoState.activeOrg, project: adoState.activeProject },
+            success: function (files) {
+                const cfg = adoTableBase('ado-secfiles-table', [
+                    { title: 'Name', data: 'name' },
+                    {
+                        title: 'Modified', data: 'modifiedOn', defaultContent: '—',
+                        render: function (d) { return d ? new Date(d).toLocaleString() : '—'; }
+                    },
+                    { title: 'Modified By', data: 'modifiedBy.displayName', defaultContent: '—' },
+                    {
+                        title: 'Created', data: 'createdOn', defaultContent: '—',
+                        render: function (d) { return d ? new Date(d).toLocaleString() : '—'; }, className: 'default-hide'
+                    },
+                    { title: 'ID', data: 'id', className: 'default-hide' }
+                ], 'ado_secure_files');
+                cfg.order = [[0, 'asc']];
+                const table = new DataTable('#ado-secfiles-table', cfg);
+                table.rows.add(files).draw();
+            },
+            error: function (xhr) {
+                bootstrapToast('Secure Files', adoParseError(xhr), 'danger');
+            }
+        });
+    }
+
+    // =========================================================
+    // Environments
+    // =========================================================
+    function loadEnvironments() {
+        if (!adoState.activeOrg || !adoState.activeProject) return;
+        $.ajax({
+            type: 'GET',
+            url: '/api/azdevops/environments',
+            data: { access_token_id: adoState.tokenId, org: adoState.activeOrg, project: adoState.activeProject },
+            success: function (envs) {
+                const cfg = adoTableBase('ado-envs-table', [
+                    { title: 'Name', data: 'name' },
+                    { title: 'Description', data: 'description', defaultContent: '—' },
+                    { title: 'Created By', data: 'createdBy.displayName', defaultContent: '—' },
+                    {
+                        title: 'Created On', data: 'createdOn', defaultContent: '—',
+                        render: function (d) { return d ? new Date(d).toLocaleString() : '—'; }
+                    },
+                    { title: 'ID', data: 'id', width: '70px', className: 'default-hide' }
+                ], 'ado_environments');
+                cfg.order = [[0, 'asc']];
+                const table = new DataTable('#ado-envs-table', cfg);
+                table.rows.add(envs).draw();
+            },
+            error: function (xhr) {
+                bootstrapToast('Environments', adoParseError(xhr), 'danger');
+            }
+        });
+    }
+
+    // =========================================================
+    // Agent Pools
+    // =========================================================
+    function loadAgentPools() {
+        if (!adoState.activeOrg) return;
+        $.ajax({
+            type: 'GET',
+            url: '/api/azdevops/agent_pools',
+            data: { access_token_id: adoState.tokenId, org: adoState.activeOrg },
+            success: function (pools) {
+                const cfg = adoTableBase('ado-pools-table', [
+                    { title: 'Name', data: 'name' },
+                    { title: 'Type', data: 'poolType', defaultContent: '—', width: '100px' },
+                    { title: 'Size', data: 'size', defaultContent: '—', width: '70px' },
+                    {
+                        title: 'Is Hosted', data: 'isHosted', defaultContent: '—', width: '100px',
+                        render: function (d) { return d ? '<span class="badge bg-info">Hosted</span>' : '<span class="badge bg-secondary">Self-hosted</span>'; }
+                    },
+                    {
+                        title: 'Auto-provision', data: 'autoProvision', defaultContent: '—', width: '110px',
+                        render: function (d) { return d ? 'Yes' : 'No'; }
+                    },
+                    {
+                        title: 'Auto-update', data: 'autoUpdate', defaultContent: '—', width: '100px',
+                        render: function (d) { return d ? 'Yes' : 'No'; }
+                    },
+                    { title: 'ID', data: 'id', width: '70px', className: 'default-hide' }
+                ], 'ado_agent_pools');
+                cfg.order = [[0, 'asc']];
+                const table = new DataTable('#ado-pools-table', cfg);
+                table.rows.add(pools).draw();
+            },
+            error: function (xhr) {
+                bootstrapToast('Agent Pools', adoParseError(xhr), 'danger');
+            }
+        });
+    }
+
+    // =========================================================
+    // Audit Log
+    // =========================================================
+    function loadAuditLog() {
+        if (!adoState.activeOrg) return;
+        const startTime = document.getElementById('ado-audit-start').value;
+        $.ajax({
+            type: 'GET',
+            url: '/api/azdevops/audit_log',
+            data: {
+                access_token_id: adoState.tokenId,
+                org: adoState.activeOrg,
+                start_time: startTime || ''
+            },
+            success: function (entries) {
+                const cfg = adoTableBase('ado-audit-table', [
+                    {
+                        title: 'Timestamp', data: 'timestamp', defaultContent: '—',
+                        render: function (d) { return d ? new Date(d).toLocaleString() : '—'; }, width: '160px'
+                    },
+                    { title: 'Actor', data: 'actorDisplayName', defaultContent: '—' },
+                    { title: 'Action', data: 'actionId', defaultContent: '—' },
+                    { title: 'IP Address', data: 'ipAddress', defaultContent: '—', width: '130px' },
+                    { title: 'User Agent', data: 'userAgent', defaultContent: '—', className: 'default-hide' },
+                    { title: 'Area', data: 'area', defaultContent: '—', width: '90px' },
+                    { title: 'Category', data: 'category', defaultContent: '—', width: '100px' },
+                    { title: 'Details', data: 'details', defaultContent: '—' },
+                    { title: 'Scope', data: 'scopeType', defaultContent: '—', width: '80px', className: 'default-hide' }
+                ], 'ado_audit_log');
+                cfg.order = [[0, 'desc']];
+                const table = new DataTable('#ado-audit-table', cfg);
+                table.rows.add(entries).draw();
+            },
+            error: function (xhr) {
+                bootstrapToast('Audit Log', adoParseError(xhr), 'danger');
+            }
+        });
+    }
+
+    // =========================================================
+    // PATs
+    // =========================================================
+    function loadPATs() {
+        const tid = adoState.tokenId || document.getElementById('access_token_id').value;
+        $.ajax({
+            type: 'GET',
+            url: '/api/azdevops/tokens',
+            data: { access_token_id: tid, org: adoState.activeOrg || '' },
+            success: function (pats) {
+                const cfg = adoTableBase('ado-pats-table', [
+                    { title: 'Display Name', data: 'displayName', defaultContent: '—' },
+                    { title: 'Scopes', data: 'scope', defaultContent: '—' },
+                    {
+                        title: 'Valid From', data: 'validFrom', defaultContent: '—',
+                        render: function (d) { return d ? new Date(d).toLocaleString() : '—'; }
+                    },
+                    {
+                        title: 'Valid To', data: 'validTo', defaultContent: '—',
+                        render: function (d) { return d ? new Date(d).toLocaleString() : '—'; }
+                    },
+                    { title: 'Authorization ID', data: 'authorizationId', defaultContent: '—', className: 'default-hide font-monospace small' },
+                    {
+                        title: 'Token (masked)', data: 'token', defaultContent: '—',
+                        render: function (d) {
+                            if (!d) return '—';
+                            return '<span class="ado-var-secret">' + d.substring(0, 8) + '••••••••</span>';
+                        }
+                    }
+                ], 'ado_pats');
+                cfg.order = [[2, 'desc']];
+                const table = new DataTable('#ado-pats-table', cfg);
+                table.rows.add(pats).draw();
+            },
+            error: function (xhr) {
+                bootstrapToast('Personal Access Tokens', adoParseError(xhr), 'danger');
+            }
+        });
+    }
+
+    // =========================================================
+    // Permissions (Security Namespaces)
+    // =========================================================
+    function loadPermissions() {
+        if (!adoState.activeOrg) return;
+        $.ajax({
+            type: 'GET',
+            url: '/api/azdevops/security_namespaces',
+            data: { access_token_id: adoState.tokenId, org: adoState.activeOrg },
+            success: function (namespaces) {
+                const cfg = adoTableBase('ado-perms-table', [
+                    { title: 'Name', data: 'name' },
+                    { title: 'Display Name', data: 'displayName', defaultContent: '—' },
+                    { title: 'Namespace ID', data: 'namespaceId', defaultContent: '—', className: 'font-monospace small' },
+                    { title: 'Permissions (bits)', data: 'actions', defaultContent: '—',
+                      render: function (d) {
+                          if (!d || !d.length) return '—';
+                          return d.map(function(a) {
+                              return '<span class="badge bg-secondary me-1">' + a.name + ' (' + a.bit + ')</span>';
+                          }).join(' ');
+                      }
+                    },
+                    { title: 'Write Permission', data: 'writePermission', defaultContent: '—', width: '110px' },
+                    { title: 'Read Permission', data: 'readPermission', defaultContent: '—', width: '110px' },
+                    { title: 'Separator Value', data: 'separatorValue', defaultContent: '—', className: 'default-hide' }
+                ], 'ado_permissions');
+                cfg.order = [[0, 'asc']];
+                const table = new DataTable('#ado-perms-table', cfg);
+                table.rows.add(namespaces).draw();
+            },
+            error: function (xhr) {
+                bootstrapToast('Permissions', adoParseError(xhr), 'danger');
+            }
+        });
+    }
+</script>
+
+{%endblock content%}
