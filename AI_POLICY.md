@@ -12,6 +12,6 @@ These rules apply to outside contributors. Maintainers are trusted to apply thei
 
 # AI is Welcome Here
 
-GraphSpy was built entirely by humans. The `AI.md` and `AGENTS.md` files in this repository exist to give AI tools enough context to understand the project so that contributors using those tools do not work against the existing structure.
+GraphSpy was built entirely by humans. [`AGENTS.md`](AGENTS.md) and [`DEVELOPMENT.md`](DEVELOPMENT.md) give AI tools enough context to understand the project so that contributors using those tools do not work against the existing structure.
 
 This policy is not anti-AI. It exists because unreviewed, poorly-directed AI output puts an unfair burden on maintainers. Whether AI-assisted or not, contributors are expected to take full ownership of what they submit.

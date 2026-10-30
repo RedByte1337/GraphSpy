@@ -1,6 +1,6 @@
 # Development Guide
 
-This guide covers the technical architecture, request lifecycle, schema model, and extension rules for GraphSpy.
+This guide covers the technical architecture, request lifecycle, schema model, and extension rules for GraphSpy. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the human contribution workflow and [`AI_POLICY.md`](AI_POLICY.md) for acceptable AI use.
 
 ## Technology stack
 
@@ -87,6 +87,93 @@ GraphSpy is an operator tool. Hidden behavior changes are risky.
 * Do not silently remove proxy support, retries, or intentional certificate-verification bypass under proxied operation.
 
 ## Architecture
+
+The initial architecture diagram was generated with [GitDiagram](https://gitdiagram.com/redbyte1337/graphspy) and corrected to match the implementation.
+
+```mermaid
+flowchart TD
+
+subgraph group_operator["Operator machine"]
+  node_operator(("Operator"))
+  node_browser["Web browser"]
+end
+
+subgraph group_server["GraphSpy host"]
+  node_cli["CLI and startup<br/>cli.py"]
+  node_app["Flask application<br/>app.py"]
+
+  subgraph group_web["Web and API layer"]
+    node_pages["Page routes<br/>web/pages.py"]
+    node_api["API blueprints<br/>api/"]
+    node_templates["Jinja2 templates<br/>web/templates/"]
+    node_assets["Static CSS and JavaScript<br/>web/static/"]
+  end
+
+  subgraph group_core["Core workflow modules"]
+    node_tokens["Token workflows<br/>tokens.py"]
+    node_devices["Device code, PRT and<br/>Windows Hello workflows"]
+    node_mfa["MFA workflows<br/>mfa.py"]
+    node_teams["Teams workflows<br/>teams.py"]
+    node_requests["Shared outbound HTTP<br/>requests_.py"]
+  end
+
+  node_db["SQLite lifecycle, schema<br/>and migrations<br/>db/"]
+end
+
+node_sqlite[("Local SQLite databases")]
+node_microsoft["Microsoft identity, Graph,<br/>Outlook and Teams APIs"]
+
+node_operator -->|"starts"| node_cli
+node_operator -->|"operates"| node_browser
+node_cli -->|"creates and serves"| node_app
+node_browser -->|"HTTP or HTTPS requests"| node_app
+node_app -.->|"registers"| node_pages
+node_app -.->|"registers"| node_api
+node_pages -->|"renders"| node_templates
+node_templates -->|"HTML responses"| node_browser
+node_app -->|"serves"| node_assets
+node_assets -->|"browser assets"| node_browser
+node_api -->|"delegates"| node_tokens
+node_api -->|"delegates"| node_devices
+node_api -->|"delegates"| node_mfa
+node_api -->|"delegates"| node_teams
+node_api -->|"custom and Entra requests"| node_requests
+node_tokens -->|"Microsoft requests"| node_requests
+node_devices -->|"Microsoft requests"| node_requests
+node_mfa -->|"Microsoft requests"| node_requests
+node_teams -->|"Microsoft requests"| node_requests
+node_api -->|"raw data access"| node_db
+node_tokens -->|"token persistence"| node_db
+node_devices -->|"key and device persistence"| node_db
+node_mfa -->|"settings and secret persistence"| node_db
+node_teams -->|"settings"| node_db
+node_db -->|"SQL operations"| node_sqlite
+node_requests -->|"OAuth and API calls"| node_microsoft
+
+click node_cli "https://github.com/RedByte1337/GraphSpy/blob/master/src/graphspy/cli.py"
+click node_app "https://github.com/RedByte1337/GraphSpy/blob/master/src/graphspy/app.py"
+click node_pages "https://github.com/RedByte1337/GraphSpy/blob/master/src/graphspy/web/pages.py"
+click node_api "https://github.com/RedByte1337/GraphSpy/tree/master/src/graphspy/api"
+click node_templates "https://github.com/RedByte1337/GraphSpy/tree/master/src/graphspy/web/templates"
+click node_assets "https://github.com/RedByte1337/GraphSpy/tree/master/src/graphspy/web/static"
+click node_tokens "https://github.com/RedByte1337/GraphSpy/blob/master/src/graphspy/core/tokens.py"
+click node_devices "https://github.com/RedByte1337/GraphSpy/tree/master/src/graphspy/core"
+click node_mfa "https://github.com/RedByte1337/GraphSpy/blob/master/src/graphspy/core/mfa.py"
+click node_teams "https://github.com/RedByte1337/GraphSpy/blob/master/src/graphspy/core/teams.py"
+click node_requests "https://github.com/RedByte1337/GraphSpy/blob/master/src/graphspy/core/requests_.py"
+click node_db "https://github.com/RedByte1337/GraphSpy/tree/master/src/graphspy/db"
+
+classDef toneBlue fill:#dbeafe,stroke:#2563eb,stroke-width:1.5px,color:#172554
+classDef toneAmber fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#78350f
+classDef toneMint fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#14532d
+classDef toneIndigo fill:#e0e7ff,stroke:#4f46e5,stroke-width:1.5px,color:#312e81
+classDef toneNeutral fill:#f8fafc,stroke:#334155,stroke-width:1.5px,color:#0f172a
+class node_operator,node_browser toneIndigo
+class node_cli,node_app,node_pages,node_api,node_templates,node_assets toneBlue
+class node_tokens,node_devices,node_mfa,node_teams,node_requests toneMint
+class node_db,node_sqlite toneAmber
+class node_microsoft toneNeutral
+```
 
 GraphSpy has four primary layers.
 
@@ -264,10 +351,6 @@ When service semantics matter, check Microsoft docs before changing behavior.
 * Microsoft Graph site resource: https://learn.microsoft.com/graph/api/resources/site?view=graph-rest-1.0
 * Microsoft Graph authentication methods overview: https://learn.microsoft.com/graph/api/resources/authenticationmethods-overview?view=graph-rest-1.0
 * Microsoft Teams API overview: https://learn.microsoft.com/graph/api/resources/teams-api-overview?view=graph-rest-1.0
-
-## AI Usage
-
-When using AI in any shape or form during development, please make sure to adhere to the [AI policy](AI_POLICY.md)!
 
 ## Definition of Done
 
